@@ -9,7 +9,7 @@
 | 프론트엔드 | React + TypeScript, Vite. 아레나는 Canvas 2D(부족하면 PixiJS) |
 | 백엔드 | Spring Boot 4.1.2, Java 25, Gradle 9.8.2(Kotlin DSL). REST API, WebSocket 게임 서버, 배치를 한 애플리케이션으로 시작 |
 | 실시간 통신 | Spring WebSocket(순수 WebSocket, 바이너리 프레임), 서버 권위. 20Hz 시뮬레이션, 10~15Hz 스냅샷. STOMP 미사용 |
-| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 개발·테스트는 JPA가 스키마를 자동 반영하고(11.3), 운영은 Flyway |
+| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 개발·테스트는 JPA가 스키마를 자동 반영하고(11.3), 운영은 Flyway. 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB |
 | 캐시 | Caffeine(서버 1대). 여러 대가 되면 Redis |
 | 배치 | Spring `@Scheduled` + ShedLock |
 | 이미지 | S3 호환 객체 저장소(초기에는 로컬 디스크 가능), 자동 검열은 ONNX Runtime(Java) |
@@ -20,6 +20,11 @@
 - `<canvas>` 하나 위에 React UI(검색, 내 트렌드 키워드, 랭킹, 카드, 팝업, 채팅, 미니맵)를 겹친다.
 - 스냅샷은 React state에 넣지 않고 렌더링 루프가 쓰는 ref에 둔다. state에는 내 점수, 열린 패널처럼 가끔 바뀌는 값만 둔다.
 - 내 아이콘은 입력을 바로 반영해 미리 움직이고(클라이언트 예측) 서버 위치로 부드럽게 보정한다. 다른 아이콘은 스냅샷 사이를 보간한다.
+- 내 아이콘 떨림 방지(빠른 연타에서도 화면이 떨리지 않게)
+  - 예측은 서버와 같은 규칙으로 움직인다: 같은 최대 속도·감속 거리, 서버 틱(50ms)마다 목표 속도와의 차이를 절반씩 줄이는 가속.
+  - 이동 목표와 방향 입력은 서버로 보내는 순간(클릭은 초당 10회, 방향키는 초당 5회로 묶은 시점)에 예측에도 반영한다. 클릭 물결 효과만 클릭 즉시 보여 준다.
+  - 서버 위치는 왕복 시간만큼 늦은 과거 값이라 매번 당기지 않는다. 움직이는 중에는 최대 속도 × (0.25초 + 왕복 시간) 넘게, 멈춰 있으면 1px 넘게 어긋날 때만 맞춘다. 왕복 시간은 2초마다 `ping`/`pong`으로 잰다.
+  - 맞출 때는 예측 위치만 서버 위치로 옮기고, 화면 위치(카메라)는 순간 이동 없이 약 0.12초에 걸쳐 따라간다. 300px 넘게 어긋나면(입장·순간 이동) 바로 맞춘다.
 - 바닥 격자는 작은 타일을 한 번 그려 반복한다. 화면 밖 아이콘은 그리지 않고 이미지는 한 번 받아 캐시한다.
 - 서버 데이터는 TanStack Query, 전역 UI 상태는 Zustand(후보, 버전 고정).
 - 다국어: react-i18next로 언어별 JSON. 빠진 번역은 영어(영어 지원 전에는 한국어)로 대체, 빌드 때 누락 키 검사. DB의 이름(칭호, 키워드·사용자 상태, 나라)은 한글 하나만 두고 다른 언어는 키로 찾는다(칭호·키워드 상태는 ID, 예: `titles.7.name`, 나라는 `countries.code`). ID는 초기 데이터를 넣는 순서로 정해지므로 순서를 바꾸거나 지우지 않는다(안 쓰는 칭호는 `enabled`를 끈다). 서버 오류는 코드와 파라미터로만 받는다.
@@ -107,7 +112,7 @@ WHERE p.id IN (/* 500명 */)
 | 대상 | 한도 |
 |---|---|
 | API 전반 | 초당 5회 수준(정상 플레이에서 걸리지 않게) |
-| 이동 명령 | 초당 5회 |
+| 이동 명령 | 클릭 이동 초당 10회, 방향키 초당 5회(클라이언트 기준). 서버는 종류별로 따로 세고, 네트워크에서 간격이 좁혀져 도착하는 경우를 감안해 클릭 12회·방향키 10회까지 받는다. `ping`은 세지 않는다 |
 | 채팅 | 1초에 1회 + IP 단위 |
 | 정보 팝업 조회 | 계정당 초당 2회, 결과 5초 캐시 |
 | 댓글 투표 | 사용자당 분당 20회, 같은 댓글 분당 5회(`vote:comment:{user}:{comment}`) |
@@ -131,11 +136,12 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/keywords/{id}/comments?page=&size=` | 최신순, `size` 최대 50 |
 | `GET /api/keywords/{id}/activity?range=24h\|7d\|30d\|180d` | 검색 수·`+` 수·가진 사람 수 증분(24시간은 시간별, 나머지는 현지 하루별)과 누적값(1분 캐시). 이번 시간은 메모리 카운터를 합쳐 "집계 중"으로 표시 |
 | `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
+| `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 팝업 공지 목록(최대 10), 본 기록(멱등) |
 | `GET /api/me/score-history?country=&range=24h\|7d\|30d\|all` | 내 점수 추이(1분 캐시) |
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404 |
 | `GET /api/admin/trends?country=&state=&source=&q=&sort=&page=&size=` | 관리자 트렌드 키워드 목록(`ROLE_ADMIN`, 1분 캐시, 13.6) |
-| `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제) |
+| `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
 - 투표 토글: 없음 → INSERT, 같은 값 → DELETE, 반대 값 → UPDATE. 조건부 쿼리의 영향 행 수가 1일 때만 `comments.like_count`·`dislike_count`를 바꾸고, 같은 때 작성자의 `comment_score`도 같이 바꾼다(추천 +1, 비추천 −1, 취소·변경은 반대로, `GREATEST(값, 0)`으로 0 아래 방지). 첫 투표 경합은 UNIQUE 오류 후 다시 읽어 처리한다.
 
@@ -328,7 +334,8 @@ record TrendBox(
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 22개를 번호 순서대로 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
-| `guide_categories` | 4.17의 초기 카테고리 7개 |
+| `guide_categories`, `guides` | 4.17의 초기 카테고리 6개와 놀이 방법 글(각 테이블이 비어 있을 때만) |
+| `users` | 공지·가이드 작성자로 쓰는 운영자 계정(`role` = ADMIN, 로그인 수단 없음) 1개, 없을 때만 |
 | `blocked_nicknames`, `blocked_terms` | 기본 금지어 소수(비어 있어도 동작) |
 
 ## 12. 빌드와 배포
@@ -352,6 +359,6 @@ java {
 - 주요 의존성: spring-boot-starter-webmvc(예전 이름 starter-web은 폐기 예정), starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, BigQuery 클라이언트, ONNX Runtime, Testcontainers(MySQL).
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
-- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 H2 메모리다.
+- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `config/application-local.yml`에 둔다.
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.

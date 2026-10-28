@@ -46,10 +46,12 @@ spring:
   config:
     activate:
       on-profile: local
+  # 로컬 개발 DB: 이 PC(우분투)의 MariaDB, DB 이름 trendist.
+  # 비밀번호는 git에 올리지 않는 config/application-local.yml(또는 환경 변수 TRENDIST_DB_PASSWORD)에 둔다.
   datasource:
-    url: jdbc:h2:mem:trendist;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE
-    username: sa
-    password: ""
+    url: ${TRENDIST_DB_URL:jdbc:mariadb://localhost:3306/trendist}
+    username: ${TRENDIST_DB_USER:trendist}
+    password: ${TRENDIST_DB_PASSWORD:}
 
 ---
 spring:

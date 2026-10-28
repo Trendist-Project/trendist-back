@@ -3,3 +3,5 @@ build
 *.log
 .java-home
 .idea/
+# 로컬 비밀값(DB 비밀번호 등)
+/config/

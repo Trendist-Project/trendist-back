@@ -3,6 +3,10 @@ package com.trendist.seed;
 import com.trendist.common.code.CodeTables;
 import com.trendist.country.entity.Country;
 import com.trendist.country.repository.CountryRepository;
+import com.trendist.guide.entity.Guide;
+import com.trendist.guide.entity.GuideCategory;
+import com.trendist.guide.repository.GuideCategoryRepository;
+import com.trendist.guide.repository.GuideRepository;
 import com.trendist.keyword.entity.DataSource;
 import com.trendist.keyword.entity.KeywordState;
 import com.trendist.keyword.repository.DataSourceRepository;
@@ -14,7 +18,9 @@ import com.trendist.setting.repository.SettingRepository;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.title.entity.Title;
 import com.trendist.title.repository.TitleRepository;
+import com.trendist.user.entity.User;
 import com.trendist.user.entity.UserState;
+import com.trendist.user.repository.UserRepository;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 시작할 때마다 초기 데이터를 채운다(11.3).
- * 코드가 이름으로 찾는 테이블은 없는 행만, 운영에서 고치는 테이블(titles)은 비어 있을 때만 넣는다.
+ * 코드가 이름으로 찾는 테이블은 없는 행만, 운영에서 고치는 테이블(titles, guide_categories, guides)은 비어 있을 때만 넣는다.
  */
 @Component
 @Order(0)
@@ -44,6 +50,9 @@ public class DataSeeder implements ApplicationRunner {
     private final SettingRepository settings;
     private final LevelRepository levels;
     private final TitleRepository titles;
+    private final GuideCategoryRepository guideCategories;
+    private final GuideRepository guides;
+    private final UserRepository users;
     private final CodeTables codeTables;
 
     @Override
@@ -100,7 +109,39 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         codeTables.clear();
+        added += seedGuides();
         log.info("seed done, {} rows added", added);
+    }
+
+    /** 가이드 카테고리와 글(4.17). 운영에서 고치는 데이터라 각 테이블이 비어 있을 때만 넣는다. */
+    private int seedGuides() {
+        int added = 0;
+        if (guideCategories.count() == 0) {
+            int order = 1;
+            for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
+                guideCategories.save(new GuideCategory(c.code(), c.name(), c.displayType(), order++));
+                added++;
+            }
+        }
+        if (guides.count() == 0) {
+            User author = operator();
+            for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
+                GuideCategory category = guideCategories.findByCodeAndEnabledTrue(c.code()).orElse(null);
+                if (category == null) continue; // 관리자가 지우거나 끈 카테고리
+                int order = 1;
+                for (GuideSeed.Article a : c.articles()) {
+                    guides.save(new Guide(category, author, a.title(), a.body(), order++));
+                    added++;
+                }
+            }
+        }
+        return added;
+    }
+
+    /** 공지·가이드 작성자로 쓰는 운영자 계정. 없으면 만든다. */
+    private User operator() {
+        return users.findFirstByRoleOrderByIdAsc(User.ROLE_ADMIN)
+                .orElseGet(() -> users.save(User.operator(userStates.findByName(CodeTables.USER_NORMAL).orElseThrow())));
     }
 
     /** 4.9의 기본 곡선: 2~10레벨은 표, 11~100레벨은 100 × (레벨/10)². */

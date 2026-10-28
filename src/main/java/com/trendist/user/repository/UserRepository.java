@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByVisitorId(String visitorId);
 
+    Optional<User> findFirstByRoleOrderByIdAsc(String role);
+
     /** 금지·탈퇴 확인용으로 상태 번호와 금지 만료 시각만 읽는다. */
     @Query("select new com.trendist.user.repository.UserRepository$AccountStatus(u.userState.id, u.bannedUntil) from User u where u.id = :id")
     Optional<AccountStatus> findStatus(@Param("id") Long id);

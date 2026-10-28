@@ -30,8 +30,9 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok")
     testAnnotationProcessor("org.projectlombok:lombok")
 
-    runtimeOnly("com.h2database:h2")
-    runtimeOnly("com.mysql:mysql-connector-j")
+    runtimeOnly("org.mariadb.jdbc:mariadb-java-client") // 로컬 개발 DB(우분투 MariaDB)
+    runtimeOnly("com.mysql:mysql-connector-j")         // mysql 프로필(MySQL 8)
+    testRuntimeOnly("com.h2database:h2")               // 테스트는 H2 메모리 DB
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

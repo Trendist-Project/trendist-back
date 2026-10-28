@@ -10,14 +10,26 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 | Java | 25 (Gradle 툴체인과 Gradle 실행 JVM 모두 25) |
 | Spring Boot | 4.1.2 |
 | Gradle | 9.8.2 (Wrapper) |
-| DB | 로컬은 H2 메모리(MySQL 모드), `mysql` 프로필은 MySQL 8 |
+| DB | 로컬은 이 PC의 MariaDB 10.11(DB `trendist`), 테스트는 H2 메모리, `mysql` 프로필은 MySQL 8 |
 
+- 로컬 DB(처음 한 번): MariaDB에 DB `trendist`를 만들고, 이 PC의 DB 계정을 `config/application-local.yml`에 적는다(git 제외 폴더, 계정 정보는 저장소에 올리지 않는다).
+  ```sql
+  CREATE DATABASE trendist CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  ```
+  ```yaml
+  # config/application-local.yml
+  spring:
+    datasource:
+      username: 계정
+      password: "비밀번호"
+  ```
+  테이블은 백엔드가 시작할 때 JPA가 만들고, 초기 데이터는 시더가 넣는다.
 - 시스템 `JAVA_HOME`이 17 미만이면 프로젝트 폴더에 `.java-home` 파일을 만들고 JDK 25 경로를 한 줄 적는다(git 제외 파일). `gradlew`가 이 경로로 Gradle을 띄운다.
 - IntelliJ는 **Settings → Build Tools → Gradle → Gradle JVM**을 `temurin-25 (WSL)`로 둔다. `gradle/gradle-daemon-jvm.properties`(데몬 JVM 지정)는 WSL에서 IntelliJ가 JDK를 찾지 못해 동기화가 실패하므로 쓰지 않는다.
 
 ```bash
 ./gradlew test                                   # 테스트
-./gradlew bootRun                                # 로컬 실행(H2, 포트 8081)
+./gradlew bootRun                                # 로컬 실행(MariaDB, 포트 8081)
 ./gradlew bootRun --args='--spring.profiles.active=mysql'
 ./gradlew bootRun --args='--spring.profiles.active=local,reset'   # 로컬 DB 테이블을 모두 지우고 다시 만든다
 ```
@@ -31,7 +43,7 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 | 프론트(Vite) | 8080 | `trendist-front`에서 `npm run dev` |
 
 - 백엔드 코드를 고치면 백엔드를 다시 띄운다. 프론트는 저장하면 바로 반영된다.
-- 로컬 DB는 H2 메모리라 백엔드를 다시 띄우면 데이터가 비워진다(게스트도 새로 시작).
+- 로컬 DB는 MariaDB라 백엔드를 다시 띄워도 데이터가 남는다. 처음부터 다시 하려면 `local,reset` 프로필로 띄운다.
 - 백엔드 포트는 환경 변수 `SERVER_PORT`로 바꿀 수 있다. 바꾸면 프론트 `vite.config.ts`의 `BACKEND`도 맞춘다.
 
 ## 작업 방식

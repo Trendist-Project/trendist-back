@@ -6,6 +6,7 @@ import com.trendist.auth.service.JwtService;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -31,6 +32,8 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/api/auth/**").permitAll()
+                        // 공지와 가이드는 메인 화면에서도 보므로 로그인 없이 읽을 수 있다(3.1)
+                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/guide/**").permitAll()
                         .requestMatchers("/ws").permitAll() // WebSocket은 연결 직후 첫 메시지로 인증한다
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())

@@ -15,6 +15,8 @@ import lombok.NoArgsConstructor;
         @UniqueConstraint(name = "uk_users_visitor_id", columnNames = "visitor_id"),
         @UniqueConstraint(name = "uk_users_oauth", columnNames = {"oauth_type", "oauth_id"})})
 public class User extends BaseTimeEntity {
+    public static final String ROLE_ADMIN = "ADMIN";
+
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "country_id") private Country country;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_state_id", nullable = false) private UserState userState;
     @Column(name = "visitor_id", length = 51) private String visitorId;
@@ -31,6 +33,17 @@ public class User extends BaseTimeEntity {
         User u = new User();
         u.visitorId = visitorId;
         u.userState = state;
+        return u;
+    }
+
+    /**
+     * 운영자 계정. 공지·가이드의 작성자(notices.user_id, guides.user_id)로 쓴다.
+     * 방문자 ID도 OAuth도 없어서 로그인할 수 없고, 관리자 로그인은 관리자 기능과 함께 붙인다.
+     */
+    public static User operator(UserState state) {
+        User u = new User();
+        u.userState = state;
+        u.role = ROLE_ADMIN;
         return u;
     }
 

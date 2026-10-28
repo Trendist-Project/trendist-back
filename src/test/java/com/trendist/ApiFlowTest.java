@@ -13,12 +13,14 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 class ApiFlowTest {
     @Autowired MockMvc mvc;
@@ -45,6 +47,19 @@ class ApiFlowTest {
         assertThat(formula.trendValue(true, 1000, 2)).isEqualByComparingTo("100.00");
         assertThat(formula.trendValue(true, 3, 1).doubleValue()).isBetween(11.0, 11.2);
         assertThat(formula.trendValue(false, 50, 2)).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void guideAndNoticesAreReadableWithoutLogin() throws Exception {
+        // 초기 가이드(4.17)가 들어 있고, 메인 화면에서도 보도록 로그인 없이 읽힌다
+        mvc.perform(get("/api/guide/categories")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("getting-started"))
+                .andExpect(jsonPath("$[?(@.code == 'faq')].displayType").value("FAQ"));
+        mvc.perform(get("/api/guide/categories/faq/articles")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").isNotEmpty())
+                .andExpect(jsonPath("$[0].body").isNotEmpty());
+        mvc.perform(get("/api/guide/categories/nope/articles")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/notices")).andExpect(status().isOk());
     }
 
     @Test

@@ -24,8 +24,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}
- * 서버 → 클라이언트: 바이너리 스냅샷, JSON(welcome, tuning, roster, score, lost)
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}
+ * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong)
  */
 @Component
 @RequiredArgsConstructor
@@ -50,7 +50,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         var safe = new ConcurrentWebSocketSessionDecorator(session, 2000, 256 * 1024,
                 ConcurrentWebSocketSessionDecorator.OverflowStrategy.DROP);
         session.getAttributes().put(ATTR_SAFE, safe);
-        session.getAttributes().put(ATTR_INPUTS, new long[]{0, 0}); // [윈도 시작 ms, 횟수]
+        session.getAttributes().put(ATTR_INPUTS, new ConcurrentHashMap<String, long[]>()); // 메시지 종류 → [윈도 시작 ms, 횟수]
         timeouts.schedule(() -> {
             if (session.isOpen() && !session.getAttributes().containsKey(ATTR_MEMBER)) close(session, CloseStatus.POLICY_VIOLATION);
         }, 5, TimeUnit.SECONDS);
@@ -66,7 +66,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
             if ("auth".equals(type)) authenticate(session, node.path("token").asString(""));
             return;
         }
-        if (!allowInput(session)) return;
+        if ("ping".equals(type)) {
+            // 왕복 시간 측정용. 클라이언트가 보낸 시각을 그대로 돌려준다. 이동 명령 빈도 제한에는 넣지 않는다
+            double t = node.path("t").asDouble(0);
+            rooms.sendText(member, Map.of("type", "pong", "t", Double.isFinite(t) ? t : 0));
+            return;
+        }
+        if (!allowInput(session, type)) return;
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
         switch (type) {
             case "input" -> {
@@ -108,13 +114,21 @@ public class GameSocketHandler extends TextWebSocketHandler {
         });
     }
 
-    /** 이동 명령 빈도 제한: 초당 10회(방향키 누름·뗌 포함). 넘으면 무시한다(9.5). */
-    private boolean allowInput(WebSocketSession session) {
-        long[] w = (long[]) session.getAttributes().get(ATTR_INPUTS);
+    /**
+     * 이동 명령 빈도 제한(9.5). 종류별로 1초에 받는 횟수를 따로 센다. 넘으면 무시한다.
+     * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 초당 5회까지 보낸다. 서버는 네트워크에서 간격이 좁혀져
+     * 도착하는 경우를 감안해 조금 더 받는다. 마지막 클릭이 버려지면 예측과 서버의 목표가 달라져 화면이 보정되기 때문이다.
+     */
+    private boolean allowInput(WebSocketSession session, String type) {
+        String key = "move".equals(type) || "input".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
+        int limit = "move".equals(key) ? 12 : 10;
+        @SuppressWarnings("unchecked")
+        Map<String, long[]> windows = (Map<String, long[]>) session.getAttributes().get(ATTR_INPUTS);
+        long[] w = windows.computeIfAbsent(key, k -> new long[]{0, 0});
         long now = System.currentTimeMillis();
         synchronized (w) {
             if (now - w[0] >= 1000) { w[0] = now; w[1] = 0; }
-            return ++w[1] <= 10;
+            return ++w[1] <= limit;
         }
     }
 
