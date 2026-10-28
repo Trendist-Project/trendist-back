@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 /**
  * 키워드 정규화(4.18): NFKC → 소문자 → 모든 공백 제거. 같은 단어 판정 키로만 쓰고 화면에는 입력 표기를 쓴다.
- * 등록 조건(4.6): 2~20자, 허용 문자, 개인정보 패턴 금지, 정규화 뒤 재검사.
+ * 등록 조건(4.6): 1~20자(최소 길이 제한 없음), 허용 문자, 개인정보 패턴 금지, 정규화 뒤 재검사.
  */
 public final class KeywordNormalizer {
     private static final Pattern ALLOWED = Pattern.compile(
@@ -32,11 +32,12 @@ public final class KeywordNormalizer {
     /** 검사를 통과하면 정규화 값을 돌려준다. */
     public static String validate(String display) {
         int len = display.codePointCount(0, display.length());
-        if (len < 2 || len > 20) throw ApiException.badRequest("KEYWORD_LENGTH", "키워드는 2~20자로 입력해 주세요");
+        if (len == 0) throw ApiException.badRequest("KEYWORD_EMPTY", "키워드를 입력해 주세요");
+        if (len > 20) throw ApiException.badRequest("KEYWORD_LENGTH", "키워드는 20자 이하로 입력해 주세요");
         String nfkc = Normalizer.normalize(display, Normalizer.Form.NFKC);
         if (!ALLOWED.matcher(nfkc).matches()) throw ApiException.badRequest("KEYWORD_CHARS", "쓸 수 없는 문자가 있어요");
         String normalized = normalize(display);
-        if (normalized.codePointCount(0, normalized.length()) < 2 || normalized.length() > 100
+        if (normalized.isEmpty() || normalized.length() > 100
                 || !ALLOWED.matcher(normalized).matches()) {
             throw ApiException.badRequest("KEYWORD_CHARS", "쓸 수 없는 문자가 있어요");
         }

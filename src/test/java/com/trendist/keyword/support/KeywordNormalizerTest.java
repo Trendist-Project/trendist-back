@@ -16,10 +16,14 @@ class KeywordNormalizerTest {
 
     @Test
     void rejectsInvalidInput() {
-        assertThatThrownBy(() -> KeywordNormalizer.validate("a")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> KeywordNormalizer.validate("")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> KeywordNormalizer.validate("가".repeat(21))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> KeywordNormalizer.validate("www.test")).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> KeywordNormalizer.validate("01012345678")).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> KeywordNormalizer.validate("양쯔<깐루")).isInstanceOf(ApiException.class);
         assertThat(KeywordNormalizer.validate("양쯔깐루")).isEqualTo("양쯔깐루");
+        // 최소 길이 제한은 없다: 한 글자 키워드도 된다
+        assertThat(KeywordNormalizer.validate("a")).isEqualTo("a");
+        assertThat(KeywordNormalizer.validate("밈")).isEqualTo("밈");
     }
 }
