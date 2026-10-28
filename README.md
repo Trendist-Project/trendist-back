@@ -17,10 +17,22 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 
 ```bash
 ./gradlew test                                   # 테스트
-./gradlew bootRun                                # 로컬 실행(H2, http://localhost:8080)
+./gradlew bootRun                                # 로컬 실행(H2, 포트 8081)
 ./gradlew bootRun --args='--spring.profiles.active=mysql'
 ./gradlew bootRun --args='--spring.profiles.active=local,reset'   # 로컬 DB 테이블을 모두 지우고 다시 만든다
 ```
+
+### 로컬에서 띄워 보기
+브라우저는 항상 **http://localhost:8080** 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고, `/api`와 `/ws`는 백엔드(8081)로 넘긴다. 운영의 Nginx와 같은 구조다.
+
+| 대상 | 포트 | 실행 |
+|---|---|---|
+| 백엔드(Spring Boot) | 8081 | `trendist-back`에서 `./gradlew bootRun` |
+| 프론트(Vite) | 8080 | `trendist-front`에서 `npm run dev` |
+
+- 백엔드 코드를 고치면 백엔드를 다시 띄운다. 프론트는 저장하면 바로 반영된다.
+- 로컬 DB는 H2 메모리라 백엔드를 다시 띄우면 데이터가 비워진다(게스트도 새로 시작).
+- 백엔드 포트는 환경 변수 `SERVER_PORT`로 바꿀 수 있다. 바꾸면 프론트 `vite.config.ts`의 `BACKEND`도 맞춘다.
 
 ## 작업 방식
 

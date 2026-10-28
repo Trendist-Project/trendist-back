@@ -18,7 +18,8 @@ spring:
     enabled: false
 
 server:
-  port: 8080
+  # 로컬 개발에서는 프론트 개발 서버(http://localhost:8080)가 /api, /ws를 이 포트로 넘긴다
+  port: ${SERVER_PORT:8081}
 
 trendist:
   jwt:
@@ -28,7 +29,7 @@ trendist:
   cookie:
     secure: false
   ws:
-    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+    allowed-origins: http://localhost:8080,http://127.0.0.1:8080
   # 외부 트렌드 소스(네이버 데이터랩)를 붙이기 전까지 쓰는 개발용 값. 이 목록의 키워드는 외부 관심도가 있는 것으로 본다.
   dev-trends:
     enabled: true
