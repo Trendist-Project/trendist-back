@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,16 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 /** 게스트 시작과 세션 이어 가기(9.3). 방문자 ID 쿠키는 여기서만 읽고 쓴다. */
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthController {
     static final String VISITOR_COOKIE = "tv_id";
 
     private final AuthService auth;
     private final AppProperties props;
-
-    public AuthController(AuthService auth, AppProperties props) {
-        this.auth = auth;
-        this.props = props;
-    }
 
     /** [시작]: 유효한 방문자 ID 쿠키가 있으면 그 게스트를, 없으면 새 게스트를 만든다. */
     @PostMapping("/guest")

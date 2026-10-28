@@ -5,7 +5,12 @@ import com.trendist.country.entity.Country;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "keywords",
         uniqueConstraints = @UniqueConstraint(name = "uk_keywords_country_normalized", columnNames = {"country_id", "normalized"}),
@@ -24,23 +29,10 @@ public class Keyword extends BaseTimeEntity {
     @Column(name = "inactive_at", columnDefinition = "DATETIME(6)") private Instant inactiveAt;
     @Column(name = "banned_at", columnDefinition = "DATETIME(6)") private Instant bannedAt;
 
-    protected Keyword() {}
-
     public Keyword(Country country, DataSource source, KeywordState state, String text, String normalized) {
         this.country = country; this.dataSource = source; this.keywordState = state;
         this.text = text; this.normalized = normalized;
     }
-
-    public Country getCountry() { return country; }
-    public DataSource getDataSource() { return dataSource; }
-    public KeywordState getKeywordState() { return keywordState; }
-    public String getText() { return text; }
-    public String getNormalized() { return normalized; }
-    public BigDecimal getTrendValue() { return trendValue; }
-    public long getSearchCount() { return searchCount; }
-    public long getTotalPlusCount() { return totalPlusCount; }
-    public int getHolderCount() { return holderCount; }
-    public Instant getActivatedAt() { return activatedAt; }
 
     public void setDataSource(DataSource dataSource) { this.dataSource = dataSource; }
     public void setTrendValue(BigDecimal trendValue) { this.trendValue = trendValue; }

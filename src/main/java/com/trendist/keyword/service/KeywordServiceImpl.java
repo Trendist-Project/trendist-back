@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** 검색, +, 내 트렌드 키워드, 만료, 충돌로 잃기(4.4~4.8, 9.4). */
 @Service
+@RequiredArgsConstructor
 public class KeywordServiceImpl implements KeywordService {
     private final KeywordRepository keywords;
     private final PlayerKeywordRepository playerKeywords;
@@ -49,15 +51,6 @@ public class KeywordServiceImpl implements KeywordService {
 
     /** 트렌드 값이 바뀐 키워드. 1분 잡이 보유자 점수를 DB에서 다시 합산한다(9.4). */
     private final Set<Long> dirtyKeywords = ConcurrentHashMap.newKeySet();
-
-    public KeywordServiceImpl(KeywordRepository keywords, PlayerKeywordRepository playerKeywords, PlayerRepository players,
-                          PlayerService playerService, TrendFormula formula, SettingService settings, CodeTables codes,
-                          List<ExternalTrendSource> sources, SearchCounter searchCounter,
-                          ApplicationEventPublisher events, Clock clock) {
-        this.keywords = keywords; this.playerKeywords = playerKeywords; this.players = players;
-        this.playerService = playerService; this.formula = formula; this.settings = settings; this.codes = codes;
-        this.sources = sources; this.searchCounter = searchCounter; this.events = events; this.clock = clock;
-    }
 
     // ---------------------------------------------------------------- 검색
 

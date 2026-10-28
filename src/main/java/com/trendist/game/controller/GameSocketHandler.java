@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.*;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
  * 서버 → 클라이언트: 바이너리 스냅샷, JSON(welcome, tuning, roster, score, lost)
  */
 @Component
+@RequiredArgsConstructor
 public class GameSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(GameSocketHandler.class);
     private static final String ATTR_MEMBER = "member";
@@ -41,12 +43,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final RoomManager rooms;
     private final ObjectMapper json;
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ws-auth-timeout"));
-
-    public GameSocketHandler(JwtService jwt, AccountGuard guard, PlayerService playerService,
-                             KeywordService keywordService, RoomManager rooms, ObjectMapper json) {
-        this.jwt = jwt; this.guard = guard; this.playerService = playerService;
-        this.keywordService = keywordService; this.rooms = rooms; this.json = json;
-    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {

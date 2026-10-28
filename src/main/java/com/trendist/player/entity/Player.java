@@ -6,8 +6,13 @@ import com.trendist.user.entity.User;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /** 플레이어 = 사용자 × 나라. current_score는 실시간 점수의 DB 값(4.8). */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "players",
         uniqueConstraints = @UniqueConstraint(name = "uk_players", columnNames = {"user_id", "country_id"}),
@@ -26,21 +31,9 @@ public class Player extends BaseTimeEntity {
     @Column(name = "comment_score", nullable = false) private int commentScore;
     @Column(name = "last_played_at", columnDefinition = "DATETIME(6)") private Instant lastPlayedAt;
 
-    protected Player() {}
-
     public Player(User user, Country country, String nickname) {
         this.user = user; this.country = country; this.nickname = nickname;
     }
-
-    public User getUser() { return user; }
-    public Country getCountry() { return country; }
-    public String getNickname() { return nickname; }
-    public long getExp() { return exp; }
-    public int getLevel() { return level; }
-    public BigDecimal getCurrentScore() { return currentScore; }
-    public int getHoldCount() { return holdCount; }
-    public int getTotalPlusCount() { return totalPlusCount; }
-    public int getCommentScore() { return commentScore; }
 
     public void addExp(long amount) { this.exp += amount; }
     public void setLevel(int level) { this.level = level; }

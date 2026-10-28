@@ -4,18 +4,16 @@ import com.trendist.auth.security.AuthUser;
 import com.trendist.player.dto.PlayerDtos;
 import com.trendist.player.service.PlayerService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class PlayerController {
     private final PlayerService playerService;
-
-    public PlayerController(PlayerService playerService) {
-        this.playerService = playerService;
-    }
 
     @GetMapping("/me")
     @Transactional(readOnly = true)

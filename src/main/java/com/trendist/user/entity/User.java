@@ -4,7 +4,12 @@ import com.trendist.common.entity.BaseTimeEntity;
 import com.trendist.country.entity.Country;
 import jakarta.persistence.*;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "users", uniqueConstraints = {
         @UniqueConstraint(name = "uk_users_visitor_id", columnNames = "visitor_id"),
@@ -22,8 +27,6 @@ public class User extends BaseTimeEntity {
     @Column(name = "upload_banned_until", columnDefinition = "DATETIME(6)") private Instant uploadBannedUntil;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
 
-    protected User() {}
-
     public static User guest(String visitorId, UserState state) {
         User u = new User();
         u.visitorId = visitorId;
@@ -32,10 +35,5 @@ public class User extends BaseTimeEntity {
     }
 
     public boolean isBanned(Instant now) { return bannedUntil != null && bannedUntil.isAfter(now); }
-    public UserState getUserState() { return userState; }
-    public String getVisitorId() { return visitorId; }
-    public String getOauthId() { return oauthId; }
-    public String getRole() { return role; }
-    public Country getCountry() { return country; }
     public void setCountry(Country country) { this.country = country; }
 }

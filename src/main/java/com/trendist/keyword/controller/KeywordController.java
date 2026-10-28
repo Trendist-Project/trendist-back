@@ -5,15 +5,15 @@ import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.service.KeywordService;
 import jakarta.validation.Valid;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class KeywordController {
     private final KeywordService service;
-
-    public KeywordController(KeywordService service) { this.service = service; }
 
     @GetMapping("/keywords/search")
     public KeywordDtos.SearchResult search(@AuthenticationPrincipal AuthUser user, @RequestParam String q) {

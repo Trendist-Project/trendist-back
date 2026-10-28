@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** 배치 잡(9.7). 서버 1대 기준이라 ShedLock은 아직 붙이지 않았다. */
 @Component
+@RequiredArgsConstructor
 public class KeywordJobs {
     private static final Logger log = LoggerFactory.getLogger(KeywordJobs.class);
 
@@ -32,13 +34,6 @@ public class KeywordJobs {
     private final SearchCounter searchCounter;
     private final TransactionTemplate tx;
     private final Clock clock;
-
-    public KeywordJobs(KeywordService keywordService, PlayerService playerService, PlayerKeywordRepository playerKeywords,
-                       PlayerRepository players, KeywordRepository keywords, SearchCounter searchCounter,
-                       TransactionTemplate tx, Clock clock) {
-        this.keywordService = keywordService; this.playerService = playerService; this.playerKeywords = playerKeywords;
-        this.players = players; this.keywords = keywords; this.searchCounter = searchCounter; this.tx = tx; this.clock = clock;
-    }
 
     /** 1분: 만료된 + 삭제, 트렌드 값이 바뀐 키워드의 보유자 점수 재합산. */
     @Scheduled(fixedDelay = 60_000, initialDelay = 10_000)

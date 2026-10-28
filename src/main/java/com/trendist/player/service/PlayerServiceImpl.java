@@ -18,11 +18,13 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class PlayerServiceImpl implements PlayerService {
     private final PlayerRepository players;
     private final UserRepository users;
@@ -33,13 +35,6 @@ public class PlayerServiceImpl implements PlayerService {
     private final CodeTables codes;
     private final ApplicationEventPublisher events;
     private final Clock clock;
-
-    public PlayerServiceImpl(PlayerRepository players, UserRepository users, CountryService countries,
-                             PlayerKeywordRepository playerKeywords, LevelService levels, TrendFormula formula,
-                             CodeTables codes, ApplicationEventPublisher events, Clock clock) {
-        this.players = players; this.users = users; this.countries = countries; this.playerKeywords = playerKeywords;
-        this.levels = levels; this.formula = formula; this.codes = codes; this.events = events; this.clock = clock;
-    }
 
     @Override
     @Transactional(readOnly = true)

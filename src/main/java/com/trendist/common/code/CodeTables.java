@@ -7,10 +7,12 @@ import com.trendist.keyword.repository.KeywordStateRepository;
 import com.trendist.user.entity.UserState;
 import com.trendist.user.repository.UserStateRepository;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /** 코드 테이블은 이름으로 찾아 번호를 메모리에 둔다(4.7, 11.1). 시더가 먼저 채운다. */
 @Component
+@RequiredArgsConstructor
 public class CodeTables {
     public static final String USER_NORMAL = "정상";
     public static final String USER_WITHDRAWN = "탈퇴";
@@ -22,12 +24,6 @@ public class CodeTables {
     private final KeywordStateRepository keywordStates;
     private final DataSourceRepository dataSources;
     private final ConcurrentHashMap<String, Object> cache = new ConcurrentHashMap<>();
-
-    public CodeTables(UserStateRepository userStates, KeywordStateRepository keywordStates, DataSourceRepository dataSources) {
-        this.userStates = userStates;
-        this.keywordStates = keywordStates;
-        this.dataSources = dataSources;
-    }
 
     public UserState userState(String name) {
         return (UserState) cache.computeIfAbsent("us:" + name,

@@ -18,6 +18,7 @@ import com.trendist.user.entity.UserState;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 @Order(0)
+@RequiredArgsConstructor
 public class DataSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
@@ -43,14 +45,6 @@ public class DataSeeder implements ApplicationRunner {
     private final LevelRepository levels;
     private final TitleRepository titles;
     private final CodeTables codeTables;
-
-    public DataSeeder(CountryRepository countries, UserStateRepository userStates, KeywordStateRepository keywordStates,
-                      DataSourceRepository dataSources, SettingRepository settings, LevelRepository levels,
-                      TitleRepository titles, CodeTables codeTables) {
-        this.countries = countries; this.userStates = userStates; this.keywordStates = keywordStates;
-        this.dataSources = dataSources; this.settings = settings; this.levels = levels; this.titles = titles;
-        this.codeTables = codeTables;
-    }
 
     @Override
     @Transactional

@@ -25,6 +25,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
+    testCompileOnly("org.projectlombok:lombok")
+    testAnnotationProcessor("org.projectlombok:lombok")
+
     runtimeOnly("com.h2database:h2")
     runtimeOnly("com.mysql:mysql-connector-j")
 

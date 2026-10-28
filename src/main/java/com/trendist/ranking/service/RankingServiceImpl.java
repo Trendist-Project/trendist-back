@@ -12,11 +12,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RankingServiceImpl implements RankingService {
     private static final int TOP = 10;
     private static final int CANDIDATES = 50; // DB 상위 후보. 접속 중인 사람의 실시간 점수로 다시 정렬한다
@@ -24,12 +26,6 @@ public class RankingServiceImpl implements RankingService {
     private final CountryService countries;
     private final PlayerRepository players;
     private final RoomManager rooms;
-
-    public RankingServiceImpl(CountryService countries, PlayerRepository players, RoomManager rooms) {
-        this.countries = countries;
-        this.players = players;
-        this.rooms = rooms;
-    }
 
     @Override
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,10 +14,9 @@ import org.springframework.stereotype.Component;
  * 키워드 점수 = trend_value × 환산 계수
  */
 @Component
+@RequiredArgsConstructor
 public class TrendFormula {
     private final SettingService settings;
-
-    public TrendFormula(SettingService settings) { this.settings = settings; }
 
     public BigDecimal trendValue(boolean active, int holders, double weight) {
         if (!active) return BigDecimal.ZERO.setScale(2);

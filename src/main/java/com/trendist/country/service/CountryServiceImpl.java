@@ -3,13 +3,13 @@ package com.trendist.country.service;
 import com.trendist.common.exception.ApiException;
 import com.trendist.country.entity.Country;
 import com.trendist.country.repository.CountryRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class CountryServiceImpl implements CountryService {
     private final CountryRepository countries;
-
-    public CountryServiceImpl(CountryRepository countries) { this.countries = countries; }
 
     @Override
     public Country requireOpen(String code) {

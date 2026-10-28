@@ -3,8 +3,13 @@ package com.trendist.keyword.entity;
 import com.trendist.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /** 데이터 소스와 반영값(가중치 0~2, 10.3). */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "data_sources", uniqueConstraints = @UniqueConstraint(name = "uk_data_sources_name", columnNames = "name"))
 public class DataSource extends BaseTimeEntity {
@@ -15,10 +20,7 @@ public class DataSource extends BaseTimeEntity {
     @Column(nullable = false, length = 50) private String name;
     @Column(nullable = false, precision = 6, scale = 3) private BigDecimal weight;
 
-    protected DataSource() {}
     public DataSource(String name, BigDecimal weight) { this.name = name; this.weight = weight; }
 
-    public String getName() { return name; }
-    public BigDecimal getWeight() { return weight; }
     public boolean isInternal() { return INTERNAL.equals(name); }
 }

@@ -8,20 +8,18 @@ import com.trendist.user.entity.User;
 import com.trendist.user.repository.UserRepository;
 import java.time.Clock;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
     private final UserRepository users;
     private final CodeTables codes;
     private final JwtService jwt;
     private final AccountGuard guard;
     private final Clock clock;
-
-    public AuthServiceImpl(UserRepository users, CodeTables codes, JwtService jwt, AccountGuard guard, Clock clock) {
-        this.users = users; this.codes = codes; this.jwt = jwt; this.guard = guard; this.clock = clock;
-    }
 
     @Override
     @Transactional

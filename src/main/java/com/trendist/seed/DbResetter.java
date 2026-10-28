@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.sql.DataSource;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -22,12 +23,11 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("reset")
+@RequiredArgsConstructor
 public class DbResetter implements BeanPostProcessor {
     private static final Logger log = LoggerFactory.getLogger(DbResetter.class);
     private final Environment env;
     private boolean done;
-
-    public DbResetter(Environment env) { this.env = env; }
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
