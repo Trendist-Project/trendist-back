@@ -81,6 +81,7 @@ public class DataSeeder implements ApplicationRunner {
         for (var e : List.of(
                 new Object[]{DataSource.NAVER_DATALAB, "2"},
                 new Object[]{DataSource.BQ_TRENDS_RISING, "2"},
+                new Object[]{DataSource.GOOGLE, "2"},
                 new Object[]{DataSource.INTERNAL, "1"})) {
             String name = (String) e[0];
             if (dataSources.findByName(name).isEmpty()) {

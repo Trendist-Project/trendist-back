@@ -111,7 +111,7 @@ public class PlayerServiceImpl implements PlayerService {
         Instant now = Instant.now(clock);
         BigDecimal sum = playerKeywords.sumActiveTrendValue(p.getId(), now, codes.keywordStateId(CodeTables.KW_ACTIVE));
         BigDecimal score = BigDecimal.valueOf(formula.expScore(p.getExp()))
-                .add(sum.multiply(BigDecimal.valueOf(formula.scoreFactor())))
+                .add(sum)
                 .setScale(2, RoundingMode.HALF_UP);
         p.setCurrentScore(score);
         p.setLevel(levels.levelFor(p.getExp()));

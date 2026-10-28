@@ -2,6 +2,8 @@ package com.trendist.keyword.repository;
 
 import com.trendist.keyword.entity.Keyword;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -15,6 +17,13 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select k from Keyword k where k.id = :id")
     Optional<Keyword> findByIdForUpdate(@Param("id") Long id);
+
+    /** 외부 유지 기간이 끝난 키워드(그 소스). */
+    List<Keyword> findByDataSourceIdAndExternalUntilBefore(Long dataSourceId, Instant now);
+
+    /** 그 나라의 한 상태 키워드 번호(구슬 보상 추첨). */
+    @Query("select k.id from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId")
+    List<Long> findIdsByCountryAndState(@Param("countryId") Long countryId, @Param("stateId") Long stateId);
 
     @Modifying
     @Query("update Keyword k set k.searchCount = k.searchCount + :n where k.id = :id")

@@ -7,7 +7,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 내 트렌드 키워드. + 한 번 = 한 행, 24시간 뒤 삭제. 만료 행을 재사용하면 created_at(+ 시각)을 새로 쓴다(9.4). */
+/** 보관함. + 한 번 = 한 행, 24시간 뒤 삭제. 만료 행을 재사용하면 created_at(+ 시각)을 새로 쓴다(9.4). */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity

@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 /**
  * 나라별 방 하나(9.2). 틱 스레드 하나만 상태를 읽고 쓰므로 락이 없다. 다른 스레드는 tasks 큐에 작업을 넣는다.
@@ -16,16 +17,23 @@ public class Room {
     private static final int SNAPSHOT_EVERY = 2;
     private static final int MINIMAP_EVERY = 20; // 1초마다
     private static final int MINIMAP_TOP = 20;   // 큰 아이콘 상위 20명(4.2)
-    public static final double REJOIN_KEEP_SECONDS = 60; // 나간 뒤 이 시간 안에 다시 들어오면 마지막 위치에서 이어 간다(4.2)
+    /** 목표 속도로 다가가는 빠르기. 50ms마다 차이가 절반이 된다(클라이언트 Arena 예측과 같은 값). */
+    static final double ACCEL_RATE = Math.log(2) / 0.05;
+    public static final double REJOIN_KEEP_SECONDS = 60;
+    public static final double ORB_RADIUS = 14; // ? 구슬 반지름(px)
+ // 나간 뒤 이 시간 안에 다시 들어오면 마지막 위치에서 이어 간다(4.2)
 
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds,
-                         double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds) {}
+                         double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds,
+                         int orbMax, double orbSpawnSeconds) {}
 
     /** 방 밖(서비스)으로 나가는 요청: 충돌로 키워드 잃기, 메시지 전송. */
     public interface Outbox {
         void requestLose(Room room, Member loser, Member winner);
+        /** ? 구슬을 먹었다. 보상(무작위 🔥 키워드)은 틱 밖에서 정하고 먹은 사람에게 알린다(4.20). */
+        void requestOrb(Room room, Member eater);
         void send(Member m, ByteBuffer binary);
         void sendText(Member m, Map<String, Object> message);
     }
@@ -44,6 +52,8 @@ public class Room {
         public double kbX, kbY, kbTime;    // 튕김
         public double protectUntil;        // 키워드 잃기 보호 종료(방 시계 초)
         public final Set<Long> keywords = new HashSet<>();
+        /** 이번 틱 구간 안에 도착한 조작. 도착한 시점(구간 안 비율)부터 적용해 틱 경계로 반올림되지 않게 한다. */
+        final List<Control> controls = new ArrayList<>();
 
         Member(int entityNo, long playerId, Object session) {
             this.entityNo = entityNo; this.playerId = playerId; this.session = session;
@@ -58,6 +68,9 @@ public class Room {
     private final Map<Long, Set<Member>> holders = new HashMap<>();
     private final Map<Long, Double> pairCooldown = new HashMap<>();
     private final Map<Long, LastSeen> lastSeen = new HashMap<>(); // 나간 플레이어의 마지막 위치
+    private final Map<Integer, double[]> orbs = new LinkedHashMap<>(); // ? 구슬 번호 → {x, y}
+    private int nextOrb = 1;
+    private double nextOrbAt;
 
     /** 나간 플레이어의 마지막 위치와 보호 종료 시각. keepUntil이 지나면 버린다. */
     private record LastSeen(double x, double y, double protectUntil, double keepUntil) {}
@@ -68,8 +81,18 @@ public class Room {
     private volatile int size;
     private volatile Map<Long, Double> scoreView = Map.of();
 
+    /** 조작 하나: 방향키 입력(target 없음) 또는 클릭 목표. at은 틱 구간 안에서의 비율(0~1). */
+    record Control(double at, double dx, double dy, Double targetX, Double targetY) {}
+
+    private final LongSupplier nanoClock;
+    private long prevTickNanos, tickNanos; // 지난 틱과 이번 틱이 시작한 시각. 그 사이에 도착한 조작의 시점을 잰다
+
     public Room(long countryId, Tuning tuning, Outbox outbox) {
-        this.countryId = countryId; this.tuning = tuning; this.outbox = outbox;
+        this(countryId, tuning, outbox, System::nanoTime);
+    }
+
+    public Room(long countryId, Tuning tuning, Outbox outbox, LongSupplier nanoClock) {
+        this.countryId = countryId; this.tuning = tuning; this.outbox = outbox; this.nanoClock = nanoClock;
     }
 
     public long countryId() { return countryId; }
@@ -107,6 +130,7 @@ public class Room {
         byPlayer.put(playerId, m);
         size = members.size();
         broadcastRoster();
+        outbox.sendText(m, orbListMessage());
         return m;
     }
 
@@ -136,6 +160,23 @@ public class Room {
         double half = activeArea(members.size()) / 2;
         m.targetX = clamp(x, -half, half); m.targetY = clamp(y, -half, half);
         m.dirX = 0; m.dirY = 0;
+    }
+
+    /** 방향키 입력. receivedNanos(도착 시각)부터 적용한다. */
+    public void setInput(Member m, double dx, double dy, long receivedNanos) {
+        m.controls.add(new Control(fractionOf(receivedNanos), dx, dy, null, null));
+    }
+
+    /** 클릭 목표. receivedNanos(도착 시각)부터 적용한다. */
+    public void setTarget(Member m, double x, double y, long receivedNanos) {
+        m.controls.add(new Control(fractionOf(receivedNanos), 0, 0, x, y));
+    }
+
+    /** 도착 시각이 지난 틱과 이번 틱 사이 어디쯤인지(0~1). */
+    private double fractionOf(long nanos) {
+        long span = tickNanos - prevTickNanos;
+        if (span <= 0) return 0;
+        return clamp((double) (nanos - prevTickNanos) / span, 0, 1);
     }
 
     /** 그 사람 점수를 DB 값으로 맞춘다. */
@@ -185,6 +226,9 @@ public class Room {
     }
 
     public void tick() {
+        long now = nanoClock.getAsLong();
+        prevTickNanos = tickNanos == 0 ? now - TICK_MS * 1_000_000L : tickNanos;
+        tickNanos = now;
         Consumer<Room> t;
         while ((t = tasks.poll()) != null) {
             try { t.accept(this); } catch (RuntimeException e) { org.slf4j.LoggerFactory.getLogger(Room.class).warn("room task failed", e); }
@@ -196,6 +240,8 @@ public class Room {
         double half = activeArea(members.size()) / 2;
         for (Member m : members.values()) move(m, dt, tu, half);
         collide(tu);
+        eatOrbs();
+        spawnOrbs(tu, half);
         for (Member m : members.values()) {
             // 크기 변화는 0.5초에 걸쳐 부드럽게(4.2)
             m.displayRadius += (m.radius - m.displayRadius) * Math.min(1, dt / 0.5 * 3);
@@ -213,7 +259,37 @@ public class Room {
 
     // ------------------------------------------------------------ 내부
 
+    /**
+     * 이번 틱 구간을 조작이 도착한 시점마다 나눠 움직인다. 방향키를 짧게 눌렀다 떼도 누른 시간만큼만 움직여서
+     * 클라이언트 예측과 같은 곳에 멈춘다(틱 경계로 반올림하면 최대 50ms만큼 더 가거나 덜 가서, 멈춘 뒤 화면이 보정된다).
+     */
     private void move(Member m, double dt, Tuning tu, double half) {
+        double done = 0;
+        for (Control c : m.controls) {
+            double at = c.at() * dt;
+            if (at > done) { advance(m, at - done, tu); done = at; }
+            if (c.targetX() != null) setTarget(m, c.targetX(), c.targetY());
+            else setInput(m, c.dx(), c.dy());
+        }
+        m.controls.clear();
+        advance(m, dt - done, tu);
+        double kx = 0, ky = 0;
+        if (m.kbTime > 0) {
+            double f = m.kbTime / tu.knockbackSeconds(); // 0.4초에 걸쳐 감속
+            kx = m.kbX * f; ky = m.kbY * f;
+            m.kbTime = Math.max(0, m.kbTime - dt);
+        }
+        m.x += kx * dt; m.y += ky * dt;
+        double r = m.displayRadius;
+        m.x = clamp(m.x, -half + r, half - r); m.y = clamp(m.y, -half + r, half - r);
+    }
+
+    /**
+     * h초 동안 목표 속도로 다가가며 움직인다. 속도 차이가 지수로 줄어드는 식을 정확히 풀어서, 나눠 계산해도
+     * 한 번에 계산한 것과 같고 클라이언트 예측(Arena)과도 같은 결과가 된다.
+     */
+    private void advance(Member m, double h, Tuning tu) {
+        if (h <= 0) return;
         double speed = tu.maxSpeed(); // 크기와 관계없이 모두 같다
         double wantX = 0, wantY = 0;
         if (m.dirX != 0 || m.dirY != 0) {
@@ -227,17 +303,77 @@ public class Room {
             }
         }
         // 입력도 목표도 없으면 감속해 그 자리에 멈춘다(자동으로 떠다니지 않는다)
-        double a = Math.min(1, dt * 10);
-        m.vx += (wantX - m.vx) * a; m.vy += (wantY - m.vy) * a;
-        double kx = 0, ky = 0;
-        if (m.kbTime > 0) {
-            double f = m.kbTime / tu.knockbackSeconds(); // 0.4초에 걸쳐 감속
-            kx = m.kbX * f; ky = m.kbY * f;
-            m.kbTime = Math.max(0, m.kbTime - dt);
+        double e = Math.exp(-ACCEL_RATE * h), moved = (1 - e) / ACCEL_RATE;
+        m.x += wantX * h + (m.vx - wantX) * moved; m.y += wantY * h + (m.vy - wantY) * moved;
+        m.vx = wantX + (m.vx - wantX) * e; m.vy = wantY + (m.vy - wantY) * e;
+    }
+
+    // ------------------------------------------------------------ ? 구슬(4.20)
+
+    /** 원이 구슬 중심을 덮으면 먹는다. 구슬은 바로 사라지고, 모두에게 누가 먹었는지 알려 먹는 연출을 보여 준다. */
+    private void eatOrbs() {
+        if (orbs.isEmpty()) return;
+        Iterator<Map.Entry<Integer, double[]>> it = orbs.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, double[]> o = it.next();
+            double[] p = o.getValue();
+            Member eater = null;
+            for (Member m : members.values()) {
+                if (Math.hypot(m.x - p[0], m.y - p[1]) < m.displayRadius + ORB_RADIUS * 0.5) { eater = m; break; }
+            }
+            if (eater == null) continue;
+            it.remove();
+            broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", eater.entityNo));
+            outbox.requestOrb(this, eater);
         }
-        m.x += (m.vx + kx) * dt; m.y += (m.vy + ky) * dt;
-        double r = m.displayRadius;
-        m.x = clamp(m.x, -half + r, half - r); m.y = clamp(m.y, -half + r, half - r);
+    }
+
+    /** 일정 간격으로 하나씩, 최대 개수까지 활동 영역 안 빈 곳에 만든다. 영역이 좁아져 밖에 남은 구슬은 지운다. */
+    private void spawnOrbs(Tuning tu, double half) {
+        Iterator<Map.Entry<Integer, double[]>> it = orbs.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, double[]> o = it.next();
+            if (Math.abs(o.getValue()[0]) > half - ORB_RADIUS || Math.abs(o.getValue()[1]) > half - ORB_RADIUS) {
+                it.remove();
+                broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", 0));
+            }
+        }
+        if (members.isEmpty() || orbs.size() >= tu.orbMax() || clockSeconds < nextOrbAt) return;
+        nextOrbAt = clockSeconds + tu.orbSpawnSeconds();
+        double margin = 80;
+        for (int tries = 0; tries < 8; tries++) {
+            double x = (ThreadLocalRandom.current().nextDouble() * 2 - 1) * (half - margin);
+            double y = (ThreadLocalRandom.current().nextDouble() * 2 - 1) * (half - margin);
+            boolean blocked = false;
+            for (Member m : members.values()) {
+                if (Math.hypot(m.x - x, m.y - y) < m.displayRadius + 60) { blocked = true; break; } // 원 바로 위에는 만들지 않는다
+            }
+            if (blocked) continue;
+            int id = nextOrb++;
+            orbs.put(id, new double[]{x, y});
+            broadcast(Map.of("type", "orbSpawn", "id", id, "x", x, "y", y));
+            return;
+        }
+    }
+
+    private Map<String, Object> orbListMessage() {
+        List<List<Object>> list = new ArrayList<>();
+        orbs.forEach((id, p) -> list.add(List.of(id, p[0], p[1])));
+        return Map.of("type", "orbs", "orbs", list);
+    }
+
+    /** 테스트·관리용: 지금 떠 있는 구슬 수. */
+    public int orbCount() { return orbs.size(); }
+
+    /** 테스트용: 그 자리에 구슬을 놓는다. */
+    public int placeOrb(double x, double y) {
+        int id = nextOrb++;
+        orbs.put(id, new double[]{x, y});
+        return id;
+    }
+
+    private void broadcast(Map<String, Object> msg) {
+        for (Member m : members.values()) outbox.sendText(m, msg);
     }
 
     private void collide(Tuning tu) {

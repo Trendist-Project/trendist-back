@@ -2,11 +2,13 @@ package com.trendist.game.service;
 
 import com.trendist.game.event.GameEvents;
 import com.trendist.game.room.Room;
+import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.service.KeywordService;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import jakarta.annotation.PreDestroy;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import org.slf4j.Logger;
@@ -73,7 +75,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.KNOCKBACK_SECONDS),
                 settings.getDouble(SettingKeys.COLLISION_COOLDOWN),
                 settings.getDouble(SettingKeys.LOSE_PROTECT_SECONDS),
-                settings.getDouble(SettingKeys.JOIN_PROTECT_SECONDS));
+                settings.getDouble(SettingKeys.JOIN_PROTECT_SECONDS),
+                settings.getInt(SettingKeys.ORB_MAX),
+                settings.getDouble(SettingKeys.ORB_SPAWN_SECONDS));
     }
 
     /** 클라이언트 예측에 필요한 값(9.2 설정값 전달). */
@@ -147,6 +151,29 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 }));
             } catch (RuntimeException e) {
                 log.warn("lose keyword failed for player {}", loserId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestOrb(Room room, Room.Member eater) {
+        long playerId = eater.playerId;
+        workers.submit(() -> {
+            try {
+                KeywordDtos.OrbResult r = keywordService.openOrb(playerId);
+                Map<String, Object> msg = new HashMap<>();
+                msg.put("type", "orbResult");
+                msg.put("status", r.status());
+                if (r.text() != null) {
+                    msg.put("text", r.text()); msg.put("state", r.state()); msg.put("trendValue", r.trendValue());
+                    msg.put("holderCount", r.holderCount()); msg.put("gained", r.gained()); msg.put("expiresAt", String.valueOf(r.expiresAt()));
+                }
+                room.submit(rr -> {
+                    Room.Member m = rr.byPlayer(playerId);
+                    if (m != null) sendText(m, msg);
+                });
+            } catch (RuntimeException e) {
+                log.warn("orb reward failed for player {}", playerId, e);
             }
         });
     }

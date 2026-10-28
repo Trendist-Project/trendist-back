@@ -13,7 +13,6 @@ public final class SettingKeys {
     public static final String TREND_BASE_RATIO = "trend_base_ratio";
     public static final String TREND_MAX_BASE = "trend_max_base";
     public static final String EXTERNAL_CONFIRM_HEAT = "external_confirm_heat";
-    public static final String SCORE_FACTOR = "score_factor";
     public static final String EXP_SCORE_CAP = "exp_score_cap";
     public static final String PLUS_TTL_HOURS = "plus_ttl_hours";
     public static final String ACTIVATE_HOLDERS = "activate_holders";
@@ -31,6 +30,10 @@ public final class SettingKeys {
     public static final String LOSE_PROTECT_SECONDS = "lose_protect_seconds";
     public static final String JOIN_PROTECT_SECONDS = "join_protect_seconds";
     public static final String NICKNAME_CHANGE_MINUTES = "nickname_change_minutes";
+    public static final String ORB_MAX = "orb_max";
+    public static final String ORB_SPAWN_SECONDS = "orb_spawn_seconds";
+    public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
+    public static final String EXTERNAL_HOLD_HOURS = "external_hold_hours";
 
     public static final List<Def> DEFAULTS = List.of(
             new Def(TREND_BASE_POPULATION, "1000", 1, 10000, "트렌드 값 식의 기준 인원(g(n)=1)"),
@@ -38,7 +41,6 @@ public final class SettingKeys {
             new Def(TREND_BASE_RATIO, "10", 0, 100, "기본 비율"),
             new Def(TREND_MAX_BASE, "50", 1, 50, "최대 기준값(× 최대 가중치 2 ≤ 100)"),
             new Def(EXTERNAL_CONFIRM_HEAT, "10", 0, 100, "외부 확인 관심도"),
-            new Def(SCORE_FACTOR, "0.5", 0.0001, 2, "점수 환산 계수"),
             new Def(EXP_SCORE_CAP, "100", 0, 1000, "EXP 점수 반영 상한"),
             new Def(PLUS_TTL_HOURS, "24", 1, 168, "+ 삭제 시간(시간)"),
             new Def(ACTIVATE_HOLDERS, "3", 1, 1000, "🔥활성 전환 인원"),
@@ -55,5 +57,9 @@ public final class SettingKeys {
             new Def(COLLISION_COOLDOWN, "0.5", 0, 10, "같은 상대 연속 충돌 쿨다운(초)"),
             new Def(LOSE_PROTECT_SECONDS, "10", 0, 600, "키워드를 잃은 뒤 보호(초)"),
             new Def(JOIN_PROTECT_SECONDS, "10", 0, 600, "입장 직후 보호(초)"),
-            new Def(NICKNAME_CHANGE_MINUTES, "60", 0, 10080, "닉네임 변경 간격(분, 나라별)"));
+            new Def(NICKNAME_CHANGE_MINUTES, "60", 0, 10080, "닉네임 변경 간격(분, 나라별)"),
+            new Def(ORB_MAX, "20", 0, 200, "방에 동시에 떠 있는 ? 구슬 최대 수(0이면 끔)"),
+            new Def(ORB_SPAWN_SECONDS, "3", 0.5, 600, "? 구슬이 하나씩 생기는 간격(초)"),
+            new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),
+            new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

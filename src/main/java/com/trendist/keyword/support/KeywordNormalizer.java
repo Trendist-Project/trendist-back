@@ -15,6 +15,8 @@ public final class KeywordNormalizer {
     private static final Pattern URL = Pattern.compile("(?i)(https?|www|\\.com|\\.kr|\\.net)");
     private static final Pattern PHONE = Pattern.compile("\\d{9,}");
     private static final Pattern WS = Pattern.compile("\\s+");
+    private static final Pattern NOT_ALLOWED_CHAR = Pattern.compile(
+            "[^\\p{IsHangul}\\p{IsHiragana}\\p{IsKatakana}\\p{IsHan}\\p{IsDevanagari}A-Za-z0-9 ]");
 
     private KeywordNormalizer() {}
 
@@ -27,6 +29,12 @@ public final class KeywordNormalizer {
     public static String normalize(String raw) {
         String s = Normalizer.normalize(raw == null ? "" : raw, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
         return WS.matcher(s).replaceAll("");
+    }
+
+    /** 외부 목록의 제목을 키워드 표기로 바꾼다: 쓸 수 없는 문자(`:` 같은 문장 부호)는 공백으로 바꾼다. */
+    public static String fromExternal(String raw) {
+        String s = Normalizer.normalize(raw == null ? "" : raw, Normalizer.Form.NFKC);
+        return display(NOT_ALLOWED_CHAR.matcher(s).replaceAll(" "));
     }
 
     /** 검사를 통과하면 정규화 값을 돌려준다. */

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-    static final String VISITOR_COOKIE = "tv_id";
+    static final String VISITOR_COOKIE = "visitor_id";
 
     private final AuthService auth;
     private final AppProperties props;

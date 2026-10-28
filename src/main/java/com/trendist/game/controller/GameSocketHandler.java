@@ -73,15 +73,16 @@ public class GameSocketHandler extends TextWebSocketHandler {
             return;
         }
         if (!allowInput(session, type)) return;
+        long receivedNanos = System.nanoTime(); // 방은 이 시점부터 조작을 적용한다(틱 경계로 반올림하지 않는다)
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
         switch (type) {
             case "input" -> {
                 double dx = clamp(node.path("dx").asDouble(0)), dy = clamp(node.path("dy").asDouble(0));
-                room.submit(r -> r.setInput(member, dx, dy));
+                room.submit(r -> r.setInput(member, dx, dy, receivedNanos));
             }
             case "move" -> {
                 double x = node.path("x").asDouble(0), y = node.path("y").asDouble(0);
-                if (Double.isFinite(x) && Double.isFinite(y)) room.submit(r -> r.setTarget(member, x, y));
+                if (Double.isFinite(x) && Double.isFinite(y)) room.submit(r -> r.setTarget(member, x, y, receivedNanos));
             }
             default -> { }
         }
@@ -116,12 +117,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     /**
      * 이동 명령 빈도 제한(9.5). 종류별로 1초에 받는 횟수를 따로 센다. 넘으면 무시한다.
-     * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 초당 5회까지 보낸다. 서버는 네트워크에서 간격이 좁혀져
+     * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 누르고 뗄 때마다 바로 보낸다. 서버는 네트워크에서 간격이 좁혀져
      * 도착하는 경우를 감안해 조금 더 받는다. 마지막 클릭이 버려지면 예측과 서버의 목표가 달라져 화면이 보정되기 때문이다.
      */
     private boolean allowInput(WebSocketSession session, String type) {
         String key = "move".equals(type) || "input".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
-        int limit = "move".equals(key) ? 12 : 10;
+        int limit = switch (key) { case "move" -> 12; case "input" -> 60; default -> 10; };
         @SuppressWarnings("unchecked")
         Map<String, long[]> windows = (Map<String, long[]>) session.getAttributes().get(ATTR_INPUTS);
         long[] w = windows.computeIfAbsent(key, k -> new long[]{0, 0});

@@ -1,6 +1,15 @@
 package com.trendist;
 
+import com.trendist.keyword.entity.DataSource;
+import com.trendist.keyword.repository.KeywordRepository;
+import com.trendist.keyword.service.KeywordService;
+import com.trendist.keyword.support.KeywordNormalizer;
 import com.trendist.keyword.support.TrendFormula;
+import com.trendist.common.code.CodeTables;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -26,6 +35,10 @@ import org.springframework.test.web.servlet.MvcResult;
 class ApiFlowTest {
     @Autowired MockMvc mvc;
     @Autowired TrendFormula formula;
+    @Autowired KeywordService keywordService;
+    @Autowired KeywordRepository keywords;
+    @Autowired CodeTables codes;
+    @Autowired TransactionTemplate tx;
 
     private String guest() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -86,6 +99,64 @@ class ApiFlowTest {
     }
 
     @Test
+    void googleTitlesStayActiveForSevenDaysThenFallBackToInternal() {
+        // 쓸 수 없는 문자(:)는 공백으로 바꿔 넣고, 규칙에 맞지 않는 제목(링크)은 버린다
+        int held = keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("콜 오브 듀티: 모던 워페어 4", "www.example.com"));
+        assertThat(held).isEqualTo(1);
+        String norm = KeywordNormalizer.normalize("콜 오브 듀티 모던 워페어 4");
+        var k = tx.execute(s -> {
+            var kw = keywords.findAll().stream().filter(x -> x.getNormalized().equals(norm)).findFirst().orElseThrow();
+            assertThat(kw.getDataSource().getName()).isEqualTo(DataSource.GOOGLE);
+            assertThat(kw.getKeywordState().getName()).isEqualTo(CodeTables.KW_ACTIVE);
+            assertThat(kw.getExternalUntil()).isAfter(Instant.now().plusSeconds(6 * 24 * 3600)); // 7일
+            return kw.getId();
+        });
+        // 목록에 다시 보이면 지금부터 7일로 다시 센다
+        expireNow(k);
+        keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("콜 오브 듀티: 모던 워페어 4"));
+        tx.executeWithoutResult(s -> assertThat(keywords.findById(k).orElseThrow().getExternalUntil()).isAfter(Instant.now().plusSeconds(6 * 24 * 3600)));
+        // 7일이 지났다고 치고(유지 끝 시각을 과거로), 아직 목록에 있으면 지금부터 7일 더
+        expireNow(k);
+        assertThat(keywordService.expireExternal(DataSource.GOOGLE, Set.of(norm))).isZero();
+        tx.executeWithoutResult(s -> assertThat(keywords.findById(k).orElseThrow().getExternalUntil()).isAfter(Instant.now().plusSeconds(6 * 24 * 3600)));
+        // 목록에서 빠졌고 가진 사람이 3명 미만이면 internal로 내려가고 💤
+        expireNow(k);
+        assertThat(keywordService.expireExternal(DataSource.GOOGLE, Set.of())).isEqualTo(1);
+        tx.executeWithoutResult(s -> {
+            var kw = keywords.findById(k).orElseThrow();
+            assertThat(kw.getDataSource().getName()).isEqualTo(DataSource.INTERNAL);
+            assertThat(kw.getKeywordState().getName()).isEqualTo(CodeTables.KW_INACTIVE);
+            assertThat(kw.getExternalUntil()).isNull();
+        });
+    }
+
+    private void expireNow(long keywordId) {
+        tx.executeWithoutResult(s -> keywords.findById(keywordId).orElseThrow()
+                .holdExternal(codes.dataSource(DataSource.GOOGLE), Instant.now().minusSeconds(1)));
+    }
+
+    @Test
+    void orbGivesActiveKeywordAtSetChanceOtherwiseMiss() throws Exception {
+        String t = player("구슬러");
+        long playerId = ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
+                .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
+        keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("구슬테스트"));
+        // 33%만 🔥 키워드, 나머지는 꽝. 이미 가진 키워드가 나오면 아무것도 바뀌지 않는다
+        int hold = 0, miss = 0;
+        for (int i = 0; i < 300; i++) {
+            var r = keywordService.openOrb(playerId);
+            switch (r.status()) {
+                case "GAINED" -> { hold++; assertThat(r.text()).isNotBlank(); }
+                case "MISS" -> miss++;
+                default -> { assertThat(r.status()).isEqualTo("DUPLICATE"); assertThat(r.gained()).isZero(); }
+            }
+        }
+        assertThat(hold).isPositive();
+        assertThat(miss).isBetween(150, 250); // 약 67%
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(hold));
+    }
+
+    @Test
     void protectedApiNeedsToken() throws Exception {
         mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
     }
@@ -93,11 +164,11 @@ class ApiFlowTest {
     @Test
     void guestCookieIsReusedBySession() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
-        Cookie c = r.getResponse().getCookie("tv_id");
+        Cookie c = r.getResponse().getCookie("visitor_id");
         assertThat(c).isNotNull();
         assertThat(c.isHttpOnly()).isTrue();
         mvc.perform(post("/api/auth/session").cookie(c)).andExpect(status().isOk());
-        mvc.perform(post("/api/auth/session").cookie(new Cookie("tv_id", "forged"))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/session").cookie(new Cookie("visitor_id", "forged"))).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -118,10 +189,10 @@ class ApiFlowTest {
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔 깐루\"}"))
                 .andExpect(status().isConflict());
-        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 20.75 × 0.5 ≈ 11.38
+        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 20.75 ≈ 21.75
         MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
         double score = ((Number) JsonPath.read(me.getResponse().getContentAsString(), "$.player.currentScore")).doubleValue();
-        assertThat(score).isBetween(11.0, 11.6);
+        assertThat(score).isBetween(21.5, 22.0);
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
         mvc.perform(get("/api/rankings").header("Authorization", "Bearer " + t)).andExpect(status().isOk())

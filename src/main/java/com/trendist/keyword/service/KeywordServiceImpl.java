@@ -3,6 +3,7 @@ package com.trendist.keyword.service;
 import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
 import com.trendist.country.entity.Country;
+import com.trendist.country.service.CountryService;
 import com.trendist.game.event.GameEvents;
 import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.entity.DataSource;
@@ -30,13 +31,17 @@ import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
-/** 검색, +, 내 트렌드 키워드, 만료, 충돌로 잃기(4.4~4.8, 9.4). */
+/** 검색, +, 보관함, 만료, 충돌로 잃기(4.4~4.8, 9.4). */
 @Service
 @RequiredArgsConstructor
 public class KeywordServiceImpl implements KeywordService {
+    private static final Logger log = LoggerFactory.getLogger(KeywordServiceImpl.class);
     private final KeywordRepository keywords;
     private final PlayerKeywordRepository playerKeywords;
     private final PlayerRepository players;
@@ -47,6 +52,8 @@ public class KeywordServiceImpl implements KeywordService {
     private final List<ExternalTrendSource> sources;
     private final SearchCounter searchCounter;
     private final ApplicationEventPublisher events;
+    private final TransactionTemplate tx;
+    private final CountryService countries;
     private final Clock clock;
 
     /** 트렌드 값이 바뀐 키워드. 1분 잡이 보유자 점수를 DB에서 다시 합산한다(9.4). */
@@ -78,7 +85,7 @@ public class KeywordServiceImpl implements KeywordService {
             searchCounter.count(userId, k.getId());
             return new KeywordDtos.SearchResult("FOUND", card(k, p, now));
         }
-        var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, BigDecimal.ZERO, BigDecimal.ZERO,
+        var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, BigDecimal.ZERO,
                 0, 0, 0, false, null);
         return new KeywordDtos.SearchResult("NEW", preview);
     }
@@ -93,7 +100,6 @@ public class KeywordServiceImpl implements KeywordService {
         String text = KeywordNormalizer.display(rawText);
         String normalized = KeywordNormalizer.validate(text);
         Instant now = Instant.now(clock);
-        Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
         Country country = p.getCountry();
 
         Keyword k = keywords.findByCountryIdAndNormalized(country.getId(), normalized)
@@ -101,14 +107,20 @@ public class KeywordServiceImpl implements KeywordService {
         k = keywords.findByIdForUpdate(k.getId()).orElseThrow();
         if (isBanned(k)) throw ApiException.badRequest("KEYWORD_BANNED", "검색할 수 없는 키워드예요");
 
+        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
+        if (existing.isPresent() && !existing.get().isExpired(now)) throw ApiException.conflict("ALREADY_PLUSED", "이미 보유중인 키워드예요");
+        return addHolding(p, k, existing, now);
+    }
+
+    /** +의 본체: 보관함에 넣고 인원·EXP·트렌드 값·점수를 고친다. 플레이어와 키워드 행을 잠근 상태에서 부른다. */
+    private KeywordDtos.PlusResult addHolding(Player p, Keyword k, Optional<PlayerKeyword> existing, Instant now) {
+        Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
+        Country country = p.getCountry();
         BigDecimal oldTrend = k.getTrendValue();
         BigDecimal oldScore = p.getCurrentScore();
-        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
         boolean newHolder;
         if (existing.isPresent()) {
-            PlayerKeyword pk = existing.get();
-            if (!pk.isExpired(now)) throw ApiException.conflict("ALREADY_PLUSED", "이미 보유중인 키워드예요");
-            pk.renew(now, expires); // 만료 행 재사용: 가진 사람 수는 그대로
+            existing.get().renew(now, expires); // 만료 행 재사용: 가진 사람 수는 그대로
             newHolder = false;
         } else {
             playerKeywords.save(new PlayerKeyword(p, k, now, expires));
@@ -133,6 +145,114 @@ public class KeywordServiceImpl implements KeywordService {
         return new KeywordDtos.PlusResult(card(k, p, now), newScore.subtract(oldScore), playerService.summary(p));
     }
 
+    // ---------------------------------------------------------------- 구슬(4.20)
+
+    @Override
+    @Transactional
+    public KeywordDtos.OrbResult openOrb(long playerId) {
+        Player p = players.findByIdForUpdate(playerId).orElse(null);
+        if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        // 설정 확률(기본 33%)로만 🔥활성 키워드가 나오고, 나머지는 꽝이다
+        if (ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
+            return new KeywordDtos.OrbResult("MISS", null, null, null, 0, null, null);
+        }
+        List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
+        if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        Keyword k = keywords.findByIdForUpdate(ids.get(ThreadLocalRandom.current().nextInt(ids.size()))).orElseThrow();
+        Instant now = Instant.now(clock);
+        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
+        if (existing.isPresent() && !existing.get().isExpired(now)) {
+            // 이미 보관함에 있는 키워드가 나오면 아무것도 바뀌지 않는다
+            return new KeywordDtos.OrbResult("DUPLICATE", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
+                    k.getHolderCount(), BigDecimal.ZERO, existing.get().getExpiresAt());
+        }
+        KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
+        return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
+                k.getHolderCount(), r.gained(), r.keyword().myExpiresAt());
+    }
+
+    // ---------------------------------------------------------------- 목록형 외부 소스(10.2)
+
+    @Override
+    public int applyExternalTitles(String countryCode, String sourceName, List<String> titles) {
+        int held = 0;
+        for (String title : titles) {
+            String text = KeywordNormalizer.fromExternal(title);
+            String normalized;
+            try {
+                normalized = KeywordNormalizer.validate(text); // 4.6 등록 조건을 통과하지 못하면 버린다
+            } catch (ApiException e) {
+                log.debug("skip external title '{}': {}", title, e.code());
+                continue;
+            }
+            try {
+                Boolean r = tx.execute(st -> holdFromList(countryCode, sourceName, text, normalized));
+                if (Boolean.TRUE.equals(r)) held++;
+            } catch (RuntimeException e) {
+                log.warn("external title '{}' failed", title, e);
+            }
+        }
+        return held;
+    }
+
+    /** 목록에 오른 단어 하나: 없으면 🔥로 만들고, 있으면 그 소스로 지금부터 유지 기간(기본 7일)을 다시 센다. 새로 유지를 시작했으면 true. */
+    private boolean holdFromList(String countryCode, String sourceName, String text, String normalized) {
+        Instant now = Instant.now(clock);
+        DataSource source = codes.dataSource(sourceName);
+        if (source.getWeight().signum() == 0) return false; // 가중치 0이면 쓰지 않는다
+        Optional<Keyword> found = keywords.findByCountryIdAndNormalized(countryOf(countryCode).getId(), normalized);
+        if (found.isEmpty()) {
+            createKeyword(countryOf(countryCode), text, normalized, Optional.of(new Confirmed(source, 100)), now);
+            return true;
+        }
+        Keyword k = keywords.findByIdForUpdate(found.get().getId()).orElseThrow();
+        if (isBanned(k)) return false;
+        boolean holding = k.getDataSource().getId().equals(source.getId()) && k.getExternalUntil() != null
+                && k.getExternalUntil().isAfter(now);
+        k.holdExternal(source, externalHoldUntil(now)); // 목록에 보일 때마다 지금부터 다시 7일
+        if (holding) return false;
+        BigDecimal old = k.getTrendValue();
+        k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now);
+        BigDecimal nw = updateTrend(k);
+        publishTrendChange(k, old, nw, null);
+        return true;
+    }
+
+    @Override
+    public int expireExternal(String sourceName, Set<String> currentNormalized) {
+        DataSource source = codes.dataSource(sourceName);
+        int dropped = 0;
+        for (Keyword stale : keywords.findByDataSourceIdAndExternalUntilBefore(source.getId(), Instant.now(clock))) {
+            try {
+                Boolean r = tx.execute(st -> expireOneExternal(stale.getId(), source, currentNormalized));
+                if (Boolean.TRUE.equals(r)) dropped++;
+            } catch (RuntimeException e) {
+                log.warn("expire external keyword {} failed", stale.getId(), e);
+            }
+        }
+        return dropped;
+    }
+
+    private boolean expireOneExternal(long keywordId, DataSource source, Set<String> currentNormalized) {
+        Instant now = Instant.now(clock);
+        Keyword k = keywords.findByIdForUpdate(keywordId).orElse(null);
+        if (k == null || !k.getDataSource().getId().equals(source.getId())
+                || k.getExternalUntil() == null || k.getExternalUntil().isAfter(now)) return false;
+        if (currentNormalized.contains(k.getNormalized())) {
+            k.holdExternal(source, externalHoldUntil(now)); // 유지 기간이 끝나도 아직 목록에 있으면 지금부터 다시
+            return false;
+        }
+        BigDecimal old = k.getTrendValue();
+        k.dropExternal(codes.dataSource(DataSource.INTERNAL));
+        // 내부 데이터만으로는 가진 사람이 3명 이상이어야 🔥(4.7)
+        if (isState(k, CodeTables.KW_ACTIVE) && k.getHolderCount() < settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
+            k.deactivate(codes.keywordState(CodeTables.KW_INACTIVE), now);
+        }
+        BigDecimal nw = updateTrend(k);
+        publishTrendChange(k, old, nw, null);
+        return true;
+    }
+
     // ---------------------------------------------------------------- 조회
 
     @Override
@@ -144,7 +264,7 @@ public class KeywordServiceImpl implements KeywordService {
                 .map(pk -> {
                     Keyword k = pk.getKeyword();
                     return new KeywordDtos.MyKeyword(k.getId(), k.getText(), k.getKeywordState().getName(),
-                            k.getTrendValue(), formula.score(k.getTrendValue()), pk.getCreatedAt(), pk.getExpiresAt());
+                            k.getTrendValue(), pk.getCreatedAt(), pk.getExpiresAt());
                 }).toList();
     }
 
@@ -242,7 +362,8 @@ public class KeywordServiceImpl implements KeywordService {
     private void tryExternalActivate(Keyword k, Instant now) {
         externalConfirm(k.getCountry().getCode(), k.getNormalized()).ifPresent(c -> {
             BigDecimal old = k.getTrendValue();
-            k.setDataSource(c.source());
+            if (isListSource(c.source())) k.holdExternal(c.source(), externalHoldUntil(now));
+            else k.setDataSource(c.source());
             k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now);
             BigDecimal nw = updateTrend(k);
             publishTrendChange(k, old, nw, null);
@@ -253,7 +374,10 @@ public class KeywordServiceImpl implements KeywordService {
         DataSource source = ext.map(Confirmed::source).orElseGet(() -> codes.dataSource(DataSource.INTERNAL));
         KeywordState state = codes.keywordState(ext.isPresent() ? CodeTables.KW_ACTIVE : CodeTables.KW_INACTIVE);
         Keyword k = new Keyword(country, source, state, text, normalized);
-        if (ext.isPresent()) k.activate(state, now);
+        if (ext.isPresent()) {
+            k.activate(state, now);
+            if (isListSource(source)) k.holdExternal(source, externalHoldUntil(now));
+        }
         try {
             k = keywords.saveAndFlush(k);
         } catch (DataIntegrityViolationException e) {
@@ -274,15 +398,27 @@ public class KeywordServiceImpl implements KeywordService {
         if (oldTrend.compareTo(newTrend) == 0) return;
         dirtyKeywords.add(k.getId());
         events.publishEvent(new GameEvents.KeywordTrendChanged(k.getCountry().getId(), k.getId(),
-                formula.score(newTrend).subtract(formula.score(oldTrend)), excludePlayerId));
+                newTrend.subtract(oldTrend), excludePlayerId));
     }
 
     private KeywordDtos.KeywordCard card(Keyword k, Player p, Instant now) {
         Optional<PlayerKeyword> mine = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()).filter(pk -> !pk.isExpired(now));
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
-                formula.score(k.getTrendValue()), k.getHolderCount(), k.getTotalPlusCount(),
+                k.getHolderCount(), k.getTotalPlusCount(),
                 k.getSearchCount() + searchCounter.pending(k.getId()), mine.isPresent(),
                 mine.map(PlayerKeyword::getExpiresAt).orElse(null));
+    }
+
+    /** 목록에 오른 동안만 확인되는 소스(google). 유지 기간(기본 7일)을 두고 끝나면 다시 본다. */
+    /** 목록형 외부 소스 유지 끝 시각: 지금 + 설정 시간(기본 168시간 = 7일). */
+    private Instant externalHoldUntil(Instant now) {
+        return now.plus(Duration.ofHours(settings.getInt(SettingKeys.EXTERNAL_HOLD_HOURS)));
+    }
+
+    private boolean isListSource(DataSource s) { return DataSource.GOOGLE.equals(s.getName()); }
+
+    private Country countryOf(String code) {
+        return countries.requireOpen(code);
     }
 
     private boolean isBanned(Keyword k) { return isState(k, CodeTables.KW_BANNED); }

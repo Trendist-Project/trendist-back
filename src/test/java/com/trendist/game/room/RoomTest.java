@@ -9,13 +9,15 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
-    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0);
+    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 0, 3);
 
     static class Out implements Room.Outbox {
         final List<long[]> loses = new ArrayList<>();
         final List<ByteBuffer> sent = new ArrayList<>();
         int snapshots;
         public void requestLose(Room room, Room.Member loser, Room.Member winner) { loses.add(new long[]{loser.playerId, winner.playerId}); }
+        final List<Long> orbEaters = new ArrayList<>();
+        public void requestOrb(Room room, Room.Member eater) { orbEaters.add(eater.playerId); }
         public void send(Room.Member m, ByteBuffer binary) { snapshots++; sent.add(binary); }
         public void sendText(Room.Member m, Map<String, Object> message) { }
     }
@@ -51,8 +53,48 @@ class RoomTest {
     }
 
     @Test
+    void shortKeyTapMovesOnlyForHeldTime() {
+        // 한 틱(50ms) 안에서 10ms에 눌러 30ms에 떼면 20ms만큼만 움직인다(틱 경계로 반올림하지 않는다)
+        long[] now = {1_000_000_000L};
+        Room r = new Room(1, T, new Out(), () -> now[0]);
+        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
+        m.x = 0; m.y = 0;
+        r.tick();                                   // 기준 틱
+        long base = now[0];
+        r.submit(room -> room.setInput(m, 1, 0, base + 10_000_000L)); // 소켓 스레드처럼 큐로 넣으면 다음 틱 시작에 처리된다
+        r.submit(room -> room.setInput(m, 0, 0, base + 30_000_000L));
+        now[0] += 50_000_000L;
+        r.tick();
+        for (int i = 0; i < 40; i++) { now[0] += 50_000_000L; r.tick(); } // 멈출 때까지
+        // 정확한 식: 20ms 가속 뒤 감속해 멈춘 거리 = 240 × 0.02 (속도 곡선 아래 넓이와 같다)
+        assertThat(m.x).isCloseTo(240 * 0.02, org.assertj.core.data.Offset.offset(0.05));
+        assertThat(m.vx).isCloseTo(0, org.assertj.core.data.Offset.offset(0.01));
+    }
+
+    @Test
+    void orbIsEatenWhenCircleCoversIt() {
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
+        m.x = 0; m.y = 0;
+        r.placeOrb(5, 0);     // 원(반지름 16) 안
+        r.placeOrb(300, 300); // 멀리
+        r.tick();
+        assertThat(out.orbEaters).containsExactly(1L);
+        assertThat(r.orbCount()).isEqualTo(1);
+    }
+
+    @Test
+    void orbsSpawnUpToMax() {
+        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 5, 0.5), new Out());
+        r.join(1, "s1", "a", 1, 0, List.of());
+        for (int i = 0; i < 20 * 10; i++) r.tick(); // 10초
+        assertThat(r.orbCount()).isEqualTo(5);
+    }
+
+    @Test
     void rejoinWithinOneMinuteKeepsLastPositionAndProtection() {
-        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 5);
+        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 5, 0, 3);
         Room r = new Room(1, withProtect, new Out());
         Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
         m.x = 321; m.y = -123;

@@ -89,7 +89,7 @@ CREATE TABLE players (
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
   exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, + 횟수로만 쌓이고 줄지 않음)',
   level               INT NOT NULL DEFAULT 1 COMMENT '레벨(1~100, levels의 누적 EXP로 정한 캐시). 아이콘은 10레벨에서 완성, 11레벨부터 꾸미기 가능(설정)',
-  current_score       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기). min(EXP, 100) + 내 트렌드 키워드 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
+  current_score       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기). min(EXP, 100) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
   hold_count          INT NOT NULL DEFAULT 0 COMMENT '지금 가진(만료되지 않은) 트렌드 키워드 개수(player_keywords 행 수 캐시, 0 아래로 내려가지 않음, 1시간마다 실제 행 수로 보정)',
   total_plus_count    INT NOT NULL DEFAULT 0 COMMENT '누적 + 횟수(만료 행 재사용 포함, 줄지 않음)',
   comment_score       INT NOT NULL DEFAULT 0 COMMENT '댓글 점수: 댓글을 쓰면 +1, 삭제하면 -1, 내 댓글이 추천을 받으면 +1, 비추천을 받으면 -1(0 아래로 내려가지 않음)',
@@ -122,7 +122,7 @@ CREATE TABLE profiles (
 
 CREATE TABLE data_sources (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '데이터 소스 ID',
-  name       VARCHAR(50) NOT NULL COMMENT '어느 데이터인지(naver_datalab, bq_trends_rising, internal 등). 화면 표시는 코드로 번역',
+  name       VARCHAR(50) NOT NULL COMMENT '어느 데이터인지(naver_datalab, bq_trends_rising, google, internal 등). 화면 표시는 코드로 번역',
   weight     DECIMAL(6,3) NOT NULL COMMENT '반영값(가중치, 0~2). 외부 소스 2, internal 1. 키워드 트렌드 값에 곱함. 0이면 사용 안 함',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
@@ -146,13 +146,14 @@ CREATE TABLE keywords (
   keyword_state_id BIGINT NOT NULL COMMENT '키워드 상태 ID(활성/비활성/금지)',
   text             VARCHAR(20) NOT NULL COMMENT '표시용 키워드(최대 20자, 입력한 표기 유지)',
   normalized       VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '정규화 키워드(같은 단어 판정용 유일 키, 바이트 비교. NFKC·소문자·공백 제거, 규칙은 4.18)',
-  trend_value      DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT '트렌드 값(0~100). 활성 상태면 반영 소스 가중치 × (10 + 40 × g(holder_count)), 그 외 0. g는 4.8. 키워드 점수 = trend_value × 점수 환산 계수',
+  trend_value      DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT '트렌드 값(0~100). 활성 상태면 반영 소스 가중치 × (10 + 40 × g(holder_count)), 그 외 0. g는 4.8. 키워드 점수 = trend_value',
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '누적 검색 수(매시 메모리 카운터를 더함)',
   total_plus_count BIGINT NOT NULL DEFAULT 0 COMMENT '누적 + 수(삭제·잃기로 줄지 않음)',
   holder_count     INT NOT NULL DEFAULT 0 COMMENT '지금 가진 사람 수(player_keywords 행 수 캐시)',
   activated_at     DATETIME(6) NULL COMMENT '처음 🔥활성이 된 시각(NULL이면 한 번도 활성 전)',
   inactive_at      DATETIME(6) NULL COMMENT '비활성 전환 시각',
   banned_at        DATETIME(6) NULL COMMENT '금지 시각',
+  external_until   DATETIME(6) NULL COMMENT '목록형 외부 소스(google)에 의한 활성 유지 끝 시각(목록에 보일 때마다 지금 + 7일). 지나면 목록에 아직 있는지 다시 본다(10.2)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
@@ -200,7 +201,7 @@ CREATE TABLE keyword_log_dailies (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키워드 일별 기록(180일 보관)';
 
 CREATE TABLE player_keywords (
-  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '내 트렌드 키워드 ID(+ 한 번)',
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '보관함 ID(+ 한 번)',
   player_id  BIGINT NOT NULL COMMENT '플레이어 ID(players.id). 키워드와 같은 지역인지는 애플리케이션에서 검사',
   keyword_id BIGINT NOT NULL COMMENT '키워드 ID',
   expires_at DATETIME(6) NOT NULL COMMENT '삭제 시각(created_at + 24시간)',
@@ -212,7 +213,7 @@ CREATE TABLE player_keywords (
   KEY idx_player_keywords_expires (expires_at),
   CONSTRAINT fk_player_keywords_player FOREIGN KEY (player_id) REFERENCES players (id),
   CONSTRAINT fk_player_keywords_keyword FOREIGN KEY (keyword_id) REFERENCES keywords (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='내 트렌드 키워드(+ 기록, 24시간 뒤 삭제)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='보관함(+ 기록, 24시간 뒤 삭제)';
 
 CREATE TABLE comments (
   id            BIGINT NOT NULL AUTO_INCREMENT COMMENT '댓글 ID',
