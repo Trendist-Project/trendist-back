@@ -50,7 +50,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         var safe = new ConcurrentWebSocketSessionDecorator(session, 2000, 256 * 1024,
                 ConcurrentWebSocketSessionDecorator.OverflowStrategy.DROP);
         session.getAttributes().put(ATTR_SAFE, safe);
-        session.getAttributes().put(ATTR_INPUTS, new ConcurrentHashMap<String, long[]>()); // 메시지 종류 → [윈도 시작 ms, 횟수]
+        session.getAttributes().put(ATTR_INPUTS, new ConcurrentHashMap<String, Bucket>()); // 메시지 종류 → 토큰 버킷
         timeouts.schedule(() -> {
             if (session.isOpen() && !session.getAttributes().containsKey(ATTR_MEMBER)) close(session, CloseStatus.POLICY_VIOLATION);
         }, 5, TimeUnit.SECONDS);
@@ -116,20 +116,37 @@ public class GameSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 이동 명령 빈도 제한(9.5). 종류별로 1초에 받는 횟수를 따로 센다. 넘으면 무시한다.
-     * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 누르고 뗄 때마다 바로 보낸다. 서버는 네트워크에서 간격이 좁혀져
-     * 도착하는 경우를 감안해 조금 더 받는다. 마지막 클릭이 버려지면 예측과 서버의 목표가 달라져 화면이 보정되기 때문이다.
+     * 이동 명령 빈도 제한(9.5). 종류별 토큰 버킷: 초당 rate개씩 채워지고 최대 burst개까지 모인다. 버킷이 비면 무시한다.
+     * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 누르고 뗄 때마다 바로 보낸다. 고정 1초 창으로 세면 네트워크·프록시가
+     * 메시지를 몰아서 전달할 때 한도를 넘겨 그 창이 끝날 때까지 모든 명령이 버려졌다(화면은 갔다가 되돌아옴).
+     * 버킷은 잠깐 몰려 도착해도 받아 주고, 평균 빈도만 제한한다.
      */
     private boolean allowInput(WebSocketSession session, String type) {
         String key = "move".equals(type) || "input".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
-        int limit = switch (key) { case "move" -> 12; case "input" -> 60; default -> 10; };
+        double rate = switch (key) { case "move" -> 12; case "input" -> 60; default -> 10; };
+        double burst = switch (key) { case "move" -> 24; case "input" -> 60; default -> 10; };
         @SuppressWarnings("unchecked")
-        Map<String, long[]> windows = (Map<String, long[]>) session.getAttributes().get(ATTR_INPUTS);
-        long[] w = windows.computeIfAbsent(key, k -> new long[]{0, 0});
-        long now = System.currentTimeMillis();
-        synchronized (w) {
-            if (now - w[0] >= 1000) { w[0] = now; w[1] = 0; }
-            return ++w[1] <= limit;
+        Map<String, Bucket> buckets = (Map<String, Bucket>) session.getAttributes().get(ATTR_INPUTS);
+        Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(burst, System.nanoTime()));
+        synchronized (bucket) {
+            return bucket.take(System.nanoTime(), rate, burst);
+        }
+    }
+
+    /** 토큰 버킷 하나: 남은 토큰과 마지막으로 채운 시각. */
+    static final class Bucket {
+        private double tokens;
+        private long filledAt;
+
+        Bucket(double tokens, long nowNanos) { this.tokens = tokens; this.filledAt = nowNanos; }
+
+        /** 지난 시간만큼 채우고, 하나를 쓸 수 있으면 쓰고 true. */
+        boolean take(long nowNanos, double rate, double burst) {
+            tokens = Math.min(burst, tokens + (nowNanos - filledAt) / 1e9 * rate);
+            filledAt = nowNanos;
+            if (tokens < 1) return false;
+            tokens -= 1;
+            return true;
         }
     }
 
