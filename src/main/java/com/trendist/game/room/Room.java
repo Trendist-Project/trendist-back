@@ -39,7 +39,7 @@ public class Room {
         public double x, y, vx, vy;
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
-        public Double targetX, targetY;    // 더블클릭 목표
+        public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
         public double kbX, kbY, kbTime;    // 튕김
         public double idleSeconds;
         public double driftAngle, driftTimer;
