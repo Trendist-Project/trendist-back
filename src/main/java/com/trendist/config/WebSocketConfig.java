@@ -1,6 +1,6 @@
 package com.trendist.config;
 
-import com.trendist.game.GameSocketHandler;
+import com.trendist.game.controller.GameSocketHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;

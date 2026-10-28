@@ -1,8 +1,8 @@
 package com.trendist.config;
 
-import com.trendist.auth.AccountGuard;
-import com.trendist.auth.JwtAuthFilter;
-import com.trendist.auth.JwtService;
+import com.trendist.auth.security.AccountGuard;
+import com.trendist.auth.security.JwtAuthFilter;
+import com.trendist.auth.service.JwtService;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

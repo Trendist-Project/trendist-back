@@ -1,0 +1,35 @@
+package com.trendist.player.service;
+
+import com.trendist.player.dto.PlayerDtos;
+import com.trendist.player.entity.Player;
+import java.math.BigDecimal;
+import java.util.Optional;
+
+/** 플레이어(사용자 × 나라): 입장, 닉네임, 현재 유행도 재합산(4.1, 4.8). */
+public interface PlayerService {
+
+    /** 방 입장에 필요한 값(트랜잭션 안에서 꺼낸다). */
+    record JoinInfo(long playerId, long countryId, String nickname, int level, double score) {}
+
+    /** 사용자의 현재 나라 플레이어. 마지막으로 플레이한 나라, 없으면 KR. */
+    Optional<Player> findCurrent(long userId);
+
+    Optional<JoinInfo> joinInfo(long userId);
+
+    /** 현재 나라 플레이어. 없으면 NO_PLAYER(닉네임을 먼저 정해야 함). */
+    Player requireCurrent(long userId);
+
+    /** 닉네임 정하기(그 나라 첫 입장). */
+    Player create(long userId, String rawNickname, String countryCode);
+
+    PlayerDtos.PlayerSummary summary(Player p);
+
+    /**
+     * 현재 유행도를 다시 합산한다(4.8): min(EXP, 100) + Σ 🔥 키워드 trend_value × 계수.
+     * 호출하는 쪽이 players 행을 잠근 트랜잭션 안에서 부른다. 결과는 커밋 뒤 방에 전달된다.
+     */
+    BigDecimal recompute(Player p);
+
+    /** 다른 트랜잭션에서 한 플레이어를 잠그고 다시 합산한다(재합산 잡, 전체 점검). */
+    void recomputeLocked(long playerId, boolean fixHoldCount);
+}

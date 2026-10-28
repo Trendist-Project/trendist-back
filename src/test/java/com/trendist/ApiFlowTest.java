@@ -1,5 +1,6 @@
 package com.trendist;
 
+import com.trendist.keyword.support.TrendFormula;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import com.trendist.keyword.TrendFormula;
 import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;

@@ -1,9 +1,21 @@
 package com.trendist.seed;
 
-import com.trendist.common.CodeTables;
-import com.trendist.domain.*;
-import com.trendist.repo.*;
-import com.trendist.setting.SettingKeys;
+import com.trendist.common.code.CodeTables;
+import com.trendist.country.entity.Country;
+import com.trendist.country.repository.CountryRepository;
+import com.trendist.keyword.entity.DataSource;
+import com.trendist.keyword.entity.KeywordState;
+import com.trendist.keyword.repository.DataSourceRepository;
+import com.trendist.keyword.repository.KeywordStateRepository;
+import com.trendist.player.entity.Level;
+import com.trendist.player.repository.LevelRepository;
+import com.trendist.setting.entity.Setting;
+import com.trendist.setting.repository.SettingRepository;
+import com.trendist.setting.support.SettingKeys;
+import com.trendist.title.entity.Title;
+import com.trendist.title.repository.TitleRepository;
+import com.trendist.user.entity.UserState;
+import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import org.slf4j.Logger;
