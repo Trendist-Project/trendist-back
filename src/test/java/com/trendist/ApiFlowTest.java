@@ -3,6 +3,7 @@ package com.trendist;
 import com.trendist.keyword.support.TrendFormula;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,6 +61,28 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$[0].body").isNotEmpty());
         mvc.perform(get("/api/guide/categories/nope/articles")).andExpect(status().isNotFound());
         mvc.perform(get("/api/notices")).andExpect(status().isOk());
+    }
+
+    @Test
+    void nicknameCanBeChangedOncePerHour() throws Exception {
+        String token = player("처음이름");
+        // 처음 정한 뒤 첫 변경은 바로 된다
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.player.nicknameChangeableAt").doesNotExist());
+        mvc.perform(patch("/api/me/nickname").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"새이름\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("새이름"))
+                .andExpect(jsonPath("$.nicknameChangeableAt").isNotEmpty());
+        // 1시간 안에 다시 바꾸면 거절
+        mvc.perform(patch("/api/me/nickname").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"또다른이름\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("NICKNAME_TOO_SOON"));
+        // 규칙에 맞지 않는 닉네임은 간격과 상관없이 거절
+        mvc.perform(patch("/api/me/nickname").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"a#b\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

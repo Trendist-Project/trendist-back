@@ -29,4 +29,12 @@ public class PlayerController {
                                            @Valid @RequestBody PlayerDtos.CreatePlayerRequest req) {
         return playerService.summary(playerService.create(user.userId(), req.nickname(), req.countryCode()));
     }
+
+    /** 현재 나라 닉네임 바꾸기(4.1). */
+    @PatchMapping("/me/nickname")
+    @Transactional
+    public PlayerDtos.PlayerSummary changeNickname(@AuthenticationPrincipal AuthUser user,
+                                                   @Valid @RequestBody PlayerDtos.ChangeNicknameRequest req) {
+        return playerService.summary(playerService.changeNickname(user.userId(), req.nickname()));
+    }
 }

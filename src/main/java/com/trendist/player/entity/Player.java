@@ -43,4 +43,10 @@ public class Player extends BaseTimeEntity {
     public void decHold() { this.holdCount = Math.max(0, holdCount - 1); }
     public void setHoldCount(int holdCount) { this.holdCount = Math.max(0, holdCount); }
     public void touchPlayed(Instant now) { this.lastPlayedAt = now; }
+
+    /** 닉네임 변경. 변경 간격 검사는 서비스가 하고, 여기서는 변경 시각을 함께 남긴다(4.1). */
+    public void changeNickname(String nickname, Instant now) {
+        this.nickname = nickname;
+        this.nicknameChangedAt = now;
+    }
 }

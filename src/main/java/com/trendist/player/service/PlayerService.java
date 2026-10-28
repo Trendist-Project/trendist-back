@@ -22,6 +22,9 @@ public interface PlayerService {
     /** 닉네임 정하기(그 나라 첫 입장). */
     Player create(long userId, String rawNickname, String countryCode);
 
+    /** 현재 나라 닉네임 바꾸기. 마지막 변경 후 설정 간격(기본 1시간)이 지나야 한다(4.1). */
+    Player changeNickname(long userId, String rawNickname);
+
     PlayerDtos.PlayerSummary summary(Player p);
 
     /**

@@ -122,6 +122,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @TransactionalEventListener(fallbackExecution = true)
+    public void on(GameEvents.NicknameChanged e) {
+        Room r = rooms.get(e.countryId());
+        if (r != null) r.submit(room -> room.applyNickname(e.playerId(), e.nickname()));
+    }
+
+    @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.HoldingChanged e) {
         Room r = rooms.get(e.countryId());
         if (r != null) r.submit(room -> room.applyHolding(e.playerId(), e.keywordId(), e.added()));

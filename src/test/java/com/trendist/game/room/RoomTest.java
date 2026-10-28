@@ -51,6 +51,29 @@ class RoomTest {
     }
 
     @Test
+    void rejoinWithinOneMinuteKeepsLastPositionAndProtection() {
+        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 5);
+        Room r = new Room(1, withProtect, new Out());
+        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
+        m.x = 321; m.y = -123;
+        double protectUntil = m.protectUntil;
+        r.leave(m);
+        for (int i = 0; i < 20 * 30; i++) r.tick(); // 30초 뒤 새로고침
+
+        Room.Member back = r.join(1, "s2", "a", 1, 0, List.of());
+        assertThat(back.x).isEqualTo(321);
+        assertThat(back.y).isEqualTo(-123);
+        assertThat(back.protectUntil).isEqualTo(protectUntil); // 들어올 때 보호를 다시 받지 않는다
+
+        back.x = 321; back.y = -123;
+        r.leave(back);
+        for (int i = 0; i < 20 * 61; i++) r.tick(); // 1분이 지나면 새 자리
+        Room.Member later = r.join(1, "s3", "a", 1, 0, List.of());
+        assertThat(later.x != 321 || later.y != -123).isTrue();
+        assertThat(later.protectUntil).isGreaterThan(protectUntil);
+    }
+
+    @Test
     void lowerScoreLosesKeywordOnCollision() {
         Out out = new Out();
         Room r = new Room(1, T, out);

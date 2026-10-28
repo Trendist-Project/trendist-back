@@ -107,7 +107,7 @@ public class KeywordServiceImpl implements KeywordService {
         boolean newHolder;
         if (existing.isPresent()) {
             PlayerKeyword pk = existing.get();
-            if (!pk.isExpired(now)) throw ApiException.conflict("ALREADY_PLUSED", "이미 +한 키워드예요");
+            if (!pk.isExpired(now)) throw ApiException.conflict("ALREADY_PLUSED", "이미 보유중인 키워드예요");
             pk.renew(now, expires); // 만료 행 재사용: 가진 사람 수는 그대로
             newHolder = false;
         } else {

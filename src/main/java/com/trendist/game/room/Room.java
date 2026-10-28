@@ -16,6 +16,7 @@ public class Room {
     private static final int SNAPSHOT_EVERY = 2;
     private static final int MINIMAP_EVERY = 20; // 1초마다
     private static final int MINIMAP_TOP = 20;   // 큰 아이콘 상위 20명(4.2)
+    public static final double REJOIN_KEEP_SECONDS = 60; // 나간 뒤 이 시간 안에 다시 들어오면 마지막 위치에서 이어 간다(4.2)
 
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
@@ -56,6 +57,10 @@ public class Room {
     private final Map<Long, Member> byPlayer = new HashMap<>();
     private final Map<Long, Set<Member>> holders = new HashMap<>();
     private final Map<Long, Double> pairCooldown = new HashMap<>();
+    private final Map<Long, LastSeen> lastSeen = new HashMap<>(); // 나간 플레이어의 마지막 위치
+
+    /** 나간 플레이어의 마지막 위치와 보호 종료 시각. keepUntil이 지나면 버린다. */
+    private record LastSeen(double x, double y, double protectUntil, double keepUntil) {}
     private volatile Tuning tuning;
     private int nextEntity = 1;
     private long tick;
@@ -85,9 +90,17 @@ public class Room {
         m.nickname = nickname; m.level = level; m.score = score;
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         double area = activeArea(members.size() + 1);
-        double[] spawn = findSpawn(area);
-        m.x = spawn[0]; m.y = spawn[1];
-        m.protectUntil = clockSeconds + tuning.joinProtectSeconds();
+        LastSeen seen = lastSeen.remove(playerId);
+        if (seen != null && seen.keepUntil() >= clockSeconds) {
+            // 새로고침으로 위치를 바꾸거나 보호를 다시 받지 못하게, 마지막 위치와 남은 보호 시간을 그대로 이어 간다
+            double half = area / 2;
+            m.x = clamp(seen.x(), -half, half); m.y = clamp(seen.y(), -half, half);
+            m.protectUntil = seen.protectUntil();
+        } else {
+            double[] spawn = findSpawn(area);
+            m.x = spawn[0]; m.y = spawn[1];
+            m.protectUntil = clockSeconds + tuning.joinProtectSeconds();
+        }
         m.keywords.addAll(keywordIds);
         for (Long k : keywordIds) holders.computeIfAbsent(k, x -> new HashSet<>()).add(m);
         members.put(m.entityNo, m);
@@ -100,6 +113,7 @@ public class Room {
     public void leave(Member m) {
         if (members.remove(m.entityNo) == null) return;
         byPlayer.remove(m.playerId);
+        lastSeen.put(m.playerId, new LastSeen(m.x, m.y, m.protectUntil, clockSeconds + REJOIN_KEEP_SECONDS));
         for (Long k : m.keywords) {
             Set<Member> set = holders.get(k);
             if (set != null) { set.remove(m); if (set.isEmpty()) holders.remove(k); }
@@ -157,6 +171,14 @@ public class Room {
         }
     }
 
+    /** 접속 중인 플레이어의 이름표를 바꾸고 모두에게 명단을 다시 보낸다. */
+    public void applyNickname(long playerId, String nickname) {
+        Member m = byPlayer.get(playerId);
+        if (m == null) return;
+        m.nickname = nickname;
+        broadcastRoster();
+    }
+
     public void protect(long playerId) {
         Member m = byPlayer.get(playerId);
         if (m != null) m.protectUntil = clockSeconds + tuning.loseProtectSeconds();
@@ -185,6 +207,7 @@ public class Room {
             for (Member m : members.values()) view.put(m.playerId, m.score);
             scoreView = view;
             pairCooldown.values().removeIf(until -> until < clockSeconds);
+            lastSeen.values().removeIf(seen -> seen.keepUntil() < clockSeconds);
         }
     }
 

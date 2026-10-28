@@ -135,6 +135,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/keywords/{id}/comments/top` | 추천 상위 3개(10초 캐시) |
 | `GET /api/keywords/{id}/comments?page=&size=` | 최신순, `size` 최대 50 |
 | `GET /api/keywords/{id}/activity?range=24h\|7d\|30d\|180d` | 검색 수·`+` 수·가진 사람 수 증분(24시간은 시간별, 나머지는 현지 하루별)과 누적값(1분 캐시). 이번 시간은 메모리 카운터를 합쳐 "집계 중"으로 표시 |
+| `PATCH /api/me/nickname` | `{ "nickname": "..." }`. 현재 나라 닉네임을 바꾼다(4.1). 규칙 위반 400, 지금과 같으면 400 `NICKNAME_SAME`, 변경 간격 전이면 409 `NICKNAME_TOO_SOON`. 응답은 플레이어 요약이고 `nicknameChangeableAt`(다음 변경 가능 시각, 없으면 바로 가능)을 담는다 |
 | `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 팝업 공지 목록(최대 10), 본 기록(멱등) |

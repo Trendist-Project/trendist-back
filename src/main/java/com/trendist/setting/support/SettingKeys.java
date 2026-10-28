@@ -30,6 +30,7 @@ public final class SettingKeys {
     public static final String COLLISION_COOLDOWN = "collision_cooldown_seconds";
     public static final String LOSE_PROTECT_SECONDS = "lose_protect_seconds";
     public static final String JOIN_PROTECT_SECONDS = "join_protect_seconds";
+    public static final String NICKNAME_CHANGE_MINUTES = "nickname_change_minutes";
 
     public static final List<Def> DEFAULTS = List.of(
             new Def(TREND_BASE_POPULATION, "1000", 1, 10000, "트렌드 값 식의 기준 인원(g(n)=1)"),
@@ -53,5 +54,6 @@ public final class SettingKeys {
             new Def(KNOCKBACK_SECONDS, "0.4", 0.05, 5, "튕김 감속 시간(초)"),
             new Def(COLLISION_COOLDOWN, "0.5", 0, 10, "같은 상대 연속 충돌 쿨다운(초)"),
             new Def(LOSE_PROTECT_SECONDS, "10", 0, 600, "키워드를 잃은 뒤 보호(초)"),
-            new Def(JOIN_PROTECT_SECONDS, "10", 0, 600, "입장 직후 보호(초)"));
+            new Def(JOIN_PROTECT_SECONDS, "10", 0, 600, "입장 직후 보호(초)"),
+            new Def(NICKNAME_CHANGE_MINUTES, "60", 0, 10080, "닉네임 변경 간격(분, 나라별)"));
 }

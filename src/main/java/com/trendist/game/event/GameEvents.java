@@ -12,6 +12,9 @@ public final class GameEvents {
     /** 키워드의 trend_value가 바뀌었다. 접속 중인 보유자 점수에 deltaScore를 더한다(excludePlayerId는 이미 정확한 값을 받음). */
     public record KeywordTrendChanged(long countryId, long keywordId, BigDecimal deltaScore, Long excludePlayerId) {}
 
+    /** 닉네임이 바뀌었다. 접속 중이면 방의 이름표를 바꾼다. */
+    public record NicknameChanged(long countryId, long playerId, String nickname) {}
+
     /** 보유 색인 갱신(키워드 번호 → 플레이어). */
     public record HoldingChanged(long countryId, long playerId, long keywordId, boolean added) {}
 }

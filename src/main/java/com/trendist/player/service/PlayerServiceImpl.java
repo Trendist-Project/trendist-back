@@ -11,11 +11,14 @@ import com.trendist.player.dto.PlayerDtos;
 import com.trendist.player.entity.Player;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.support.NicknameValidator;
+import com.trendist.setting.service.SettingService;
+import com.trendist.setting.support.SettingKeys;
 import com.trendist.user.entity.User;
 import com.trendist.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final TrendFormula formula;
     private final CodeTables codes;
     private final ApplicationEventPublisher events;
+    private final SettingService settings;
     private final Clock clock;
 
     @Override
@@ -73,10 +77,33 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    @Transactional
+    public Player changeNickname(long userId, String rawNickname) {
+        String nickname = NicknameValidator.clean(rawNickname);
+        Player p = requireCurrent(userId);
+        if (nickname.equals(p.getNickname())) throw ApiException.badRequest("NICKNAME_SAME", "지금 닉네임과 같아요");
+        Instant now = Instant.now(clock);
+        Instant changeableAt = changeableAt(p);
+        if (changeableAt != null && now.isBefore(changeableAt)) {
+            long minutes = Math.max(1, (Duration.between(now, changeableAt).getSeconds() + 59) / 60);
+            throw ApiException.conflict("NICKNAME_TOO_SOON", "닉네임은 " + minutes + "분 뒤에 바꿀 수 있어요");
+        }
+        p.changeNickname(nickname, now);
+        events.publishEvent(new GameEvents.NicknameChanged(p.getCountry().getId(), p.getId(), nickname));
+        return p;
+    }
+
+    /** 다음에 닉네임을 바꿀 수 있는 시각. 처음 정한 뒤 한 번도 바꾸지 않았으면 null(바로 가능). */
+    private Instant changeableAt(Player p) {
+        if (p.getNicknameChangedAt() == null) return null;
+        return p.getNicknameChangedAt().plus(Duration.ofMinutes(settings.getInt(SettingKeys.NICKNAME_CHANGE_MINUTES)));
+    }
+
+    @Override
     public PlayerDtos.PlayerSummary summary(Player p) {
         return new PlayerDtos.PlayerSummary(p.getId(), p.getNickname(), p.getCountry().getCode(), p.getLevel(), p.getExp(),
                 levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getTotalPlusCount(),
-                p.getCommentScore());
+                p.getCommentScore(), changeableAt(p));
     }
 
     @Override
