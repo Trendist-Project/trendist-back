@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, focus{focused}
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}
  * 서버 → 클라이언트: 바이너리 스냅샷, JSON(welcome, tuning, roster, score, lost)
  */
 @Component
@@ -76,10 +76,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
             case "move" -> {
                 double x = node.path("x").asDouble(0), y = node.path("y").asDouble(0);
                 if (Double.isFinite(x) && Double.isFinite(y)) room.submit(r -> r.setTarget(member, x, y));
-            }
-            case "focus" -> {
-                boolean focused = node.path("focused").asBoolean(true);
-                room.submit(r -> r.setFocus(member, focused));
             }
             default -> { }
         }

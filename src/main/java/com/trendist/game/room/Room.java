@@ -41,8 +41,6 @@ public class Room {
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
         public double kbX, kbY, kbTime;    // 튕김
-        public double idleSeconds;
-        public double driftAngle, driftTimer;
         public double protectUntil;        // 키워드 잃기 보호 종료(방 시계 초)
         public final Set<Long> keywords = new HashSet<>();
 
@@ -117,16 +115,14 @@ public class Room {
     public void setInput(Member m, double dx, double dy) {
         double len = Math.hypot(dx, dy);
         m.dirX = len > 1 ? dx / len : dx; m.dirY = len > 1 ? dy / len : dy;
-        if (len > 0) { m.targetX = null; m.targetY = null; m.idleSeconds = 0; }
+        if (len > 0) { m.targetX = null; m.targetY = null; }
     }
 
     public void setTarget(Member m, double x, double y) {
         double half = activeArea(members.size()) / 2;
         m.targetX = clamp(x, -half, half); m.targetY = clamp(y, -half, half);
-        m.dirX = 0; m.dirY = 0; m.idleSeconds = 0;
+        m.dirX = 0; m.dirY = 0;
     }
-
-    public void setFocus(Member m, boolean focused) { if (!focused) m.idleSeconds = 999; }
 
     /** 그 사람 점수를 DB 값으로 맞춘다. */
     public void applyScore(long playerId, double score, int level) {
@@ -206,20 +202,8 @@ public class Room {
                 double s = speed * Math.min(1, d / 120); // 근처에서 감속
                 wantX = dx / d * s; wantY = dy / d * s;
             }
-        } else {
-            m.idleSeconds += dt;
-            if (m.idleSeconds > 3) { // 드리프트: 최대 속도의 35%, 약 2초마다 방향 전환
-                m.driftTimer -= dt;
-                if (m.driftTimer <= 0) {
-                    m.driftTimer = 2;
-                    double toCenter = Math.atan2(-m.y, -m.x);
-                    boolean nearWall = Math.abs(m.x) > half * 0.8 || Math.abs(m.y) > half * 0.8;
-                    m.driftAngle = nearWall ? toCenter + (ThreadLocalRandom.current().nextDouble() - 0.5)
-                            : ThreadLocalRandom.current().nextDouble() * Math.PI * 2;
-                }
-                wantX = Math.cos(m.driftAngle) * speed * 0.35; wantY = Math.sin(m.driftAngle) * speed * 0.35;
-            }
         }
+        // 입력도 목표도 없으면 감속해 그 자리에 멈춘다(자동으로 떠다니지 않는다)
         double a = Math.min(1, dt * 10);
         m.vx += (wantX - m.vx) * a; m.vy += (wantY - m.vy) * a;
         double kx = 0, ky = 0;

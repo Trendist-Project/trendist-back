@@ -41,6 +41,16 @@ class RoomTest {
     }
 
     @Test
+    void idlePlayerStaysStill() {
+        Room r = new Room(1, T, new Out());
+        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
+        m.x = 100; m.y = -50;
+        for (int i = 0; i < 200; i++) r.tick(); // 10초 동안 아무 입력 없음
+        assertThat(m.x).isEqualTo(100);
+        assertThat(m.y).isEqualTo(-50);
+    }
+
+    @Test
     void lowerScoreLosesKeywordOnCollision() {
         Out out = new Out();
         Room r = new Room(1, T, out);
