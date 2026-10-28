@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: trendist
+  profiles:
+    default: local
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+
+trendist:
+  jwt:
+    # 개발용 기본값. 운영에서는 반드시 환경 변수 TRENDIST_JWT_SECRET(32바이트 이상)로 바꾼다.
+    secret: ${TRENDIST_JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    access-ttl-minutes: 15
+  cookie:
+    secure: false
+  ws:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+  # 외부 트렌드 소스(네이버 데이터랩)를 붙이기 전까지 쓰는 개발용 값. 이 목록의 키워드는 외부 관심도가 있는 것으로 본다.
+  dev-trends:
+    enabled: true
+    # "키워드:관심도" 형식
+    keywords:
+      - "양쯔깐루:82"
+      - "두바이쫀득쿠키:64"
+      - "탕후루:35"
+      - "케이팝:70"
+      - "말차라떼:41"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:trendist;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE
+    username: sa
+    password: ""
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: ${TRENDIST_DB_URL:jdbc:mysql://localhost:3306/trendist?serverTimezone=UTC&characterEncoding=UTF-8&rewriteBatchedStatements=true}
+    username: ${TRENDIST_DB_USER:trendist}
+    password: ${TRENDIST_DB_PASSWORD:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+trendist:
+  cookie:
+    secure: true
+  dev-trends:
+    enabled: false
