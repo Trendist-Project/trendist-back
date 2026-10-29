@@ -51,7 +51,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional(readOnly = true)
     public Optional<JoinInfo> joinInfo(long userId) {
         return findCurrent(userId).map(p -> new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(),
-                Math.toIntExact(p.getLevel()), p.getCurrentScore()));
+                Math.toIntExact(p.getLevel()), p.getCurrentScore(), p.getTotalPlusCount() == 0));
     }
 
     @Override

@@ -42,6 +42,13 @@ public final class SettingKeys {
     public static final String ORB_SPAWN_PERCENT = "orb_spawn_percent";
     public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
     public static final String EXTERNAL_HOLD_HOURS = "external_hold_hours";
+    public static final String SAFE_CENTER_RATIO = "safe_center_ratio";
+    public static final String SAFE_CENTER_MIN = "safe_center_min";
+    public static final String SAFE_ZONE_RATIO = "safe_zone_ratio";
+    public static final String SAFE_ZONE_MIN = "safe_zone_min";
+    public static final String SAFE_ZONE_DENSITY = "safe_zone_density";
+    public static final String SAFE_ZONE_MAX = "safe_zone_max";
+    public static final String SAFE_ZONE_SECONDS = "safe_zone_seconds";
 
     /**
      * 기본값을 바꾼 설정과 예전 기본값. 시더는 기존 행을 덮어쓰지 않지만, 아직 예전 기본값 그대로인 행만 새 기본값으로 바꾼다
@@ -87,5 +94,13 @@ public final class SettingKeys {
             new Def(BOT_STEP_MIN, "20", 0, 100, "봇이 가진 키워드 하나의 점수 최소(사람의 키워드 점수처럼)"),
             new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),
             new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),
+            // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
+            new Def(SAFE_CENTER_RATIO, "0.06", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
+            new Def(SAFE_CENTER_MIN, "600", 100, 5000, "가운데 고정 세이프존 한 변 최소(px)"),
+            new Def(SAFE_ZONE_RATIO, "0.035", 0.005, 0.2, "무작위 세이프존 한 변: 활동 영역 한 변의 이 비율"),
+            new Def(SAFE_ZONE_MIN, "400", 100, 3000, "무작위 세이프존 한 변 최소(px)"),
+            new Def(SAFE_ZONE_DENSITY, "6", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
+            new Def(SAFE_ZONE_MAX, "40", 0, 200, "무작위 세이프존 동시 개수 상한"),
+            new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

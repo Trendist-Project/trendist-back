@@ -46,8 +46,10 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         tuningRefresher.scheduleAtFixedRate(() -> {
             try {
                 Room.Tuning t = tuning();
+                Room.ZoneTuning z = zoneTuning();
                 rooms.values().forEach(r -> {
                     if (!t.equals(r.tuning())) { r.setTuning(t); r.submit(rr -> broadcastTuning(rr)); }
+                    if (!z.equals(r.zoneTuning())) r.setZoneTuning(z);
                 });
             } catch (RuntimeException e) { log.warn("tuning refresh failed", e); }
         }, 1, 1, TimeUnit.SECONDS);
@@ -57,6 +59,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     public Room room(long countryId) {
         return rooms.computeIfAbsent(countryId, id -> {
             Room r = new Room(id, tuning(), this);
+            r.setZoneTuning(zoneTuning());
             r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
             ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(
                     run -> { Thread t = new Thread(run, "room-" + id); t.setDaemon(true); return t; }); // 틱은 플랫폼 스레드
@@ -94,6 +97,18 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.BOT_STEP_MIN),
                 settings.getDouble(SettingKeys.BOT_STEP_MAX),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP));
+    }
+
+    /** 세이프존 설정(4.22). */
+    private Room.ZoneTuning zoneTuning() {
+        return new Room.ZoneTuning(
+                settings.getDouble(SettingKeys.SAFE_CENTER_RATIO),
+                settings.getDouble(SettingKeys.SAFE_CENTER_MIN),
+                settings.getDouble(SettingKeys.SAFE_ZONE_RATIO),
+                settings.getDouble(SettingKeys.SAFE_ZONE_MIN),
+                settings.getDouble(SettingKeys.SAFE_ZONE_DENSITY),
+                settings.getInt(SettingKeys.SAFE_ZONE_MAX),
+                settings.getDouble(SettingKeys.SAFE_ZONE_SECONDS));
     }
 
     /** 클라이언트 예측에 필요한 값(9.2 설정값 전달). */

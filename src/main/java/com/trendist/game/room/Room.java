@@ -29,6 +29,18 @@ public class Room {
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
                          int botPlayers, double botCapRatio, double botStepMin, double botStepMax, double expScoreCap) {}
 
+    /**
+     * 세이프존 설정(4.22). 가운데 고정 존과 무작위 존의 한 변은 활동 영역 한 변의 비율(최소값 이상)이고,
+     * 무작위 존 수는 넓이 10,000×10,000px마다 density개(상한 max), 하나는 seconds초 동안 유지된다.
+     */
+    public record ZoneTuning(double centerRatio, double centerMin, double zoneRatio, double zoneMin,
+                             double density, int max, double seconds) {
+        public static final ZoneTuning DEFAULT = new ZoneTuning(0.06, 600, 0.035, 400, 6, 40, 300);
+    }
+
+    /** 무작위 세이프존 하나. 정사각형 중심(x, y)과 한 변, 사라지는 시각(방 시계 초). */
+    record SafeZone(int id, double x, double y, double size, double expiresAt) {}
+
     /** 방 밖(서비스)으로 나가는 요청: 충돌로 키워드 잃기, 메시지 전송. */
     public interface Outbox {
         void requestLose(Room room, Member loser, Member winner);
@@ -53,6 +65,7 @@ public class Room {
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
         public double kbX, kbY, kbTime;    // 튕김: 전체 밀려날 거리(벡터)와 남은 시간
         public double protectUntil;        // 키워드 잃기 보호 종료(방 시계 초)
+        public boolean safe;               // 이번 틱에 세이프존 안에 있다(4.22). 부딪히지 않는다
         public final Set<Long> keywords = new HashSet<>();
         /** 마지막으로 이 접속에서 메시지(ping 포함)를 받은 시각(nanoTime). 받는 스레드가 쓰고 틱이 읽는다 */
         public volatile long lastHeardNanos;
@@ -90,6 +103,10 @@ public class Room {
     private final Map<Integer, double[]> orbs = new LinkedHashMap<>(); // ? 구슬 번호 → {x, y}
     private int nextOrb = 1;
     private double nextOrbAt;
+    private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
+    private final List<SafeZone> zones = new ArrayList<>();
+    private int nextZone = 1;
+    private double centerSize, sentCenterSize = -1;
 
     /** 나간 플레이어의 마지막 위치와 보호 종료 시각. keepUntil이 지나면 버린다. */
     private record LastSeen(double x, double y, double protectUntil, double keepUntil) {}
@@ -117,6 +134,8 @@ public class Room {
     public long countryId() { return countryId; }
     public int size() { return size; }
     public void setTuning(Tuning t) { this.tuning = t; }
+    public void setZoneTuning(ZoneTuning z) { this.zoneTuning = z; }
+    public ZoneTuning zoneTuning() { return zoneTuning; }
     public Tuning tuning() { return tuning; }
     public void submit(Consumer<Room> task) { tasks.add(task); }
 
@@ -129,6 +148,12 @@ public class Room {
     // ------------------------------------------------------------ 틱 스레드에서만 부른다
 
     public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds) {
+        return join(playerId, session, nickname, level, score, keywordIds, false);
+    }
+
+    /** firstTime이면(처음 온 플레이어) 가운데 고정 세이프존 안에서 시작한다(4.22). */
+    public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
+                       boolean firstTime) {
         Member old = byPlayer.get(playerId);
         if (old != null) leave(old); // 한 계정은 한 방에 한 연결
         Member m = new Member(nextEntity++, playerId, session);
@@ -143,7 +168,7 @@ public class Room {
             m.x = clamp(seen.x(), -half, half); m.y = clamp(seen.y(), -half, half);
             m.protectUntil = seen.protectUntil();
         } else {
-            double[] spawn = findSpawn(area);
+            double[] spawn = firstTime ? centerSpawn(area) : findSpawn(area);
             m.x = spawn[0]; m.y = spawn[1];
             m.protectUntil = clockSeconds + tuning.joinProtectSeconds();
         }
@@ -154,6 +179,7 @@ public class Room {
         size = humanCount();
         broadcastRoster();
         outbox.sendText(m, orbListMessage());
+        outbox.sendText(m, zonesMessage());
         outbox.sendText(m, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
         return m;
     }
@@ -278,6 +304,8 @@ public class Room {
         if (tick % 20 == 0) { dropSilent(); maintainBots(tu); }
         thinkBots(tu, half);
         for (Member m : members.values()) move(m, dt, tu, half);
+        updateZones(half);
+        for (Member m : members.values()) m.safe = inSafeZone(m.x, m.y);
         collide(tu);
         eatOrbs();
         spawnOrbs(tu, half);
@@ -347,6 +375,75 @@ public class Room {
         m.x += wantX * h + (m.vx - wantX) * moved; m.y += wantY * h + (m.vy - wantY) * moved;
         m.vx = wantX + (m.vx - wantX) * e; m.vy = wantY + (m.vy - wantY) * e;
     }
+
+    // ------------------------------------------------------------ 세이프존(4.22)
+
+    /** 원의 중심이 가운데 고정 존이나 무작위 존 안에 있는지. */
+    boolean inSafeZone(double x, double y) {
+        double c = centerSize / 2;
+        if (Math.abs(x) <= c && Math.abs(y) <= c) return true;
+        for (SafeZone z : zones) {
+            if (Math.abs(x - z.x()) <= z.size() / 2 && Math.abs(y - z.y()) <= z.size() / 2) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 가운데 고정 존 크기를 활동 영역에 맞추고, 시간이 다 됐거나 영역 밖으로 나간 무작위 존을 지운다.
+     * 무작위 존은 목표 개수(넓이 비례)보다 적으면 1초에 하나씩 무작위 위치에 생긴다. 바뀌면 모두에게 목록을 다시 보낸다.
+     */
+    private void updateZones(double half) {
+        ZoneTuning zt = zoneTuning;
+        double area = half * 2;
+        centerSize = Math.min(area / 2, Math.max(zt.centerMin(), area * zt.centerRatio()));
+        boolean changed = Math.abs(centerSize - sentCenterSize) > 1;
+        changed |= zones.removeIf(z -> z.expiresAt() <= clockSeconds
+                || Math.abs(z.x()) + z.size() / 2 > half || Math.abs(z.y()) + z.size() / 2 > half);
+        int target = (int) Math.min(zt.max(), Math.round(area * area / 1e8 * zt.density()));
+        if (!members.isEmpty() && zones.size() < target && tick % 20 == 0) changed |= spawnZone(half, zt);
+        if (changed) { sentCenterSize = centerSize; broadcast(zonesMessage()); }
+    }
+
+    /** 다른 존과 겹치지 않는 무작위 위치에 존 하나. 10번 안에 자리를 못 찾으면 다음 기회에. */
+    private boolean spawnZone(double half, ZoneTuning zt) {
+        double size = Math.max(zt.zoneMin(), half * 2 * zt.zoneRatio()), gap = 200;
+        double range = half - size / 2 - 100;
+        if (range <= 0) return false;
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        for (int tries = 0; tries < 10; tries++) {
+            double x = (rnd.nextDouble() * 2 - 1) * range, y = (rnd.nextDouble() * 2 - 1) * range;
+            double reach = (centerSize + size) / 2 + gap;
+            if (Math.abs(x) < reach && Math.abs(y) < reach) continue;
+            boolean blocked = false;
+            for (SafeZone z : zones) {
+                double r = (z.size() + size) / 2 + gap;
+                if (Math.abs(x - z.x()) < r && Math.abs(y - z.y()) < r) { blocked = true; break; }
+            }
+            if (blocked) continue;
+            zones.add(new SafeZone(nextZone++, x, y, size, clockSeconds + zt.seconds()));
+            return true;
+        }
+        return false;
+    }
+
+    /** {type: safeZones, center: 한 변, zones: [[번호, x, y, 한 변, 남은 ms]...]} */
+    private Map<String, Object> zonesMessage() {
+        List<List<Object>> list = new ArrayList<>();
+        for (SafeZone z : zones) list.add(List.of(z.id(), z.x(), z.y(), z.size(), Math.round((z.expiresAt() - clockSeconds) * 1000)));
+        return Map.of("type", "safeZones", "center", centerSize, "zones", list);
+    }
+
+    /** 처음 온 플레이어의 자리: 가운데 고정 존 안 무작위 위치. */
+    private double[] centerSpawn(double area) {
+        double c = Math.min(area / 2, Math.max(zoneTuning.centerMin(), area * zoneTuning.centerRatio()));
+        double range = Math.max(0, c / 2 - 60);
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        return new double[]{(rnd.nextDouble() * 2 - 1) * range, (rnd.nextDouble() * 2 - 1) * range};
+    }
+
+    /** 테스트용: 지금 무작위 세이프존 수와 가운데 존 한 변. */
+    int zoneCount() { return zones.size(); }
+    double centerZoneSize() { return centerSize; }
 
     // ------------------------------------------------------------ ? 구슬(4.20)
 
@@ -450,6 +547,7 @@ public class Room {
                 Member a = list.get(i), b = list.get(j);
                 long key = a.entityNo < b.entityNo ? ((long) a.entityNo << 32) | b.entityNo : ((long) b.entityNo << 32) | a.entityNo;
                 if (!checked.add(key)) continue;
+                if (a.safe || b.safe) continue; // 세이프존에서는 겹쳐 있어도 튕기지 않고 키워드도 잃지 않는다(4.22)
                 double dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.displayRadius + b.displayRadius;
                 if (d >= min) continue;
                 if (d < 0.001) { dx = 1; dy = 0; d = 1; }
@@ -732,8 +830,9 @@ public class Room {
             for (Member o : members.values()) {
                 if (o == b) continue;
                 double d = Math.hypot(o.x - b.x, o.y - b.y) - o.displayRadius - b.displayRadius;
-                if (o.score > b.score && d < fleeRange && d < threatD) { threat = o; threatD = d; }
-                if (o.score < b.score && d < chaseRange && d < preyD) { prey = o; preyD = d; }
+                // 세이프존 안의 원은 잡을 수 없고, 내가 세이프존 안이면 도망칠 필요가 없다(4.22)
+                if (!b.safe && !o.safe && o.score > b.score && d < fleeRange && d < threatD) { threat = o; threatD = d; }
+                if (!o.safe && o.score < b.score && d < chaseRange && d < preyD) { prey = o; preyD = d; }
             }
             double limit = half - 60 - b.displayRadius;
 

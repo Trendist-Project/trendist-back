@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 class RoomTest {
     static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
 
+    /** 충돌 테스트: 무작위 세이프존을 끄고, 가운데 고정 세이프존(한 변 600px) 밖에서 부딪히게 한다(4.22). */
+    static final Room.ZoneTuning NO_RANDOM_ZONES = new Room.ZoneTuning(0.06, 600, 0.035, 400, 0, 0, 300);
+
     static class Out implements Room.Outbox {
         final List<long[]> loses = new ArrayList<>();
         final List<ByteBuffer> sent = new ArrayList<>();
@@ -122,9 +125,10 @@ class RoomTest {
     void lowerScoreLosesKeywordOnCollision() {
         Out out = new Out();
         Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member a = r.join(1, "s1", "a", 1, 10, List.of(100L));
         Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
-        a.x = 0; a.y = 0; b.x = 10; b.y = 0;
+        a.x = 800; a.y = 800; b.x = 810; b.y = 800;
         r.tick();
         assertThat(out.loses).hasSize(1);
         assertThat(out.loses.get(0)[0]).isEqualTo(1L);
@@ -245,6 +249,7 @@ class RoomTest {
     void humanLosesKeywordToBotAndBotLosesKeywordToHuman() {
         Out out = new Out();
         Room r = new Room(1, withBots(2), out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member human = r.join(1, "s1", "사람", 1, 1000, List.of(11L));
         for (int i = 0; i < 25; i++) r.tick(); // 봇 하나가 들어온다
         Room.Member bot = r.members().stream().filter(m -> m.bot).findFirst().orElseThrow();
@@ -252,7 +257,7 @@ class RoomTest {
 
         // 봇이 더 크면 사람이 키워드를 잃는다(봇에게 져도 잃는다)
         bot.score = 900; human.score = 100;
-        bot.x = 0; bot.y = 0; human.x = 10; human.y = 0;
+        bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
         r.tick();
         assertThat(out.loses).containsExactly(new long[]{1L, bot.playerId});
         // 잃은 쪽(사람)에 3초 무적: 모두에게 보호막 카운트다운을 알린다
@@ -281,9 +286,10 @@ class RoomTest {
         // 같은 크기끼리 부딪히면 각자 최대 속도 × 0.6초만큼(240px/s면 144px) 밀려나고, 처음에 빠르고 점점 느려진다(4.3)
         Out out = new Out();
         Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member a = r.join(1, "s1", "a", 1, 100, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 100, List.of());
-        a.x = 0; a.y = 0; b.x = 2 * a.radius - 10; b.y = 0; // 10px 겹침
+        a.x = 500; a.y = 800; b.x = 500 + 2 * a.radius - 10; b.y = 800; // 10px 겹침(가운데 세이프존 밖)
         double bStart = b.x;
         r.tick(); // 이번 틱에 부딪힘을 찾아 겹친 만큼 떼어 놓고, 튕김은 다음 틱부터 움직인다
         double afterHit = b.x;
@@ -313,5 +319,48 @@ class RoomTest {
         assertThat(r.members()).containsExactly(alive);
         assertThat(out.closed).containsExactly(1L);
         assertThat(r.liveView()).containsOnlyKeys(2L); // 랭킹에서도 빠진다
+    }
+
+    @Test
+    void noCollisionInsideSafeZone() {
+        // 가운데 세이프존 안에서는 겹쳐 있어도 튕기지 않고 키워드도 잃지 않는다(4.22)
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 10, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
+        a.protectUntil = 0; b.protectUntil = 0;
+        a.x = 0; a.y = 0; b.x = 10; b.y = 0;
+        r.tick();
+        assertThat(out.loses).isEmpty();
+        assertThat(a.x).isEqualTo(0.0);
+        assertThat(b.x).isEqualTo(10.0);
+        assertThat(out.texts).noneMatch(t -> "knock".equals(t.get("type")));
+    }
+
+    @Test
+    void firstTimePlayerStartsInCenterZoneAndZonesAreSent() {
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        for (int i = 0; i < 20; i++) {
+            Room.Member m = r.join(100 + i, "s" + i, "new", 1, 0, List.of(), true);
+            assertThat(Math.abs(m.x)).isLessThanOrEqualTo(300);
+            assertThat(Math.abs(m.y)).isLessThanOrEqualTo(300);
+        }
+        assertThat(out.texts).anyMatch(t -> "safeZones".equals(t.get("type")));
+    }
+
+    @Test
+    void randomZonesSpawnUpToTargetAndExpire() {
+        // 24,000px 기준 맵 1000명이면 넓이 비례로 여러 개, 맵이 3,000px이면 1개. 유지 시간이 지나면 사라진다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(new Room.ZoneTuning(0.06, 600, 0.035, 400, 6, 40, 2));
+        r.join(1, "s1", "a", 1, 0, List.of());
+        for (int i = 0; i < 25; i++) r.tick();
+        assertThat(r.zoneCount()).isEqualTo(1);
+        assertThat(r.centerZoneSize()).isEqualTo(600.0);
+        for (int i = 0; i < 30; i++) r.tick(); // 2초가 지나면 사라지고 1초 뒤 다시 생긴다
+        assertThat(r.zoneCount()).isLessThanOrEqualTo(1);
     }
 }

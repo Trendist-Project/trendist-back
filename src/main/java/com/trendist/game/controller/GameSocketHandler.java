@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
  * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}, bye(페이지를 떠남)
- * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError)
+ * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError, safeZones)
  */
 @Component
 @RequiredArgsConstructor
@@ -113,7 +113,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
                 room.submit(r -> {
                     if (!session.isOpen()) return;
-                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds);
+                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime());
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),
