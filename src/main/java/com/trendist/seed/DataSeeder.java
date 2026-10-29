@@ -159,11 +159,11 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     private static final String[][] TITLES = {
-            {"트렌드 워처", "처음으로 키워드를 +했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":1}"},
-            {"트렌드 수집가", "키워드를 100번 +했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":100}"},
-            {"트렌드 사냥꾼", "키워드를 500번 +했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":500}"},
-            {"트렌드 장인", "키워드를 2,000번 +했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":2000}"},
-            {"트렌드 전설", "키워드를 10,000번 +했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":10000}"},
+            {"트렌드 워처", "처음으로 키워드를 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":1}"},
+            {"트렌드 수집가", "키워드를 100번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":100}"},
+            {"트렌드 사냥꾼", "키워드를 500번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":500}"},
+            {"트렌드 장인", "키워드를 2,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":2000}"},
+            {"트렌드 전설", "키워드를 10,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":10000}"},
             {"완전체", "아이콘이 다 자랐어요(10레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":10}"},
             {"스타일리스트", "꾸미기가 열렸어요(11레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":11}"},
             {"베테랑", "30레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":30}"},
