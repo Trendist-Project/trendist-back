@@ -7,8 +7,8 @@
 
 접근과 권한
 - 관리자 화면은 게임과 따로 만든 페이지 `/admin/`이다(로컬 `http://localhost:8080/admin/`, 빌드 결과 `admin/index.html`이라 웹 서버가 폴더 주소로 연다). 관리자 계정이면 게임 도구 줄과 ☰ 메뉴에 [🛠 관리자]가 보여 새 탭으로 연다. 관리자가 아닌 사람의 화면에는 링크가 없고 검색 엔진에도 올리지 않는다(`noindex`).
-- 게임에서 Google로 로그인한 계정의 갱신 토큰으로 들어온다. 서버는 `/api/admin/**`를 `users.role = ADMIN`인 계정만 받는다(JWT 확인 때 30초 캐시로 권한을 읽어 `ROLE_ADMIN`을 준다). 권한이 없으면 화면에 내 계정 번호를 보여 준다.
-- 권한은 운영자가 DB에서 준다: `UPDATE users SET role = 'ADMIN' WHERE id = <계정 번호>;`(30초 안에 반영). 게스트 계정에는 주지 않는다.
+- 게임에서 Google로 로그인한 계정의 갱신 토큰으로 들어온다. 서버는 `/api/admin/**`를 `users.role = ADMIN`인 계정만 받는다(JWT 확인 때 30초 캐시로 권한을 읽어 `ROLE_ADMIN`을 준다). 로그인하지 않았거나 권한이 없으면 "접근할 수 없는 페이지예요"만 보여 주고 이유·방법·계정 번호 같은 정보는 주지 않는다(`GET /api/me/admin`도 관리자인지만 돌려준다).
+- 권한은 운영자가 DB에서 준다. 계정 번호는 그 사람의 닉네임으로 찾는다: `SELECT u.id FROM users u JOIN players p ON p.user_id = u.id WHERE p.nickname = '<닉네임>' AND u.oauth_id IS NOT NULL;` → `UPDATE users SET role = 'ADMIN' WHERE id = <계정 번호>;`(30초 안에 반영). 구글 로그인 계정에만 준다.
 - 화면 탭: 키워드(13.1, 13.6), 키워드 추가(13.7), 신고(13.5), 설정(13.3).
 
 ### 13.1 키워드 금지
