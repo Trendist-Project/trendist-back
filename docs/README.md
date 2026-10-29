@@ -22,6 +22,10 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 112판 (2026-10-30)
+- 모바일 이동 방식 두 가지: 누른 자리에 생기는 조이스틱(기본)과 터치 이동(누른 지점으로 이동). 메뉴 [이동 방식]으로 바꾸고 브라우저에 기억(3.2, 4.2)
+- 봇 유행도 상한 `bot_cap_ratio` 1.5 → 0.7(방 1등 사람보다 커지지 않게). 예전 기본값 1.5 그대로인 DB 행은 시작할 때 0.7로 바꿈(4.21, 13.3)
+
 ### 111판 (2026-10-30)
 - 설정 파일을 `application.yml`(공통)·`application-dev.yml`(로컬, 기본 프로필)·`application-prod.yml`(운영)로 나누고 DB 연결을 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, `PROD_SERVER_PORT`)로 받음. 로컬 값은 git 제외 `src/main/resources/application.env`. `local`·`mysql` 프로필 제거, 운영은 Flyway 전환 전까지 `ddl-auto=update`(12)
 - 백엔드 CI/CD 추가: GitHub Actions로 테스트·이미지 빌드 후 Docker Hub push, 서버에서 단일 컨테이너 중단 배포(12)

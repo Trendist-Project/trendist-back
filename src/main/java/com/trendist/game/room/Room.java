@@ -595,7 +595,7 @@ public class Room {
         return n;
     }
 
-    /** 봇 유행도 상한: 그 방 1등(사람) 현재 유행도 × botCapRatio(기본 1.5). */
+    /** 봇 유행도 상한: 그 방 1등(사람) 현재 유행도 × botCapRatio(기본 0.7). */
     double botCap(Tuning tu) {
         double top = 0;
         for (Member m : members.values()) if (!m.bot) top = Math.max(top, m.score);

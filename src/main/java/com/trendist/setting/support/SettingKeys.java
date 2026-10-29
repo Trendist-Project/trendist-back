@@ -1,6 +1,7 @@
 package com.trendist.setting.support;
 
 import java.util.List;
+import java.util.Map;
 
 /** settings 테이블의 이름과 기본값(13.3). 시더가 없는 행만 넣는다(11.3). */
 public final class SettingKeys {
@@ -42,6 +43,13 @@ public final class SettingKeys {
     public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
     public static final String EXTERNAL_HOLD_HOURS = "external_hold_hours";
 
+    /**
+     * 기본값을 바꾼 설정과 예전 기본값. 시더는 기존 행을 덮어쓰지 않지만, 아직 예전 기본값 그대로인 행만 새 기본값으로 바꾼다
+     * (관리자가 직접 바꾼 값은 그대로 둔다).
+     */
+    public static final Map<String, String> REPLACED_DEFAULTS = Map.of(
+            BOT_CAP_RATIO, "1.5"); // 봇이 1등 사람보다 커지지 않게 1.5 → 0.7(4.21)
+
     public static final List<Def> DEFAULTS = List.of(
             new Def(TREND_BASE_POPULATION, "1000", 1, 10000, "트렌드 값 식의 기준 인원(g(n)=1)"),
             new Def(TREND_LOG_SOFTNESS, "30", 0.0001, 100000, "로그 완만도"),
@@ -75,7 +83,7 @@ public final class SettingKeys {
             new Def(ORB_SPAWN_PERCENT, "5", 1, 100, "? 구슬이 간격마다 목표 개수의 몇 %씩 생기는지(최소 1개). 5%면 빈 아레나가 약 20번의 간격에 다 찬다"),
             // NPC 봇(4.21): 사람 + 봇이 이 수가 되도록 채운다. 봇은 키워드 없이 방 메모리의 점수만 가진다
             new Def(BOT_PLAYERS, "10", 0, 200, "방 인원(사람 + 봇)이 이 수보다 적으면 봇으로 채운다(0이면 봇 없음)"),
-            new Def(BOT_CAP_RATIO, "1.5", 0.1, 10, "봇 유행도 상한: 그 방 1등(사람) 유행도의 이 배수"),
+            new Def(BOT_CAP_RATIO, "0.7", 0.1, 10, "봇 유행도 상한: 그 방 1등(사람) 유행도의 이 배수"),
             new Def(BOT_STEP_MIN, "20", 0, 100, "봇이 가진 키워드 하나의 점수 최소(사람의 키워드 점수처럼)"),
             new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),
             new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),

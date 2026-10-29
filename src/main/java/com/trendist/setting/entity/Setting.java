@@ -23,4 +23,7 @@ public class Setting extends BaseTimeEntity {
         this.name = name; this.value = value; this.valueType = valueType;
         this.minValue = min; this.maxValue = max; this.description = description;
     }
+
+    /** 값을 바꾼다. 허용 범위 검사는 호출하는 쪽에서 한다. */
+    public void changeValue(String value) { this.value = value; }
 }

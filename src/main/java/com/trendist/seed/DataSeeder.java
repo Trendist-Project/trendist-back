@@ -100,6 +100,13 @@ public class DataSeeder implements ApplicationRunner {
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
                 settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description()));
                 added++;
+            } else if (SettingKeys.REPLACED_DEFAULTS.containsKey(d.name())) {
+                Setting s = settings.findByName(d.name()).get();
+                if (s.getValue().equals(SettingKeys.REPLACED_DEFAULTS.get(d.name()))) {
+                    s.changeValue(d.value());
+                    settings.save(s);
+                    log.info("설정 기본값 변경 반영: {} {} → {}", d.name(), SettingKeys.REPLACED_DEFAULTS.get(d.name()), d.value());
+                }
             }
         }
         if (levels.count() < 100) {
