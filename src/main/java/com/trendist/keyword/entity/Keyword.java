@@ -63,4 +63,17 @@ public class Keyword extends BaseTimeEntity {
         this.keywordState = inactive;
         this.inactiveAt = now;
     }
+
+    /** 관리자 금지(13.1): 조회·점수에서 빠진다. 보관함·댓글 데이터는 그대로 둔다. */
+    public void ban(KeywordState banned, Instant now) {
+        this.keywordState = banned;
+        this.bannedAt = now;
+    }
+
+    /** 금지 해제: 💤비활성으로 돌아간다(4.7). */
+    public void unban(KeywordState inactive, Instant now) {
+        this.keywordState = inactive;
+        this.bannedAt = null;
+        this.inactiveAt = now;
+    }
 }

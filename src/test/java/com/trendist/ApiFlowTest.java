@@ -1,5 +1,8 @@
 package com.trendist;
 
+import com.trendist.setting.support.SettingKeys;
+import com.trendist.report.entity.ReportType;
+import com.trendist.report.entity.Report;
 import com.trendist.chat.service.ChatService;
 import com.trendist.keyword.entity.DataSource;
 import com.trendist.player.service.PlayerService;
@@ -15,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -44,6 +48,8 @@ class ApiFlowTest {
     @Autowired CodeTables codes;
     @Autowired TransactionTemplate tx;
     @Autowired ChatService chatService;
+    @Autowired com.trendist.report.service.ReportService reportService;
+    @Autowired com.trendist.setting.service.SettingService settingService;
     @Autowired PlayerService playerService;
     @Autowired ScoreHistoryService scoreHistory;
     @Autowired KeywordActivityService activityService;
@@ -191,6 +197,36 @@ class ApiFlowTest {
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + loserT)).andExpect(jsonPath("$.player.holdCount").value(0));
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + winnerT)).andExpect(jsonPath("$.player.holdCount").value(1));
         assertThat(keywordService.stealRandom(loser, winner)).isEmpty(); // 잃을 키워드가 없으면 아무 일도 없다
+    }
+
+    @Test
+    void adminAddsActiveKeywordForSevenDaysAndNonAdminIsRejected() throws Exception {
+        // 관리자가 넣은 키워드는 🔥활성, 반영 소스 admin, 지금부터 7일(13.7). 관리자가 아니면 403
+        String t = player("관리자시험");
+        mvc.perform(get("/api/me/admin").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.admin").value(false));
+        mvc.perform(post("/api/admin/keywords").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"관리자키워드\"}")).andExpect(status().isForbidden());
+        var added = keywordService.adminAdd("KR", "관리자 키워드");
+        assertThat(added.created()).isTrue();
+        assertThat(added.state()).isEqualTo(CodeTables.KW_ACTIVE);
+        assertThat(added.externalUntil()).isAfter(Instant.now().plusSeconds(6 * 24 * 3600));
+        tx.executeWithoutResult(s -> assertThat(keywords.findById(added.id()).orElseThrow().getDataSource().getName()).isEqualTo(DataSource.ADMIN));
+        assertThat(keywordService.adminSearch("KR", null, DataSource.ADMIN, null, "externalUntil", "desc", 0, 50).items())
+                .anyMatch(k -> k.id() == added.id());
+        // 7일이 지나면(유지 끝 시각을 과거로) internal로 내려가고 가진 사람이 3명 미만이면 💤
+        tx.executeWithoutResult(s -> keywords.findById(added.id()).orElseThrow()
+                .holdExternal(codes.dataSource(DataSource.ADMIN), Instant.now().minusSeconds(1)));
+        assertThat(keywordService.expireExternal(DataSource.ADMIN, Set.of())).isEqualTo(1);
+        tx.executeWithoutResult(s -> {
+            var kw = keywords.findById(added.id()).orElseThrow();
+            assertThat(kw.getDataSource().getName()).isEqualTo(DataSource.INTERNAL);
+            assertThat(kw.getKeywordState().getName()).isEqualTo(CodeTables.KW_INACTIVE);
+        });
+        // 이미 있는 키워드를 다시 넣으면 admin으로 바꾸고 다시 🔥, 7일
+        var again = keywordService.adminAdd("KR", "관리자키워드");
+        assertThat(again.created()).isFalse();
+        assertThat(again.id()).isEqualTo(added.id());
+        assertThat(again.state()).isEqualTo(CodeTables.KW_ACTIVE);
     }
 
     @Test
@@ -381,7 +417,30 @@ class ApiFlowTest {
         long chatId = chatService.save(countryId, playerId, "신고될 채팅").id();
         report(b, "CHAT", chatId, 201);
         report(b, "CHAT", chatId, 409);
-        report(b, "PLAYER", 1, 400);      // 지금은 댓글·채팅만 받는다
+        report(b, "PLAYER", 1, 404);      // 플레이어 신고는 같은 방에 있을 때만(정보 팝업, 4.11)
+
+        // 관리자 검토(13.5): 목록에 대상 내용이 붙고, 처리 결과를 바꿀 수 있다
+        var page = reportService.adminList(Report.RECEIVED, 0, 50);
+        var row = page.items().stream().filter(r -> r.targetId() == cid && ReportType.COMMENT.equals(r.type())).findFirst().orElseThrow();
+        assertThat(row.content()).isEqualTo("신고될 댓글입니다");
+        assertThat(row.keywordText()).isEqualTo("신고 키워드");
+        assertThat(row.targetNickname()).isEqualTo("신고대상");
+        assertThat(row.reporterNickname()).isEqualTo("신고자");
+        assertThat(reportService.adminSetStatus(row.id(), Report.RESOLVED, true)).isEqualTo(1);
+        assertThat(reportService.adminList(Report.RESOLVED, 0, 50).items()).anyMatch(r -> r.id() == row.id());
+    }
+
+    @Test
+    void adminUpdatesSettingWithRangeCheck() {
+        // 관리자 설정(13.3): 형식·정수·범위를 검사하고 저장하면 바로 반영된다
+        var item = settingService.update(1, SettingKeys.BOT_PLAYERS, "12");
+        assertThat(item.value()).isEqualTo("12");
+        assertThat(settingService.getInt(SettingKeys.BOT_PLAYERS)).isEqualTo(12);
+        assertThatThrownBy(() -> settingService.update(1, SettingKeys.BOT_PLAYERS, "1.5")).hasMessageContaining("정수");
+        assertThatThrownBy(() -> settingService.update(1, SettingKeys.BOT_PLAYERS, "999")).hasMessageContaining("범위");
+        assertThatThrownBy(() -> settingService.update(1, SettingKeys.BOT_PLAYERS, "abc")).hasMessageContaining("숫자");
+        assertThat(settingService.list()).anyMatch(i -> i.name().equals(SettingKeys.BOT_PLAYERS) && "10".equals(i.defaultValue()));
+        settingService.update(1, SettingKeys.BOT_PLAYERS, "10");
     }
 
     private static String uncheckedBody(MvcResult r) {

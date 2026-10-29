@@ -32,6 +32,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -217,6 +219,81 @@ public class KeywordServiceImpl implements KeywordService {
         long nw = updateTrend(k);
         publishTrendChange(k, old, nw, null);
         return true;
+    }
+
+    // ---------------------------------------------------------------- 관리자 키워드(13.7)
+
+    @Override
+    @Transactional
+    public AdminKeyword adminAdd(String countryCode, String text) {
+        String display = KeywordNormalizer.display(text);
+        String normalized = KeywordNormalizer.validate(display);
+        Country country = countryOf(countryCode);
+        DataSource source = codes.dataSource(DataSource.ADMIN);
+        if (source.getWeight().signum() == 0) throw ApiException.badRequest("SOURCE_DISABLED", "admin 소스의 가중치가 0이라 쓸 수 없어요");
+        Instant now = Instant.now(clock);
+        Optional<Keyword> found = keywords.findByCountryIdAndNormalized(country.getId(), normalized);
+        if (found.isEmpty()) {
+            // 새 키워드: 🔥활성, 반영 소스 admin, 지금부터 유지 기간(createKeyword가 유지 기간형 소스로 처리)
+            Keyword k = createKeyword(country, display, normalized, Optional.of(new Confirmed(source, 100)), now);
+            return adminView(k, true);
+        }
+        Keyword k = keywords.findByIdForUpdate(found.get().getId()).orElseThrow();
+        if (isBanned(k)) throw ApiException.conflict("KEYWORD_BANNED", "금지된 키워드예요. 금지를 먼저 풀어 주세요");
+        long old = k.getTrendValue();
+        k.holdExternal(source, externalHoldUntil(now)); // 다른 소스였어도 admin으로 바꾸고 지금부터 다시 7일
+        k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now);
+        long nw = updateTrend(k);
+        keywords.flush();
+        publishTrendChange(k, old, nw, null);
+        return adminView(k, false);
+    }
+
+    private static final Set<String> ADMIN_SORTS = Set.of("trendValue", "holderCount", "totalPlusCount", "searchCount",
+            "createdAt", "activatedAt", "externalUntil");
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminKeywordPage adminSearch(String countryCode, String state, String source, String q, String sort, String dir,
+                                        int page, int size) {
+        Country country = countryOf(countryCode);
+        Long stateId = state == null || state.isBlank() ? null : codes.keywordStateId(state);
+        Long sourceId = source == null || source.isBlank() ? null : codes.dataSource(source).getId();
+        String like = q == null || q.isBlank() ? null : "%" + KeywordNormalizer.normalize(q) + "%";
+        String by = ADMIN_SORTS.contains(sort) ? sort : "trendValue";
+        Sort.Direction d = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        int sz = Math.max(1, Math.min(size, 100));
+        var result = keywords.searchForAdmin(country.getId(), stateId, sourceId, like,
+                PageRequest.of(Math.max(0, page), sz, Sort.by(d, by).and(Sort.by(Sort.Direction.DESC, "id"))));
+        return new AdminKeywordPage(result.getContent().stream().map(this::adminRow).toList(), result.getTotalElements(),
+                result.getNumber(), sz);
+    }
+
+    @Override
+    @Transactional
+    public AdminKeywordRow adminBan(long keywordId, boolean banned) {
+        Keyword k = keywords.findByIdForUpdate(keywordId)
+                .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
+        Instant now = Instant.now(clock);
+        if (banned == isBanned(k)) return adminRow(k);
+        long old = k.getTrendValue();
+        if (banned) k.ban(codes.keywordState(CodeTables.KW_BANNED), now);
+        else k.unban(codes.keywordState(CodeTables.KW_INACTIVE), now);
+        long nw = updateTrend(k); // 금지·💤면 0
+        keywords.flush();
+        publishTrendChange(k, old, nw, null); // 접속 중인 보유자는 바로, 아닌 보유자는 1분 재합산에서 점수가 빠진다
+        return adminRow(k);
+    }
+
+    private AdminKeywordRow adminRow(Keyword k) {
+        return new AdminKeywordRow(k.getId(), k.getText(), k.getKeywordState().getName(), k.getDataSource().getName(),
+                k.getTrendValue(), k.getHolderCount(), k.getTotalPlusCount(), k.getSearchCount() + searchCounter.pending(k.getId()),
+                k.getExternalUntil(), k.getActivatedAt(), k.getBannedAt(), k.getCreatedAt());
+    }
+
+    private AdminKeyword adminView(Keyword k, boolean created) {
+        return new AdminKeyword(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(), k.getHolderCount(),
+                k.getExternalUntil(), created);
     }
 
     @Override
@@ -456,13 +533,13 @@ public class KeywordServiceImpl implements KeywordService {
                 mine.map(PlayerKeyword::getExpiresAt).orElse(null));
     }
 
-    /** 목록에 오른 동안만 확인되는 소스(google). 유지 기간(기본 7일)을 두고 끝나면 다시 본다. */
     /** 목록형 외부 소스 유지 끝 시각: 지금 + 설정 시간(기본 168시간 = 7일). */
     private Instant externalHoldUntil(Instant now) {
         return now.plus(Duration.ofHours(settings.getInt(SettingKeys.EXTERNAL_HOLD_HOURS)));
     }
 
-    private boolean isListSource(DataSource s) { return DataSource.GOOGLE.equals(s.getName()); }
+    /** 유지 기간(기본 7일)을 두고 끝나면 다시 보는 소스: 목록에 오른 동안만 확인되는 google, 관리자가 넣은 admin. */
+    private boolean isListSource(DataSource s) { return DataSource.GOOGLE.equals(s.getName()) || DataSource.ADMIN.equals(s.getName()); }
 
     private Country countryOf(String code) {
         return countries.requireOpen(code);

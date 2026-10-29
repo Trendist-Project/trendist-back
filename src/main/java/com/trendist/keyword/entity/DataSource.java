@@ -17,6 +17,7 @@ public class DataSource extends BaseTimeEntity {
     public static final String NAVER_DATALAB = "naver_datalab";
     public static final String BQ_TRENDS_RISING = "bq_trends_rising";
     public static final String GOOGLE = "google"; // 구글 트렌드 실시간 인기 RSS(10.1)
+    public static final String ADMIN = "admin";   // 관리자가 직접 넣은 🔥활성 키워드(13.7)
 
     @Column(nullable = false, length = 50) private String name;
     @Column(nullable = false, precision = 6, scale = 3) private BigDecimal weight;

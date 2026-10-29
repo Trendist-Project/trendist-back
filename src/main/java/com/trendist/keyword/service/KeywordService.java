@@ -38,6 +38,28 @@ public interface KeywordService {
     /** 충돌로 빼앗기(4.3): 진 사람이 잃은 키워드를 이긴 사람이 가져간다. 진 사람에게 잃을 키워드가 없으면 비어 있다. */
     Optional<StolenKeyword> stealRandom(long loserId, long winnerId);
 
+    /** 관리자가 넣은 키워드(13.7). externalUntil이 지나면 반영 소스가 internal로 내려간다. created는 이번에 새로 만든 키워드인지. */
+    record AdminKeyword(long id, String text, String state, long trendValue, long holderCount, Instant externalUntil, boolean created) {}
+
+    /** 관리자가 그 나라에 🔥활성 키워드를 바로 넣는다: 반영 소스 admin, 지금부터 유지 기간(기본 7일). 이미 있으면 admin으로 바꾸고 다시 센다. */
+    AdminKeyword adminAdd(String countryCode, String text);
+
+    /** 관리자 키워드 목록의 한 줄(13.6). */
+    record AdminKeywordRow(long id, String text, String state, String source, long trendValue, long holderCount,
+                           long totalPlusCount, long searchCount, Instant externalUntil, Instant activatedAt,
+                           Instant bannedAt, Instant createdAt) {}
+
+    record AdminKeywordPage(List<AdminKeywordRow> items, long total, int page, int size) {}
+
+    /**
+     * 관리자 키워드 목록(13.6). state: 활성/비활성/금지(이름, 비우면 전체), source: data_sources.name, q: 검색어,
+     * sort: trendValue / holderCount / totalPlusCount / searchCount / createdAt / activatedAt / externalUntil, dir: asc·desc.
+     */
+    AdminKeywordPage adminSearch(String countryCode, String state, String source, String q, String sort, String dir, int page, int size);
+
+    /** 관리자 금지·해제(13.1). 금지하면 트렌드 값이 0이 되어 보유자 점수에서 바로 빠지고, 해제하면 💤비활성이다. */
+    AdminKeywordRow adminBan(long keywordId, boolean banned);
+
     /** 트렌드 값이 바뀐 키워드를 비우면서 돌려준다. 1분 잡이 보유자 점수를 다시 합산한다(9.4). */
     Set<Long> drainDirtyKeywords();
 

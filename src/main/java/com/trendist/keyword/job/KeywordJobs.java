@@ -1,5 +1,6 @@
 package com.trendist.keyword.job;
 
+import com.trendist.keyword.entity.DataSource;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
 import com.trendist.keyword.service.KeywordActivityService;
@@ -43,6 +44,11 @@ public class KeywordJobs {
     /** 1분: 만료된 + 삭제, 트렌드 값이 바뀐 키워드의 보유자 점수 재합산. */
     @Scheduled(fixedDelay = 60_000, initialDelay = 10_000)
     public void everyMinute() {
+        // 관리자가 넣은 키워드(13.7)는 유지 기간(7일)이 끝나면 internal로 내려간다. 다시 확인해 줄 목록이 없으므로 빈 목록으로 정리한다
+        try {
+            int dropped = keywordService.expireExternal(DataSource.ADMIN, Set.of());
+            if (dropped > 0) log.info("admin keywords: {} moved to internal", dropped);
+        } catch (RuntimeException e) { log.warn("admin keyword expire failed", e); }
         int expired = 0;
         List<Long> ids;
         do {

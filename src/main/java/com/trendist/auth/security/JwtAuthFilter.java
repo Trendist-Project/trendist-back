@@ -28,8 +28,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String h = req.getHeader("Authorization");
         if (h != null && h.startsWith("Bearer ")) {
             jwt.verify(h.substring(7)).filter(guard::accepts).ifPresent(t -> {
-                var auth = new UsernamePasswordAuthenticationToken(new AuthUser(t.userId()), null,
-                        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                // 관리자 API(/api/admin/**)는 ROLE_ADMIN만 들어간다(9.3, 13)
+                var roles = guard.isAdmin(t.userId())
+                        ? List.of(new SimpleGrantedAuthority("ROLE_USER"), new SimpleGrantedAuthority("ROLE_ADMIN"))
+                        : List.of(new SimpleGrantedAuthority("ROLE_USER"));
+                var auth = new UsernamePasswordAuthenticationToken(new AuthUser(t.userId()), null, roles);
                 SecurityContextHolder.getContext().setAuthentication(auth);
             });
         }

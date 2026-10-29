@@ -19,6 +19,9 @@ import lombok.NoArgsConstructor;
         indexes = @Index(name = "idx_reports_status", columnList = "status, created_at"))
 public class Report extends BaseTimeEntity {
     public static final String RECEIVED = "RECEIVED";
+    public static final String RESOLVED = "RESOLVED"; // 조치함
+    public static final String REJECTED = "REJECTED"; // 문제없음
+    public static final java.util.Set<String> STATUSES = java.util.Set.of(RECEIVED, RESOLVED, REJECTED);
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "player_id", nullable = false) private Player player;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "report_type_id", nullable = false) private ReportType reportType;
@@ -29,4 +32,7 @@ public class Report extends BaseTimeEntity {
     public Report(Player player, ReportType reportType, long targetId, String reason) {
         this.player = player; this.reportType = reportType; this.targetId = targetId; this.reason = reason;
     }
+
+    /** 관리자 검토 결과(RECEIVED / RESOLVED / REJECTED). */
+    public void changeStatus(String status) { this.status = status; }
 }

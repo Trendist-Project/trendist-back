@@ -152,11 +152,16 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/me/score-history?range=24h\|7d\|30d\|all` | 내 점수 추이(현재 나라). 점 `{t, score, live}`, 기록이 없는 칸은 직전 값, 마지막 점은 지금 값 |
 | `GET /api/room/players/{entity_no}` | 같은 방 다른 플레이어 정보(4.11): 닉네임, 관리자 여부, 활성 칭호, 레벨, 현재 유행도, 댓글 점수, 보관함 상위 3개(이름·상태). 계정당 초당 2회(429 `INFO_TOO_FAST`) |
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404. 7일 외의 range는 400 |
-| `GET /api/admin/trends?country=&state=&source=&q=&sort=&page=&size=` | 관리자 트렌드 키워드 목록(`ROLE_ADMIN`, 1분 캐시, 13.6) |
+| `GET /api/me/admin` | 내 계정 번호와 관리자인지(관리자 화면이 처음 부른다) |
+| `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
+| `POST /api/admin/keywords` | `{ "text": "...", "country": "KR" }`. 🔥활성 키워드 추가(반영 소스 admin, 7일, 13.7) |
+| `POST /api/admin/keywords/{id}/ban`, `/unban` | 금지·해제(13.1). 금지하면 트렌드 값 0, 보유자 점수에서 바로 빠짐 |
+| `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5) |
+| `GET /api/admin/settings`, `PATCH /api/admin/settings/{name}` | 설정 목록과 값 변경 `{ "value": "12" }`. 숫자·정수·허용 범위 검사, 저장하면 캐시를 비워 바로 반영(13.3) |
 | `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
 | `PATCH /api/comments/{id}`, `DELETE /api/comments/{id}` | 내 댓글 고치기(작성 후 5분 안, 지나면 409 `COMMENT_EDIT_EXPIRED`), 지우기(소프트 삭제, 댓글 점수 −1) |
-| `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT", "targetId": 1, "reason": "..." }`. 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
+| `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT" \| "PLAYER", "targetId": 1, "reason": "..." }`(PLAYER는 같은 방의 세션 엔티티 번호). 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
@@ -253,6 +258,7 @@ record TrendBox(
 | naver_datalab | 네이버 데이터랩 검색어트렌드 | KR | 검색어 묶음의 기간별 상대 검색 비율 | 일 |
 | bq_trends_rising | BigQuery Google Trends 공개 데이터셋 | 해외 | 나라별 급상승·인기 검색어 Top 25 | 일 |
 | google | 구글 트렌드 실시간 인기 RSS(`https://trends.google.com/trending/rss?geo=KR`) | KR | 지금 급상승 중인 검색어 상위 10개의 제목(`title`). 대략 검색량·관련 뉴스도 오지만 쓰지 않는다 | 약 10분(5분마다 조회) |
+| admin | 관리자가 직접 넣은 키워드(13.7) | 전체 | 관리자 화면에서 넣은 🔥활성 키워드. 넣은 때부터 7일 유지 | - |
 | internal | 서비스 내부 | 전체 | 외부에서 확인되지 않은 키워드의 반영 소스. 점수는 가진 사람 수만으로 정함(4.8) | - |
 
 - 갱신 주기(2026-10-26 공식 문서 확인): 네이버 데이터랩 검색어트렌드는 구간 단위가 일간(`date`)이 가장 짧고, 하루 호출 한도가 1,000회, 요청마다 주제어 묶음이 최대 5개다. 앵커 1개를 빼면 한 번에 키워드 4개를 재므로 하루 최대 약 4,000개이고, 온디맨드 검색도 같은 한도를 쓴다. BigQuery Google Trends 국제 데이터는 일 단위다(하루 4번 갱신은 미국 데이터뿐이다). 두 소스 모두 하루보다 짧은 주기로는 값이 바뀌지 않는다.
@@ -288,7 +294,7 @@ record TrendBox(
 
 | 나라 | 소스 | 가중치(반영값, 0~2) |
 |---|---|---|
-| KR | naver_datalab / google / internal | 2 / 2 / 1 |
+| KR | naver_datalab / google / admin / internal | 2 / 2 / 2 / 1 |
 | GLOBAL·JP·IN | bq_trends_rising / internal | 2 / 1 |
 
 - 나라마다 외부 소스는 하나이고, 한 키워드는 한 번에 반영 소스를 하나만 가진다(`internal` 아니면 그 외부 소스). 외부 소스를 더 붙이면 외부 확인된 소스 중 가중치가 큰 쪽을 쓴다. 트렌드 값의 식은 4.8에 있다.
@@ -357,7 +363,7 @@ record TrendBox(
 |---|---|
 | `countries` | KR(오픈), GLOBAL·JP·IN·CN(닫힘), 시간대·기본 언어·방 상한 |
 | `settings` | 13.3의 기본값과 허용 범위 |
-| `data_sources` | naver_datalab 2, google 2, bq_trends_rising 2, internal 1 (10.3) |
+| `data_sources` | naver_datalab 2, google 2, bq_trends_rising 2, admin 2, internal 1 (10.3) |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 22개를 번호 순서대로 |
