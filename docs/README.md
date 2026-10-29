@@ -22,6 +22,10 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 111판 (2026-10-30)
+- 설정 파일을 `application.yml`(공통)·`application-dev.yml`(로컬, 기본 프로필)·`application-prod.yml`(운영)로 나누고 DB 연결을 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, `PROD_SERVER_PORT`)로 받음. 로컬 값은 git 제외 `src/main/resources/application.env`. `local`·`mysql` 프로필 제거, 운영은 Flyway 전환 전까지 `ddl-auto=update`(12)
+- 백엔드 CI/CD 추가: GitHub Actions로 테스트·이미지 빌드 후 Docker Hub push, 서버에서 단일 컨테이너 중단 배포(12)
+
 ### 110판 (2026-10-29)
 - 구글 로그인 구현: 구글 ID 토큰을 서버가 구글 공개 키로 검증한 뒤 이 사이트의 JWT(15분)와 갱신 토큰(1일, 회전, 재사용 감지, DB에는 해시만)으로 인증. 처음 쓰는 구글 계정이면 게스트 행에 OAuth 값만 채워 기록을 이어 가고, 게스트가 없으면 OAuth 값만 가진 계정을 만듦. 메인 화면 구글 버튼, 게임 중 게스트용 [🔑 로그인], 내 정보 창 로그인·로그아웃. 클라이언트 보안 비밀번호는 쓰지 않음(3.1, 4.1, 9.3, 9.6)
 - 게스트 쿠키 만료 30일 전 로그인 안내는 두지 않기로 함(4.1)

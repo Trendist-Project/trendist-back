@@ -1,0 +1,23 @@
+# 운영. 값은 서버 docker compose의 env_file(../.env)과 environment로 받는다.
+server:
+  # nginx upstream trendist-back:4001
+  port: ${PROD_SERVER_PORT}
+
+spring:
+  datasource:
+    url: ${PROD_MYSQL_URL}
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+
+  # JPA 설정
+  jpa:
+    open-in-view: false
+    show-sql: false    # Hibernate 가 생성하는 SQL 쿼리를 콘솔에 출력
+    hibernate:
+      ddl-auto: update # Flyway 전환 전까지 update(16.1)
+
+trendist:
+  cookie:
+    secure: true
+  dev-trends:
+    enabled: false

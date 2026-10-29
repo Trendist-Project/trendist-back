@@ -381,6 +381,8 @@ java {
 - 주요 의존성: spring-boot-starter-webmvc(예전 이름 starter-web은 폐기 예정), starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, BigQuery 클라이언트, ONNX Runtime, Testcontainers(MySQL).
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
-- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `config/application-local.yml`에 둔다.
+- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
+- 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 운영은 Flyway 전환 전까지 `ddl-auto=update`다(16.1).
+- 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 실행 설정(포트 4001, 네트워크, `.env`)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.

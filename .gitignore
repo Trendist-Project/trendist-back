@@ -5,3 +5,5 @@ build
 .idea/
 # 로컬 비밀값(DB 비밀번호 등)
 /config/
+# 로컬 비밀값(DB 계정)
+src/main/resources/application.env

@@ -1,0 +1,21 @@
+# 로컬 개발(기본 프로필). DB 값은 git에 올리지 않는 src/main/resources/application.env에 적는다.
+spring:
+  config:
+    import: optional:file:./src/main/resources/application.env[.properties]
+
+  # 로컬 DB: 이 PC(우분투)의 MariaDB, DB 이름 trendist
+  datasource:
+    url: ${DEV_MYSQL_URL}
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+
+  # JPA 설정
+  jpa:
+    show-sql: false    # Hibernate 가 생성하는 SQL 쿼리를 콘솔에 출력
+    properties:
+      hibernate:
+        format_sql: true    # SQL 쿼리를 보기 쉽게 포맷팅하여 출력합니다.
+        use_sql_comments: true    # SQL 쿼리에 주석을 추가
+        highlight_sql: true   # SQL 쿼리를 하이라이트하여 출력
+    hibernate:
+      ddl-auto: update

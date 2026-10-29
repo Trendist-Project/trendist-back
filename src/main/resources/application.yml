@@ -1,8 +1,9 @@
 spring:
   application:
     name: trendist
+  # 프로필을 따로 주지 않으면 개발(dev)로 뜬다. 운영 컨테이너는 -Dspring.profiles.active=prod
   profiles:
-    default: local
+    default: dev
   threads:
     virtual:
       enabled: true
@@ -18,7 +19,7 @@ spring:
     enabled: false
 
 server:
-  # 로컬 개발에서는 프론트 개발 서버(http://localhost:8080)가 /api, /ws를 이 포트로 넘긴다
+  # 로컬 개발에서는 프론트 개발 서버(http://localhost:8080)가 /api, /ws를 이 포트로 넘긴다. 운영 포트는 application-prod.yml
   port: ${SERVER_PORT:8081}
 
 trendist:
@@ -46,42 +47,3 @@ trendist:
       - "탕후루:35"
       - "케이팝:70"
       - "말차라떼:41"
-
----
-spring:
-  config:
-    activate:
-      on-profile: local
-  # 로컬 개발 DB: 이 PC(우분투)의 MariaDB, DB 이름 trendist.
-  # 비밀번호는 git에 올리지 않는 config/application-local.yml(또는 환경 변수 TRENDIST_DB_PASSWORD)에 둔다.
-  datasource:
-    url: ${TRENDIST_DB_URL:jdbc:mariadb://localhost:3306/trendist}
-    username: ${TRENDIST_DB_USER:trendist}
-    password: ${TRENDIST_DB_PASSWORD:}
-
----
-spring:
-  config:
-    activate:
-      on-profile: mysql
-  datasource:
-    url: ${TRENDIST_DB_URL:jdbc:mysql://localhost:3306/trendist?serverTimezone=UTC&characterEncoding=UTF-8&rewriteBatchedStatements=true}
-    username: ${TRENDIST_DB_USER:trendist}
-    password: ${TRENDIST_DB_PASSWORD:}
-
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-  jpa:
-    hibernate:
-      ddl-auto: validate
-server:
-  # 서버의 docker compose가 PROD_SERVER_PORT=4001로 넘긴다(nginx upstream trendist-back:4001)
-  port: ${PROD_SERVER_PORT:4001}
-trendist:
-  cookie:
-    secure: true
-  dev-trends:
-    enabled: false
