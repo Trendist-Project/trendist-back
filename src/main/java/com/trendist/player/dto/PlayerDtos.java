@@ -20,7 +20,7 @@ public final class PlayerDtos {
 
     /**
      * 다른 플레이어 정보 팝업(4.11). 사용자 번호 대신 방 안에서만 쓰는 세션 엔티티 번호로 가리킨다(4.1).
-     * title은 활성 칭호 이름(없으면 null), topKeywords는 보관함 중 점수 상위 3개.
+     * title은 활성 칭호 이름(없으면 null), topKeywords는 보관함의 🔥활성 키워드 중 무작위 3개.
      */
     public record PlayerCard(int entityNo, String nickname, boolean admin, String title, long level, long score,
                              long commentScore, java.util.List<KeywordTag> topKeywords) {}

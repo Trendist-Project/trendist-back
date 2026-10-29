@@ -150,7 +150,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 팝업 공지 목록(최대 10), 본 기록(멱등) |
 | `GET /api/me/score-history?range=24h\|7d\|30d\|all` | 내 점수 추이(현재 나라). 점 `{t, score, live}`, 기록이 없는 칸은 직전 값, 마지막 점은 지금 값 |
-| `GET /api/room/players/{entity_no}` | 같은 방 다른 플레이어 정보(4.11): 닉네임, 관리자 여부, 활성 칭호, 레벨, 현재 유행도, 댓글 점수, 보관함 상위 3개(이름·상태). 계정당 초당 2회(429 `INFO_TOO_FAST`) |
+| `GET /api/room/players/{entity_no}` | 같은 방 다른 플레이어 정보(4.11): 닉네임, 관리자 여부, 활성 칭호, 레벨, 현재 유행도, 댓글 점수, 보관함의 🔥활성 키워드 중 무작위 3개(이름·상태). 계정당 초당 2회(429 `INFO_TOO_FAST`) |
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404. 7일 외의 range는 400 |
 | `GET /api/admin/trends?country=&state=&source=&q=&sort=&page=&size=` | 관리자 트렌드 키워드 목록(`ROLE_ADMIN`, 1분 캐시, 13.6) |
 | `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |

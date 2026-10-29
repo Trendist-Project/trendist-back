@@ -188,15 +188,15 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                     // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
                         Room.Member m = r.byPlayer(loserId);
-                        if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "score", lost.score()));
+                        if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
                     }));
                     return;
                 }
-                // 사람끼리면 이긴 사람이 그 키워드를 빼앗는다. 잃은 사람에게는 어떤 키워드인지 숨기고 점수만,
-                // 이긴 사람에게는 키워드와 점수, 새로 들어갔는지(ADDED)·남은 시간만 갱신됐는지(RENEWED)를 보여 준다(4.3)
+                // 사람끼리면 이긴 사람이 그 키워드를 빼앗는다. 양쪽 모두에게 어떤 키워드인지와 점수를, 이긴 사람에게는
+                // 새로 들어갔는지(ADDED)·남은 시간만 갱신됐는지(RENEWED)도 보여 준다(4.3)
                 keywordService.stealRandom(loserId, winnerId).ifPresent(st -> room.submit(r -> {
                     Room.Member m = r.byPlayer(loserId);
-                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "score", st.score(), "stolen", true));
+                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", st.text(), "score", st.score(), "stolen", true));
                     Room.Member w = r.byPlayer(winnerId);
                     if (w != null) sendText(w, Map.of("type", "hit", "target", loserName, "keyword", st.text(), "score", st.score(),
                             "stolen", st.result(), "gained", st.gained()));
