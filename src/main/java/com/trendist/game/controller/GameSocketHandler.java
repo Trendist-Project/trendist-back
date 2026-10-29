@@ -2,6 +2,8 @@ package com.trendist.game.controller;
 
 import com.trendist.auth.security.AccountGuard;
 import com.trendist.auth.service.JwtService;
+import com.trendist.chat.service.ChatService;
+import com.trendist.common.exception.ApiException;
 import com.trendist.game.room.Room;
 import com.trendist.game.service.RoomManager;
 import com.trendist.keyword.service.KeywordService;
@@ -24,8 +26,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}
- * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong)
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}
+ * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError)
  */
 @Component
 @RequiredArgsConstructor
@@ -40,6 +42,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final AccountGuard guard;
     private final PlayerService playerService;
     private final KeywordService keywordService;
+    private final ChatService chatService;
     private final RoomManager rooms;
     private final ObjectMapper json;
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ws-auth-timeout"));
@@ -72,6 +75,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
             rooms.sendText(member, Map.of("type", "pong", "t", Double.isFinite(t) ? t : 0));
             return;
         }
+        if ("chat".equals(type)) { chat(session, member, node.path("text").asString("")); return; }
         if (!allowInput(session, type)) return;
         long receivedNanos = System.nanoTime(); // 방은 이 시점부터 조작을 적용한다(틱 경계로 반올림하지 않는다)
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
@@ -115,6 +119,31 @@ public class GameSocketHandler extends TextWebSocketHandler {
         });
     }
 
+    /** 채팅(4.13): 1초에 1회, 검사를 통과하면 저장한 뒤 방 전체에 보낸다. 거절하면 보낸 사람에게만 이유를 알린다. */
+    private void chat(WebSocketSession session, Room.Member member, String raw) {
+        if (!allowInput(session, "chat")) {
+            rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_TOO_FAST", "message", "채팅은 1초에 한 번 보낼 수 있어요"));
+            return;
+        }
+        String text;
+        try {
+            text = chatService.validate(raw);
+        } catch (ApiException e) {
+            rooms.sendText(member, Map.of("type", "chatError", "code", e.code(), "message", e.getMessage()));
+            return;
+        }
+        Room room = (Room) session.getAttributes().get(ATTR_ROOM);
+        rooms.submitWork(() -> {
+            try {
+                ChatService.Saved saved = chatService.save(room.countryId(), member.playerId, text);
+                room.submit(r -> r.chat(member, saved.id(), text, saved.atMillis()));
+            } catch (RuntimeException e) {
+                log.warn("chat save failed", e);
+                rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_FAILED", "message", "메시지를 보내지 못했어요"));
+            }
+        });
+    }
+
     /**
      * 이동 명령 빈도 제한(9.5). 종류별 토큰 버킷: 초당 rate개씩 채워지고 최대 burst개까지 모인다. 버킷이 비면 무시한다.
      * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 누르고 뗄 때마다 바로 보낸다. 고정 1초 창으로 세면 네트워크·프록시가
@@ -122,9 +151,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
      * 버킷은 잠깐 몰려 도착해도 받아 주고, 평균 빈도만 제한한다.
      */
     private boolean allowInput(WebSocketSession session, String type) {
-        String key = "move".equals(type) || "input".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
-        double rate = switch (key) { case "move" -> 12; case "input" -> 60; default -> 10; };
-        double burst = switch (key) { case "move" -> 24; case "input" -> 60; default -> 10; };
+        String key = "move".equals(type) || "input".equals(type) || "chat".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
+        double rate = switch (key) { case "move" -> 12; case "input" -> 60; case "chat" -> 1; default -> 10; };
+        double burst = switch (key) { case "move" -> 24; case "input" -> 60; case "chat" -> 1; default -> 10; };
         @SuppressWarnings("unchecked")
         Map<String, Bucket> buckets = (Map<String, Bucket>) session.getAttributes().get(ATTR_INPUTS);
         Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(burst, System.nanoTime()));

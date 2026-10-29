@@ -13,6 +13,8 @@ import com.trendist.keyword.repository.DataSourceRepository;
 import com.trendist.keyword.repository.KeywordStateRepository;
 import com.trendist.player.entity.Level;
 import com.trendist.player.repository.LevelRepository;
+import com.trendist.report.entity.ReportType;
+import com.trendist.report.repository.ReportTypeRepository;
 import com.trendist.setting.entity.Setting;
 import com.trendist.setting.repository.SettingRepository;
 import com.trendist.setting.support.SettingKeys;
@@ -46,6 +48,7 @@ public class DataSeeder implements ApplicationRunner {
     private final CountryRepository countries;
     private final UserStateRepository userStates;
     private final KeywordStateRepository keywordStates;
+    private final ReportTypeRepository reportTypes;
     private final DataSourceRepository dataSources;
     private final SettingRepository settings;
     private final LevelRepository levels;
@@ -65,6 +68,9 @@ public class DataSeeder implements ApplicationRunner {
         }
         for (String n : List.of(CodeTables.KW_ACTIVE, CodeTables.KW_INACTIVE, CodeTables.KW_BANNED)) {
             if (keywordStates.findByName(n).isEmpty()) { keywordStates.save(new KeywordState(n)); added++; }
+        }
+        for (String n : ReportType.ALL) {
+            if (reportTypes.findByName(n).isEmpty()) { reportTypes.save(new ReportType(n)); added++; }
         }
         record C(String code, String name, String locale, String tz, boolean enabled, int order) {}
         for (C c : List.of(

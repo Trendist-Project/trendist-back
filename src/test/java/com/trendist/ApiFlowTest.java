@@ -1,6 +1,8 @@
 package com.trendist;
 
+import com.trendist.chat.service.ChatService;
 import com.trendist.keyword.entity.DataSource;
+import com.trendist.player.service.PlayerService;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.service.KeywordService;
 import com.trendist.keyword.support.KeywordNormalizer;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -39,6 +42,8 @@ class ApiFlowTest {
     @Autowired KeywordRepository keywords;
     @Autowired CodeTables codes;
     @Autowired TransactionTemplate tx;
+    @Autowired ChatService chatService;
+    @Autowired PlayerService playerService;
 
     private String guest() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -224,5 +229,130 @@ class ApiFlowTest {
         mvc.perform(post("/api/players").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"a#b\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    private long plusKeyword(String token, String text) throws Exception {
+        MvcResult r = mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"" + text + "\"}"))
+                .andExpect(status().isOk()).andReturn();
+        return ((Number) JsonPath.read(r.getResponse().getContentAsString(), "$.keyword.id")).longValue();
+    }
+
+    private long commentScore(String token) throws Exception {
+        MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + token)).andReturn();
+        return ((Number) JsonPath.read(me.getResponse().getContentAsString(), "$.player.commentScore")).longValue();
+    }
+
+    @Test
+    void keywordDetailAndActivity() throws Exception {
+        String t = player("상세");
+        long id = plusKeyword(t, "상세 카드 키워드");
+        mvc.perform(get("/api/keywords/" + id).header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.text").value("상세 카드 키워드"))
+                .andExpect(jsonPath("$.plusedByMe").value(true));
+        // 24시간: 지난 23시간 + 이번 시간(집계 중). 이번 시간의 + 1회가 보인다
+        mvc.perform(get("/api/keywords/" + id + "/activity?range=24h").header("Authorization", "Bearer " + t))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points.length()").value(24))
+                .andExpect(jsonPath("$.points[23].live").value(true))
+                .andExpect(jsonPath("$.points[23].plus").value(1))
+                .andExpect(jsonPath("$.totalPlus").value(1));
+        mvc.perform(get("/api/keywords/" + id + "/activity?range=7d").header("Authorization", "Bearer " + t))
+                .andExpect(jsonPath("$.points.length()").value(7))
+                .andExpect(jsonPath("$.points[6].plus").value(1));
+        mvc.perform(get("/api/keywords/" + id + "/activity?range=1y").header("Authorization", "Bearer " + t))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/keywords/99999999").header("Authorization", "Bearer " + t)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void commentsAndVotes() throws Exception {
+        String a = player("작성자"), b = player("투표자");
+        long kid = plusKeyword(a, "댓글 키워드");
+        String auth = "Bearer " + a;
+        // 길이·링크 검사
+        mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"짧음\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMENT_LENGTH"));
+        mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"여기 보세요 www.example.com\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMENT_LINK"));
+        MvcResult w = mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"망고 올린 홍콩 디저트예요\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mine").value(true)).andExpect(jsonPath("$.editable").value(true)).andReturn();
+        long cid = ((Number) JsonPath.read(w.getResponse().getContentAsString(), "$.id")).longValue();
+        assertThat(commentScore(a)).isEqualTo(1);
+
+        // 자기 댓글에는 투표할 수 없다. 다른 사람의 추천은 작성자 점수 +1, 같은 버튼은 취소, 반대 버튼은 변경
+        mvc.perform(post("/api/comments/" + cid + "/vote").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vote\":\"LIKE\"}"))
+                .andExpect(status().isBadRequest());
+        String vb = "Bearer " + b;
+        mvc.perform(post("/api/comments/" + cid + "/vote").header("Authorization", vb)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vote\":\"LIKE\"}"))
+                .andExpect(jsonPath("$.myVote").value("LIKE")).andExpect(jsonPath("$.likeCount").value(1));
+        assertThat(commentScore(a)).isEqualTo(2);
+        mvc.perform(get("/api/keywords/" + kid + "/comments/top").header("Authorization", vb))
+                .andExpect(jsonPath("$[0].id").value(cid)).andExpect(jsonPath("$[0].myVote").value("LIKE"));
+        // 추천 상위로 고정된 댓글은 최신순 목록에서 빠진다
+        mvc.perform(get("/api/keywords/" + kid + "/comments").header("Authorization", vb))
+                .andExpect(jsonPath("$.items.length()").value(0)).andExpect(jsonPath("$.total").value(1));
+        mvc.perform(post("/api/comments/" + cid + "/vote").header("Authorization", vb)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vote\":\"DISLIKE\"}"))
+                .andExpect(jsonPath("$.likeCount").value(0)).andExpect(jsonPath("$.dislikeCount").value(1));
+        assertThat(commentScore(a)).isEqualTo(0); // 1 + 1 − 2
+        mvc.perform(post("/api/comments/" + cid + "/vote").header("Authorization", vb)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vote\":\"DISLIKE\"}"))
+                .andExpect(jsonPath("$.myVote").doesNotExist()).andExpect(jsonPath("$.dislikeCount").value(0));
+
+        // 고치기는 내 댓글만, 지우면 안내 문구로 보이고 투표할 수 없다
+        mvc.perform(patch("/api/comments/" + cid).header("Authorization", vb)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"남의 댓글 고치기\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(patch("/api/comments/" + cid).header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"망고·자몽 올린 홍콩 디저트\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.body").value("망고·자몽 올린 홍콩 디저트"));
+        mvc.perform(delete("/api/comments/" + cid).header("Authorization", auth)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/keywords/" + kid + "/comments").header("Authorization", vb))
+                .andExpect(jsonPath("$.items[0].deleted").value(true))
+                .andExpect(jsonPath("$.items[0].body").value("삭제된 댓글이에요"));
+        mvc.perform(post("/api/comments/" + cid + "/vote").header("Authorization", vb)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vote\":\"LIKE\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    private void report(String token, String target, long id, int expected) throws Exception {
+        mvc.perform(post("/api/reports").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"target\":\"" + target + "\",\"targetId\":" + id + ",\"reason\":\"욕설·비방\"}"))
+                .andExpect(status().is(expected));
+    }
+
+    @Test
+    void reportCommentAndChatOnce() throws Exception {
+        String a = player("신고대상"), b = player("신고자");
+        long kid = plusKeyword(a, "신고 키워드");
+        MvcResult w = mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", "Bearer " + a)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"신고될 댓글입니다\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long cid = ((Number) JsonPath.read(w.getResponse().getContentAsString(), "$.id")).longValue();
+        report(a, "COMMENT", cid, 400);   // 내 글은 신고할 수 없다
+        report(b, "COMMENT", cid, 201);
+        report(b, "COMMENT", cid, 409);   // 같은 대상은 한 번만
+        report(b, "COMMENT", 99999999, 404);
+
+        // 채팅은 게임 WebSocket으로 저장되므로 서비스로 한 줄 남겨 두고 신고한다
+        MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + a)).andReturn();
+        long playerId = ((Number) JsonPath.read(me.getResponse().getContentAsString(), "$.player.id")).longValue();
+        long countryId = tx.execute(s -> playerService.findCurrent(((Number) JsonPath.read(uncheckedBody(me), "$.userId")).longValue())
+                .orElseThrow().getCountry().getId());
+        long chatId = chatService.save(countryId, playerId, "신고될 채팅").id();
+        report(b, "CHAT", chatId, 201);
+        report(b, "CHAT", chatId, 409);
+        report(b, "PLAYER", 1, 400);      // 지금은 댓글·채팅만 받는다
+    }
+
+    private static String uncheckedBody(MvcResult r) {
+        try { return r.getResponse().getContentAsString(); } catch (Exception e) { throw new IllegalStateException(e); }
     }
 }

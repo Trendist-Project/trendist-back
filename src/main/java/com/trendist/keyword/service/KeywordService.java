@@ -13,6 +13,9 @@ public interface KeywordService {
 
     List<KeywordDtos.MyKeyword> myKeywords(long userId);
 
+    /** 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 볼 수 없다. */
+    KeywordDtos.KeywordCard detail(long userId, long keywordId);
+
     /** 방 입장 때 보유 색인에 넣을 키워드 번호(만료 전, 금지 아님). */
     List<Long> activeKeywordIds(long playerId);
 

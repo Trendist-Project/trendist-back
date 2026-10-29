@@ -2,12 +2,14 @@ package com.trendist.keyword.job;
 
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
+import com.trendist.keyword.service.KeywordActivityService;
 import com.trendist.keyword.service.KeywordService;
 import com.trendist.keyword.support.SearchCounter;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.service.PlayerService;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,7 @@ public class KeywordJobs {
     private static final Logger log = LoggerFactory.getLogger(KeywordJobs.class);
 
     private final KeywordService keywordService;
+    private final KeywordActivityService activity;
     private final PlayerService playerService;
     private final PlayerKeywordRepository playerKeywords;
     private final PlayerRepository players;
@@ -55,12 +58,14 @@ public class KeywordJobs {
         if (expired > 0 || !playerIds.isEmpty()) log.info("minute job: expired={}, recomputed={}", expired, playerIds.size());
     }
 
-    /** 매시 정각: 검색 카운터를 DB로 옮기고, 키워드가 있는 플레이어 전원을 점검한다. */
+    /** 매시 정각: 검색 카운터를 DB로 옮기고, 끝난 시간의 활동 기록을 남기고(9.9), 키워드가 있는 플레이어 전원을 점검한다. */
     @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     public void hourly() {
+        Instant hourStart = Instant.now(clock).truncatedTo(ChronoUnit.HOURS).minus(1, ChronoUnit.HOURS);
         Map<Long, Long> counts = searchCounter.drain();
         tx.executeWithoutResult(s -> counts.entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .forEach(e -> keywords.addSearchCount(e.getKey(), e.getValue())));
+        try { activity.recordHour(hourStart, counts); } catch (RuntimeException e) { log.warn("activity log {} failed", hourStart, e); }
         for (Long pid : players.findCheckTargets()) {
             try { playerService.recomputeLocked(pid, true); } catch (RuntimeException e) { log.warn("check {} failed", pid, e); }
         }

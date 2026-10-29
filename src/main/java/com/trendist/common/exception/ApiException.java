@@ -25,6 +25,9 @@ public class ApiException extends RuntimeException {
     public static ApiException conflict(String code, String message) {
         return new ApiException(HttpStatus.CONFLICT, code, message);
     }
+    public static ApiException tooMany(String code, String message) {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, code, message);
+    }
     public static ApiException unauthorized(String code) {
         return new ApiException(HttpStatus.UNAUTHORIZED, code, "인증이 필요해요");
     }

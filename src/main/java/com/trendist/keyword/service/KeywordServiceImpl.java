@@ -401,6 +401,16 @@ public class KeywordServiceImpl implements KeywordService {
                 newTrend.subtract(oldTrend), excludePlayerId));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public KeywordDtos.KeywordCard detail(long userId, long keywordId) {
+        Player p = playerService.requireCurrent(userId);
+        Keyword k = keywords.findById(keywordId)
+                .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !isBanned(x))
+                .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
+        return card(k, p, Instant.now(clock));
+    }
+
     private KeywordDtos.KeywordCard card(Keyword k, Player p, Instant now) {
         Optional<PlayerKeyword> mine = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()).filter(pk -> !pk.isExpired(now));
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),

@@ -3,6 +3,7 @@ package com.trendist.keyword.dto;
 import com.trendist.player.dto.PlayerDtos;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public final class KeywordDtos {
     private KeywordDtos() {}
@@ -22,6 +23,15 @@ public final class KeywordDtos {
                             BigDecimal gained, Instant expiresAt) {}
 
     public record PlusResult(KeywordCard keyword, BigDecimal gained, PlayerDtos.PlayerSummary player) {}
+
+    /**
+     * 활동 그래프의 점 하나(4.12, 9.9). t는 그 구간의 시작(24시간은 정시, 나머지는 나라 현지 자정).
+     * search·plus는 그 구간의 증분, holders는 구간이 끝날 때 가진 사람 수. live면 아직 집계 중인 이번 시간·오늘.
+     */
+    public record ActivityPoint(Instant t, long search, long plus, int holders, boolean live) {}
+
+    /** 활동 그래프. range: 24h / 7d / 30d / 180d, timezone: 나라 시간대. */
+    public record Activity(String range, String timezone, List<ActivityPoint> points, long totalSearch, long totalPlus, int holders) {}
 
     public record PlusRequest(@jakarta.validation.constraints.NotBlank String text) {}
 }

@@ -64,6 +64,9 @@ public class Room {
     private final Outbox outbox;
     private final Queue<Consumer<Room>> tasks = new ConcurrentLinkedQueue<>();
     private final Map<Integer, Member> members = new LinkedHashMap<>();
+    /** 최근 채팅(4.13). 새로 들어온 사람에게 보여 준다. 서버를 다시 켜면 비워진다(DB에는 30일 남는다). */
+    private final Deque<Map<String, Object>> chatHistory = new ArrayDeque<>();
+    private static final int CHAT_HISTORY = 50;
     private final Map<Long, Member> byPlayer = new HashMap<>();
     private final Map<Long, Set<Member>> holders = new HashMap<>();
     private final Map<Long, Double> pairCooldown = new HashMap<>();
@@ -134,7 +137,21 @@ public class Room {
         size = members.size();
         broadcastRoster();
         outbox.sendText(m, orbListMessage());
+        outbox.sendText(m, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
         return m;
+    }
+
+    /**
+     * 채팅 한 줄을 방 전체에 보낸다(4.13). 보낸 사람은 세션 엔티티 번호와 지금 닉네임으로만 가리킨다.
+     * 클라이언트는 이 번호로 말풍선을 아이콘 위에 띄운다.
+     */
+    public void chat(Member from, long id, String text, long atMillis) {
+        if (members.get(from.entityNo) != from) return; // 저장하는 사이에 나갔다
+        Map<String, Object> msg = Map.of("type", "chat", "id", id, "e", from.entityNo, "nickname", from.nickname,
+                "text", text, "at", atMillis);
+        chatHistory.addLast(msg);
+        while (chatHistory.size() > CHAT_HISTORY) chatHistory.pollFirst();
+        for (Member m : members.values()) outbox.sendText(m, msg);
     }
 
     public void leave(Member m) {
