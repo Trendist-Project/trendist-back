@@ -77,6 +77,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+server:
+  # 서버의 docker compose가 PROD_SERVER_PORT=4001로 넘긴다(nginx upstream trendist-back:4001)
+  port: ${PROD_SERVER_PORT:4001}
 trendist:
   cookie:
     secure: true

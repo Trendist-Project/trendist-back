@@ -1,0 +1,7 @@
+# 이미지 빌드·push 전용. 서버 실행은 서버에 있는 docker compose 파일(trendist-back 서비스, ubuntu_back-network)이 맡는다.
+services:
+  trendist-back:
+    image: dlrudgjs104/trendist-back:latest
+    build:
+      context: ../../
+      dockerfile: .github/docker/Dockerfile
