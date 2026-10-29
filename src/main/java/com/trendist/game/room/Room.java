@@ -36,6 +36,8 @@ public class Room {
         void requestOrb(Room room, Member eater);
         void send(Member m, ByteBuffer binary);
         void sendText(Member m, Map<String, Object> message);
+        /** 오래 응답이 없는 접속을 끊는다(방에서는 이미 뺐다). */
+        default void close(Member m) {}
     }
 
     public static final class Member {
@@ -52,6 +54,8 @@ public class Room {
         public double kbX, kbY, kbTime;    // 튕김: 전체 밀려날 거리(벡터)와 남은 시간
         public double protectUntil;        // 키워드 잃기 보호 종료(방 시계 초)
         public final Set<Long> keywords = new HashSet<>();
+        /** 마지막으로 이 접속에서 메시지(ping 포함)를 받은 시각(nanoTime). 받는 스레드가 쓰고 틱이 읽는다 */
+        public volatile long lastHeardNanos;
         /** NPC 봇(4.21). 연결도 키워드도 없고, 점수는 방 메모리에만 있다. playerId는 음수다. */
         public boolean bot;
         long botExp;         // 봇의 EXP(사람처럼 추가할 때마다 +1, 줄지 않는다). 레벨은 이것으로 정한다
@@ -128,6 +132,7 @@ public class Room {
         Member old = byPlayer.get(playerId);
         if (old != null) leave(old); // 한 계정은 한 방에 한 연결
         Member m = new Member(nextEntity++, playerId, session);
+        m.lastHeardNanos = nanoClock.getAsLong();
         m.nickname = nickname; m.level = level; m.score = score;
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         double area = activeArea(members.size() + 1);
@@ -270,7 +275,7 @@ public class Room {
         tick++;
         Tuning tu = tuning;
         double half = activeArea(members.size()) / 2;
-        if (tick % 20 == 0) maintainBots(tu);
+        if (tick % 20 == 0) { dropSilent(); maintainBots(tu); }
         thinkBots(tu, half);
         for (Member m : members.values()) move(m, dt, tu, half);
         collide(tu);
@@ -547,6 +552,22 @@ public class Room {
         for (Member m : members.values()) list.add(Map.of("e", m.entityNo, "nickname", m.nickname, "level", m.level, "bot", m.bot));
         Map<String, Object> msg = Map.of("type", "roster", "players", list);
         for (Member m : members.values()) outbox.sendText(m, msg);
+    }
+
+    /**
+     * 응답 없는 접속 정리: 클라이언트는 2초마다 ping을 보낸다. SILENT_SECONDS 동안 아무 메시지도 없으면(네트워크가 끊겼는데 닫힘 신호가
+     * 오지 않은 경우, 중간 프록시가 서버 쪽 연결을 남겨 둔 경우) 방에서 빼고 연결을 닫는다. 그러지 않으면 랭킹·방에 유령 접속자가 남는다.
+     * 백그라운드 탭은 브라우저가 타이머를 1분 간격까지 늦추므로 그보다 넉넉하게 잡는다.
+     */
+    static final long SILENT_SECONDS = 90;
+
+    private void dropSilent() {
+        long now = nanoClock.getAsLong();
+        for (Member m : List.copyOf(members.values())) {
+            if (m.bot || now - m.lastHeardNanos < SILENT_SECONDS * 1_000_000_000L) continue;
+            leave(m);
+            outbox.close(m);
+        }
     }
 
     // ------------------------------------------------------------ NPC 봇(4.21)

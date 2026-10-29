@@ -26,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}, bye(페이지를 떠남)
  * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError)
  */
 @Component
@@ -67,6 +67,14 @@ public class GameSocketHandler extends TextWebSocketHandler {
         Room.Member member = (Room.Member) session.getAttributes().get(ATTR_MEMBER);
         if (member == null) {
             if ("auth".equals(type)) authenticate(session, node.path("token").asString(""));
+            return;
+        }
+        member.lastHeardNanos = System.nanoTime(); // 살아 있다는 표시(응답 없는 접속 정리에 쓴다)
+        if ("bye".equals(type)) {
+            // 페이지를 떠난다(구글 로그인으로 이동, 새로고침, 탭 닫기): 닫힘 신호를 기다리지 않고 바로 방에서 뺀다
+            Room room = (Room) session.getAttributes().get(ATTR_ROOM);
+            if (room != null) room.submit(r -> r.leave(member));
+            close(session, CloseStatus.NORMAL);
             return;
         }
         if ("ping".equals(type)) {

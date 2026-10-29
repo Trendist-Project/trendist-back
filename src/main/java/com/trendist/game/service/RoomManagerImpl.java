@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.socket.BinaryMessage;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.ObjectMapper;
@@ -210,6 +211,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         WebSocketSession s = (WebSocketSession) m.session;
         if (!s.isOpen()) return;
         try { s.sendMessage(new BinaryMessage(binary)); } catch (Exception e) { /* 느린 연결: 데코레이터가 버린다 */ }
+    }
+
+    @Override
+    public void close(Room.Member m) {
+        if (m.bot || !(m.session instanceof WebSocketSession s)) return;
+        try { if (s.isOpen()) s.close(CloseStatus.GOING_AWAY.withReason("SILENT")); } catch (Exception ignored) { /* 이미 닫힘 */ }
     }
 
     @Override

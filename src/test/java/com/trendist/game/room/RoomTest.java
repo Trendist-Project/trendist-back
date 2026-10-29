@@ -19,6 +19,8 @@ class RoomTest {
         final List<Long> orbEaters = new ArrayList<>();
         public void requestOrb(Room room, Room.Member eater) { orbEaters.add(eater.playerId); }
         public void send(Room.Member m, ByteBuffer binary) { snapshots++; sent.add(binary); }
+        final List<Long> closed = new ArrayList<>();
+        public void close(Room.Member m) { closed.add(m.playerId); }
         final List<Map<String, Object>> texts = new ArrayList<>(); // 사람에게 보낸 글 메시지(봇에게 가는 것은 실제로는 버려진다)
         public void sendText(Room.Member m, Map<String, Object> message) { if (!m.bot) texts.add(message); }
     }
@@ -293,5 +295,23 @@ class RoomTest {
         assertThat(firstStep).isGreaterThan(144.0 / 5); // 처음 0.05초에 많이 밀려난다(ease-out, 약 27%)
         // 밀려난 사람에게는 같은 튕김을 알려 클라이언트 예측도 같이 밀린다
         assertThat(out.texts).anyMatch(t -> "knock".equals(t.get("type")));
+    }
+
+    @Test
+    void silentConnectionIsDroppedFromRoom() {
+        // 90초 동안 아무 메시지(ping 포함)도 없으면 방에서 빼고 연결을 닫는다. 메시지를 보내는 사람은 남는다
+        long[] now = {1_000_000_000L};
+        Out out = new Out();
+        Room r = new Room(1, T, out, () -> now[0]);
+        Room.Member silent = r.join(1, "s1", "유령", 1, 0, List.of());
+        Room.Member alive = r.join(2, "s2", "사람", 1, 0, List.of());
+        for (int i = 0; i < 20 * 95; i++) {
+            now[0] += 50_000_000L;
+            alive.lastHeardNanos = now[0]; // 2초마다 ping을 보내는 사람
+            r.tick();
+        }
+        assertThat(r.members()).containsExactly(alive);
+        assertThat(out.closed).containsExactly(1L);
+        assertThat(r.liveView()).containsOnlyKeys(2L); // 랭킹에서도 빠진다
     }
 }
