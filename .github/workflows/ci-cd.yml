@@ -54,10 +54,12 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/trendist/trendist-back
-            docker compose pull trendist-back
-            docker compose stop trendist-back
-            docker compose rm -f trendist-back
-            docker compose up -d trendist-back
+            # 서버에 compose v2 플러그인이 없으면 docker-compose(v1)를 쓴다
+            if docker compose version >/dev/null 2>&1; then DC="docker compose"; else DC="docker-compose"; fi
+            $DC pull trendist-back
+            $DC stop trendist-back
+            $DC rm -f trendist-back
+            $DC up -d trendist-back
             # nginx upstream(trendist-back:4001)이 새 컨테이너 주소를 다시 읽게 한다
             docker exec nginx nginx -s reload
             docker image prune -f
