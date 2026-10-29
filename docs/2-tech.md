@@ -93,6 +93,7 @@
 - 만료 행 재사용: `expires_at`이 지났지만 1분 잡이 아직 지우지 않은 행이 있으면 INSERT하지 않고 그 행을 UPDATE한다(`created_at`과 `expires_at`을 새 `+` 값으로 바꾼다). 행 수가 그대로이므로 `keywords.holder_count`와 `players.hold_count`는 바꾸지 않고, 두 `total_plus_count`만 +1 하며, `current_score`는 그 사람의 목록을 다시 합산해서 구한다. `created_at`을 갱신하므로 이 엔티티는 JPA Auditing의 `updatable = false`를 쓰지 않는다.
 - 1분 주기 잡이 `expires_at`이 지난 행을 삭제하고 `keywords.holder_count`와 `players.hold_count`를 −1(0 아래로 내려가지 않게), `trend_value`를 다시 계산한 뒤 그 플레이어의 점수를 다시 합산한다. 같은 `players` 행을 잠그고 `DELETE ... WHERE id = ? AND expires_at <= 지금`처럼 조건부로 지워서, 방금 재사용된 행을 지우거나 두 번 처리하지 않는다. 조회할 때도 `expires_at`을 검사한다.
 - 충돌로 잃기: 틱 밖의 작업 스레드가 잃는 사람의 후보 행(키워드 미금지) 중 하나를 무작위로 골라 DELETE하고, 같은 트랜잭션에서 `holder_count`·`hold_count`를 −1, `trend_value` 재계산, 그 플레이어의 점수 재합산을 한다. 행이 지워지므로 바로 다시 `+`할 수 있다. 끝나면 방에 점수 변경을, 잃은 사람에게만 알림을 보낸다. 후보가 없으면(`hold_count`가 0이면 조회 없이) 아무것도 하지 않는다.
+- 충돌로 빼앗기(사람끼리): 위 잃기와 같은 트랜잭션에서 이긴 사람에게 그 키워드를 준다. 두 `players` 행을 번호 순서로 먼저 잠그고(서로 동시에 빼앗아도 교착하지 않게) 키워드 행은 그다음에 잠근다. 이긴 사람에게 만료 전 행이 있으면 `created_at`·`expires_at`만 지금 기준으로 갱신하고, 없으면 `+` 처리와 같이 넣는다(만료 행 재사용 포함). 잃은 사람 −1, 이긴 사람 +1이라 `holder_count`와 트렌드 값은 결국 그대로다.
 
 트렌드 값과 점수 갱신
 - 트렌드 값 재계산: 한 키워드의 `trend_value`는 4.8의 식으로 `holder_count`, 반영 소스(`data_source_id`)의 가중치, 상태에서 구한다. 값이 바뀌면 (키워드 번호, 변화량)을 두 곳에 알린다. 접속 중인 보유자에게는 방 메모리 이벤트로 바로(9.2), 접속 중이 아닌 보유자에게는 메모리의 "변경됨" 집합으로. 외부 수집, 💤↔🔥 전환, 가중치·설정 변경 때도 같은 방식이다.

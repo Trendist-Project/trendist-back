@@ -312,6 +312,40 @@ public class KeywordServiceImpl implements KeywordService {
         return Optional.of(new LostKeyword(text, score));
     }
 
+    @Override
+    @Transactional
+    public Optional<StolenKeyword> stealRandom(long loserId, long winnerId) {
+        // 두 플레이어 행을 번호 순서로 잠근다(두 사람이 동시에 서로에게서 빼앗아도 교착하지 않게). 그다음 키워드(플레이어 → 키워드 순서)
+        Player first = players.findByIdForUpdate(Math.min(loserId, winnerId)).orElse(null);
+        Player second = players.findByIdForUpdate(Math.max(loserId, winnerId)).orElse(null);
+        if (first == null || second == null || loserId == winnerId) return Optional.empty();
+        Player loser = first.getId() == loserId ? first : second, winner = loser == first ? second : first;
+        if (loser.getHoldCount() == 0 || !loser.getCountry().getId().equals(winner.getCountry().getId())) return Optional.empty();
+        Instant now = Instant.now(clock);
+        List<PlayerKeyword> candidates = playerKeywords.findLosableByPlayer(loserId, now, codes.keywordStateId(CodeTables.KW_BANNED));
+        if (candidates.isEmpty()) return Optional.empty();
+        PlayerKeyword pk = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+        String text = pk.getKeyword().getText();
+        Long keywordId = pk.getKeyword().getId();
+        long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0;
+        playerKeywords.delete(pk);
+        playerKeywords.flush();
+        removeHolding(loser, keywordId, now);
+
+        Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();
+        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(winnerId, keywordId);
+        if (existing.isPresent() && !existing.get().isExpired(now)) {
+            // 이미 가진 키워드: 남은 시간만 지금부터 다시 24시간. 점수·EXP는 그대로
+            Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
+            existing.get().renew(now, expires);
+            playerKeywords.flush();
+            return Optional.of(new StolenKeyword(text, score, "RENEWED", 0, expires));
+        }
+        // 없던 키워드: 일반 추가와 같이 보관함에 넣는다(24시간, EXP +1, 가진 사람 수 +1, 점수 반영). 구슬(4.20)과 같은 방식
+        KeywordDtos.PlusResult r = addHolding(winner, k, existing, now);
+        return Optional.of(new StolenKeyword(text, score, "ADDED", r.gained(), r.keyword().myExpiresAt()));
+    }
+
     private void removeHolding(Player p, Long keywordId, Instant now) {
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();
         long oldTrend = k.getTrendValue();

@@ -1,6 +1,7 @@
 package com.trendist.keyword.service;
 
 import com.trendist.keyword.dto.KeywordDtos;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,6 +28,15 @@ public interface KeywordService {
 
     /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. */
     Optional<LostKeyword> loseRandom(long playerId);
+
+    /**
+     * 빼앗긴 키워드(4.3). result: ADDED(이긴 사람 보관함에 새로 들어감) / RENEWED(이미 가진 키워드라 남은 시간만 24시간으로).
+     * gained는 이긴 사람 유행도가 늘어난 양, expiresAt은 이긴 사람 보관함에서 사라지는 시각.
+     */
+    record StolenKeyword(String text, long score, String result, long gained, Instant expiresAt) {}
+
+    /** 충돌로 빼앗기(4.3): 진 사람이 잃은 키워드를 이긴 사람이 가져간다. 진 사람에게 잃을 키워드가 없으면 비어 있다. */
+    Optional<StolenKeyword> stealRandom(long loserId, long winnerId);
 
     /** 트렌드 값이 바뀐 키워드를 비우면서 돌려준다. 1분 잡이 보유자 점수를 다시 합산한다(9.4). */
     Set<Long> drainDirtyKeywords();

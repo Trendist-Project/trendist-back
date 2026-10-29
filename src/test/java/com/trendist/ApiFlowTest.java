@@ -166,6 +166,33 @@ class ApiFlowTest {
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(hold));
     }
 
+    private long playerIdOf(String token) throws Exception {
+        return ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
+                .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
+    }
+
+    @Test
+    void winnerStealsLosersKeywordOrRenewsIt() throws Exception {
+        // 충돌로 이기면 진 사람이 잃은 키워드를 빼앗는다. 없던 키워드면 보관함에 추가, 이미 있으면 남은 시간만 갱신(4.3)
+        String loserT = player("뺏김"), winnerT = player("뺏음");
+        long loser = playerIdOf(loserT), winner = playerIdOf(winnerT);
+        plusKeyword(loserT, "빼앗기테스트");
+        var first = keywordService.stealRandom(loser, winner).orElseThrow();
+        assertThat(first.text()).isEqualTo("빼앗기테스트");
+        assertThat(first.result()).isEqualTo("ADDED");
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + loserT)).andExpect(jsonPath("$.player.holdCount").value(0));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + winnerT)).andExpect(jsonPath("$.player.holdCount").value(1));
+
+        plusKeyword(loserT, "빼앗기테스트"); // 진 사람이 같은 키워드를 다시 추가했다
+        var second = keywordService.stealRandom(loser, winner).orElseThrow();
+        assertThat(second.result()).isEqualTo("RENEWED");
+        assertThat(second.gained()).isZero();
+        assertThat(second.expiresAt()).isAfter(Instant.now().plusSeconds(23 * 3600));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + loserT)).andExpect(jsonPath("$.player.holdCount").value(0));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + winnerT)).andExpect(jsonPath("$.player.holdCount").value(1));
+        assertThat(keywordService.stealRandom(loser, winner)).isEmpty(); // 잃을 키워드가 없으면 아무 일도 없다
+    }
+
     @Test
     void protectedApiNeedsToken() throws Exception {
         mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
