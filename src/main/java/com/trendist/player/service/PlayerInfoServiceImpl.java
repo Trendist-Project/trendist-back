@@ -14,10 +14,9 @@ import com.trendist.user.entity.User;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,12 +43,8 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
         }
         Room.Live live = target(userId, entityNo);
         Player p = players.findById(live.playerId()).orElseThrow(PlayerInfoServiceImpl::notInRoom);
-        // 🔥활성 키워드 중 무작위 3개(4.11). 행 번호만 읽어 고른 뒤 그 3개만 키워드와 함께 읽는다
-        List<Long> ids = new ArrayList<>(playerKeywords.findActiveIdsByPlayer(p.getId(), Instant.now(clock),
-                codes.keywordStateId(CodeTables.KW_ACTIVE)));
-        Collections.shuffle(ids);
-        List<Long> picked = ids.subList(0, Math.min(TOP_KEYWORDS, ids.size()));
-        List<PlayerDtos.KeywordTag> top = picked.isEmpty() ? List.of() : playerKeywords.findWithKeywordByIdIn(picked).stream()
+        List<PlayerDtos.KeywordTag> top = playerKeywords.findTopByPlayer(p.getId(), Instant.now(clock),
+                        codes.keywordStateId(CodeTables.KW_BANNED), PageRequest.of(0, TOP_KEYWORDS)).stream()
                 .map(pk -> new PlayerDtos.KeywordTag(pk.getKeyword().getId(), pk.getKeyword().getText(),
                         pk.getKeyword().getKeywordState().getName()))
                 .toList();

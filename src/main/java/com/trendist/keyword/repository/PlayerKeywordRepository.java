@@ -2,7 +2,6 @@ package com.trendist.keyword.repository;
 
 import com.trendist.keyword.entity.PlayerKeyword;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -52,14 +51,11 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     @Query("select count(pk) from PlayerKeyword pk where pk.keyword.id = :keywordId and pk.createdAt >= :since")
     long countPlusedSince(@Param("keywordId") Long keywordId, @Param("since") Instant since);
 
-    /** 정보 팝업(4.11)의 후보: 그 플레이어의 만료 전 🔥활성 키워드 행 번호만. 여기서 무작위로 몇 개를 고른다. */
+    /** 정보 팝업의 상위 키워드(4.11): 만료 전·금지 아님, 트렌드 값 높은 순(같으면 최근에 넣은 순). */
     @Query("""
-            select pk.id from PlayerKeyword pk
-            where pk.player.id = :playerId and pk.expiresAt > :now and pk.keyword.keywordState.id = :activeStateId""")
-    List<Long> findActiveIdsByPlayer(@Param("playerId") Long playerId, @Param("now") Instant now,
-                                     @Param("activeStateId") Long activeStateId);
-
-    /** 고른 행만 키워드·상태와 함께 읽는다. */
-    @Query("select pk from PlayerKeyword pk join fetch pk.keyword k join fetch k.keywordState where pk.id in :ids")
-    List<PlayerKeyword> findWithKeywordByIdIn(@Param("ids") Collection<Long> ids);
+            select pk from PlayerKeyword pk join fetch pk.keyword k join fetch k.keywordState
+            where pk.player.id = :playerId and pk.expiresAt > :now and k.keywordState.id <> :bannedStateId
+            order by k.trendValue desc, pk.createdAt desc""")
+    List<PlayerKeyword> findTopByPlayer(@Param("playerId") Long playerId, @Param("now") Instant now,
+                                        @Param("bannedStateId") Long bannedStateId, Pageable pageable);
 }
