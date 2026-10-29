@@ -18,7 +18,7 @@ public class GuideCategory extends BaseTimeEntity {
     @Column(nullable = false, length = 50) private String code;
     @Column(nullable = false, length = 100) private String name;
     @Column(name = "display_type", nullable = false, length = 20) private String displayType;
-    @Column(name = "sort_order", nullable = false) private int sortOrder;
+    @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
 
     public GuideCategory(String code, String name, String displayType, int sortOrder) {

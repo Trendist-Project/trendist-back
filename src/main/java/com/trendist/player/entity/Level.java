@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "levels", uniqueConstraints = @UniqueConstraint(name = "uk_levels_level", columnNames = "level"))
 public class Level extends BaseTimeEntity {
-    @Column(nullable = false) private int level;
+    @Column(nullable = false) private long level;
     @Column(name = "required_exp", nullable = false) private long requiredExp;
 
     public Level(int level, long requiredExp) { this.level = level; this.requiredExp = requiredExp; }

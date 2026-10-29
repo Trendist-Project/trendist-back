@@ -32,6 +32,8 @@ public final class SettingKeys {
     public static final String NICKNAME_CHANGE_MINUTES = "nickname_change_minutes";
     public static final String ORB_MAX = "orb_max";
     public static final String ORB_SPAWN_SECONDS = "orb_spawn_seconds";
+    public static final String ORB_DENSITY = "orb_density";
+    public static final String ORB_SPAWN_PERCENT = "orb_spawn_percent";
     public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
     public static final String EXTERNAL_HOLD_HOURS = "external_hold_hours";
 
@@ -45,11 +47,11 @@ public final class SettingKeys {
             new Def(PLUS_TTL_HOURS, "24", 1, 168, "+ 삭제 시간(시간)"),
             new Def(ACTIVATE_HOLDERS, "3", 1, 1000, "🔥활성 전환 인원"),
             new Def(EXP_PER_PLUS, "1", 0, 100, "+ 한 번의 EXP"),
-            new Def(WORLD_SIZE, "12000", 1000, 50000, "기준 맵 한 변(px)"),
+            new Def(WORLD_SIZE, "24000", 1000, 50000, "기준 맵 한 변(px)"),
             new Def(MIN_RADIUS, "16", 4, 100, "최소 반지름(px)"),
-            new Def(MAX_DIAMETER_RATIO, "0.10", 0.01, 0.20, "최대 지름 비율(기준 맵 한 변 대비)"),
+            new Def(MAX_DIAMETER_RATIO, "0.05", 0.01, 0.20, "최대 지름 비율(기준 맵 한 변 대비)"),
             new Def(SCORE_CAP, "2000", 1, 1000000, "크기 상한 점수(S_cap)"),
-            new Def(MAX_SPEED, "240", 50, 1000, "최대 속도(px/s, 모든 플레이어 동일)"),
+            new Def(MAX_SPEED, "480", 50, 1000, "최대 속도(px/s, 모든 플레이어 동일)"),
             new Def(ZOOM_FACTOR, "170", 1, 10000, "줌 계수"),
             new Def(BIG_RATIO, "1.15", 1, 5, "큰 쪽 판정 비율"),
             new Def(KNOCKBACK_CAP, "3", 1, 10, "튕김 상한(배)"),
@@ -58,8 +60,12 @@ public final class SettingKeys {
             new Def(LOSE_PROTECT_SECONDS, "10", 0, 600, "키워드를 잃은 뒤 보호(초)"),
             new Def(JOIN_PROTECT_SECONDS, "10", 0, 600, "입장 직후 보호(초)"),
             new Def(NICKNAME_CHANGE_MINUTES, "60", 0, 10080, "닉네임 변경 간격(분, 나라별)"),
-            new Def(ORB_MAX, "20", 0, 200, "방에 동시에 떠 있는 ? 구슬 최대 수(0이면 끔)"),
-            new Def(ORB_SPAWN_SECONDS, "3", 0.5, 600, "? 구슬이 하나씩 생기는 간격(초)"),
+            // ? 구슬 목표 개수 = 지금 활동 영역 넓이(100만 px² 단위) × 밀도. 맵이 넓어지면 같은 비율로 늘어난다(4.20).
+            // 기본 밀도 2.2는 활동 영역 3,000×3,000px에 20개였던 예전 비율이다
+            new Def(ORB_DENSITY, "2.2", 0, 50, "? 구슬 밀도: 1,000×1,000px 넓이마다 떠 있는 개수(0이면 끔)"),
+            new Def(ORB_MAX, "1500", 0, 5000, "방에 동시에 떠 있는 ? 구슬 수 상한(0이면 끔). 밀도로 정한 목표가 이보다 크면 이 값까지만"),
+            new Def(ORB_SPAWN_SECONDS, "3", 0.5, 600, "? 구슬이 생기는 간격(초)"),
+            new Def(ORB_SPAWN_PERCENT, "5", 1, 100, "? 구슬이 간격마다 목표 개수의 몇 %씩 생기는지(최소 1개). 5%면 빈 아레나가 약 20번의 간격에 다 찬다"),
             new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

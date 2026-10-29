@@ -141,8 +141,9 @@ WHERE p.id IN (/* 500명 */)
 | `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 팝업 공지 목록(최대 10), 본 기록(멱등) |
-| `GET /api/me/score-history?country=&range=24h\|7d\|30d\|all` | 내 점수 추이(1분 캐시) |
-| `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404 |
+| `GET /api/me/score-history?range=24h\|7d\|30d\|all` | 내 점수 추이(현재 나라). 점 `{t, score, live}`, 기록이 없는 칸은 직전 값, 마지막 점은 지금 값 |
+| `GET /api/room/players/{entity_no}` | 같은 방 다른 플레이어 정보(4.11): 닉네임, 관리자 여부, 활성 칭호, 레벨, 현재 유행도, 댓글 점수, 보관함 상위 3개(이름·상태). 계정당 초당 2회(429 `INFO_TOO_FAST`) |
+| `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404. 7일 외의 range는 400 |
 | `GET /api/admin/trends?country=&state=&source=&q=&sort=&page=&size=` | 관리자 트렌드 키워드 목록(`ROLE_ADMIN`, 1분 캐시, 13.6) |
 | `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
@@ -293,6 +294,7 @@ record TrendBox(
 - 테이블 이름은 소문자 스네이크 케이스 복수형(마지막 단어만, 기간 접미사 `24h`는 복수형을 쓰지 않는다). 다대다 매핑은 `앞 단수_뒤 복수`(`player_keywords`). 외래 키 컬럼은 `참조 단수_id`이고(복수형의 s를 뗀다) 기본 키 바로 다음에 순서대로 둔다(ERD Cloud에 보이는 순서). 한 테이블에서 같은 테이블을 두 번 참조하는 컬럼은 두지 않는다(그래서 공지·가이드에는 마지막 수정 관리자 컬럼이 없다).
 - 모든 테이블의 기본 키는 `id BIGINT AUTO_INCREMENT` 하나다. 관계는 모두 비식별, 복합 키 없음. "한 번만" 규칙은 `UNIQUE`로 지킨다.
 - 시각 컬럼: 기본은 `created_at`·`updated_at`(`DATETIME(6)`, UTC, DB 기본값 + JPA Auditing). 고치지 않는 기록 테이블(`*_histories`, `user_notices`, `blocked_terms`, `chat_messages`)은 `created_at`만이다. 칸을 덮어쓰거나 매시간 다시 쓰는 `player_score_24h`, `player_score_dailies`, `keyword_log_24h`, `keyword_log_dailies`는 `updated_at`도 둔다. 업무 시각(`expires_at`, `banned_at` 등)은 따로 둔다.
+- 정수 컬럼은 확장에 대비해 모두 `BIGINT`로 둔다(점수, 인원, 횟수, 순서, 레벨 등). 참/거짓은 `TINYINT(1)`, 0~23 시간 칸 같은 작은 번호는 `TINYINT`로 둔다. JPA 엔티티 필드도 `long`이다.
 - 코드값은 `ENUM` 대신 `VARCHAR` 대문자 코드(`countries`, `users.role` 등) 또는 이름만 있는 코드 테이블(`user_states`, `keyword_states`, `report_types`, `sanction_types`)로 둔다. 허용 값 검증은 `CHECK` 없이 애플리케이션에서 한다.
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 개발·테스트에서는 시작할 때 JPA가 스키마를 반영하고 시더가 초기 데이터를 넣는다(11.3). 운영은 17절 SQL(`4-schema.sql`)을 기준으로 Flyway를 쓴다.
@@ -303,7 +305,7 @@ record TrendBox(
 |---|---|---|
 | 사용자 | `user_states` | 사용자 상태(정상 / 탈퇴) |
 | | `users` | 계정(게스트 포함). 방문자 ID, OAuth 종류·ID, 상태, 권한, UI 언어, 계정 금지·업로드 정지 만료 시각, 탈퇴 시각 |
-| | `players` | 플레이어 = 사용자 × 나라. 닉네임, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 누적 `+` 횟수, 댓글 점수 |
+| | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 누적 `+` 횟수, 댓글 점수 |
 | | `profiles` | 플레이어별 꾸미기 프로필(성장형·픽셀 그림·업로드 이미지, 바탕·테두리 색과 두께). 한 플레이어에 여러 개, 하나만 장착 |
 | | `titles`, `player_titles` | 칭호 목록과 플레이어별 보유 칭호 |
 | | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자가 수정) |

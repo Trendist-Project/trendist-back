@@ -49,11 +49,11 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
             Base base = base(k, hourStart);
             long searchInc = searched.getOrDefault(k.getId(), 0L);
             int slot = hourStart.atZone(zone).getHour();
-            KeywordLog24h row = hourly.findByKeywordIdAndHourSlot(k.getId(), slot)
-                    .orElseGet(() -> hourly.save(new KeywordLog24h(k, slot)));
+            // 새 칸은 값을 채운 뒤에 저장한다(recorded_at은 NOT NULL)
+            KeywordLog24h row = hourly.findByKeywordIdAndHourSlot(k.getId(), slot).orElseGet(() -> new KeywordLog24h(k, slot));
             row.overwrite(hourStart, k.getSearchCount(), k.getTotalPlusCount(), k.getHolderCount(),
                     searchInc, Math.max(0, k.getTotalPlusCount() - base.plus()), k.getHolderCount() - base.holders());
-            hourly.flush();
+            hourly.saveAndFlush(row);
             rebuildDay(k, hourStart.atZone(zone).toLocalDate(), zone, hourEnd);
         }
         daily.deleteOlderThan(LocalDate.now(clock).minusDays(KEEP_DAYS));
@@ -66,16 +66,16 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
                 k.getId(), dayStart, until);
         if (rows.isEmpty()) return;
         KeywordLog24h last = rows.getLast();
-        KeywordLogDaily d = daily.findByKeywordIdAndRecordDate(k.getId(), date)
-                .orElseGet(() -> daily.save(new KeywordLogDaily(k, date)));
+        KeywordLogDaily d = daily.findByKeywordIdAndRecordDate(k.getId(), date).orElseGet(() -> new KeywordLogDaily(k, date));
+        daily.save(d);
         d.overwrite(last.getSearchCount(), last.getTotalPlusCount(), last.getHolderCount(),
                 rows.stream().mapToLong(KeywordLog24h::getSearchInc).sum(),
                 rows.stream().mapToLong(KeywordLog24h::getTotalPlusInc).sum(),
-                rows.stream().mapToInt(KeywordLog24h::getHolderInc).sum());
+                rows.stream().mapToLong(KeywordLog24h::getHolderInc).sum());
     }
 
     /** 그 시각 직전의 누적 + 수와 가진 사람 수. 증분은 지금 값에서 이것을 뺀다. */
-    private record Base(long plus, int holders) {}
+    private record Base(long plus, long holders) {}
 
     private Base base(Keyword k, Instant since) {
         Optional<KeywordLog24h> prev = hourly.findTopByKeywordIdAndRecordedAtBeforeOrderByRecordedAtDesc(k.getId(), since);
@@ -83,7 +83,7 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         // 직전 기록이 없다(새 키워드거나 기록을 시작하기 전부터 있던 키워드). 그 시간 뒤에 +되어 남아 있는 행만 이번 증분으로 본다.
         // 옛 누적값이 한 시간에 몰려 그래프가 튀지 않게 하려는 것이다
         long recent = playerKeywords.countPlusedSince(k.getId(), since);
-        return new Base(Math.max(0, k.getTotalPlusCount() - recent), (int) Math.max(0, k.getHolderCount() - recent));
+        return new Base(Math.max(0, k.getTotalPlusCount() - recent), Math.max(0, k.getHolderCount() - recent));
     }
 
     // ---------------------------------------------------------------- 조회
@@ -123,8 +123,8 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         for (KeywordLog24h r : hourly.findByKeywordIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAt(k.getId(), from, thisHour)) {
             rows.put(r.getRecordedAt(), r);
         }
-        int holders = hourly.findTopByKeywordIdAndRecordedAtBeforeOrderByRecordedAtDesc(k.getId(), from)
-                .map(KeywordLog24h::getHolderCount).orElse(0);
+        long holders = hourly.findTopByKeywordIdAndRecordedAtBeforeOrderByRecordedAtDesc(k.getId(), from)
+                .map(KeywordLog24h::getHolderCount).orElse(0L);
         List<KeywordDtos.ActivityPoint> out = new ArrayList<>();
         for (Instant t = from; t.isBefore(thisHour); t = t.plus(1, ChronoUnit.HOURS)) {
             KeywordLog24h r = rows.get(t);
@@ -140,7 +140,7 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         LocalDate today = thisHour.atZone(zone).toLocalDate();
         LocalDate from = today.minusDays(days - 1L);
         Map<LocalDate, KeywordLogDaily> rows = new HashMap<>();
-        int holders = 0;
+        long holders = 0;
         for (KeywordLogDaily d : daily.findByKeywordIdAndRecordDateGreaterThanEqualOrderByRecordDate(k.getId(), from.minusDays(1))) {
             if (d.getRecordDate().isBefore(from)) holders = d.getHolderCount(); // 구간 바로 앞날의 가진 사람 수
             else rows.put(d.getRecordDate(), d);

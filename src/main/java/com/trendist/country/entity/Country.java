@@ -16,8 +16,8 @@ public class Country extends BaseTimeEntity {
     @Column(name = "default_locale", nullable = false, length = 10) private String defaultLocale;
     @Column(nullable = false, length = 50) private String timezone;
     @Column(nullable = false) private boolean enabled;
-    @Column(name = "max_room_size", nullable = false) private int maxRoomSize = 1000;
-    @Column(name = "sort_order", nullable = false) private int sortOrder;
+    @Column(name = "max_room_size", nullable = false) private long maxRoomSize = 1000;
+    @Column(name = "sort_order", nullable = false) private long sortOrder;
 
     public Country(String code, String name, String defaultLocale, String timezone, boolean enabled, int sortOrder) {
         this.code = code; this.name = name; this.defaultLocale = defaultLocale;

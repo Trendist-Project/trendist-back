@@ -5,5 +5,5 @@ public interface LevelService {
     int levelFor(long exp);
 
     /** 다음 레벨에 필요한 누적 EXP. 최고 레벨이면 -1. */
-    long nextRequired(int level);
+    long nextRequired(long level);
 }

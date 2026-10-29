@@ -7,6 +7,7 @@ import com.trendist.keyword.service.KeywordService;
 import com.trendist.keyword.support.SearchCounter;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.service.PlayerService;
+import com.trendist.player.service.ScoreHistoryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +32,7 @@ public class KeywordJobs {
     private final KeywordService keywordService;
     private final KeywordActivityService activity;
     private final PlayerService playerService;
+    private final ScoreHistoryService scoreHistory;
     private final PlayerKeywordRepository playerKeywords;
     private final PlayerRepository players;
     private final KeywordRepository keywords;
@@ -58,7 +60,10 @@ public class KeywordJobs {
         if (expired > 0 || !playerIds.isEmpty()) log.info("minute job: expired={}, recomputed={}", expired, playerIds.size());
     }
 
-    /** 매시 정각: 검색 카운터를 DB로 옮기고, 끝난 시간의 활동 기록을 남기고(9.9), 키워드가 있는 플레이어 전원을 점검한다. */
+    /**
+     * 매시 정각: 검색 카운터를 DB로 옮기고, 끝난 시간의 활동 기록을 남기고(9.9), 키워드가 있는 플레이어 전원을 점검한 뒤,
+     * 점검으로 맞춘 점수로 플레이어 점수 기록을 남긴다(4.15).
+     */
     @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     public void hourly() {
         Instant hourStart = Instant.now(clock).truncatedTo(ChronoUnit.HOURS).minus(1, ChronoUnit.HOURS);
@@ -69,5 +74,6 @@ public class KeywordJobs {
         for (Long pid : players.findCheckTargets()) {
             try { playerService.recomputeLocked(pid, true); } catch (RuntimeException e) { log.warn("check {} failed", pid, e); }
         }
+        try { scoreHistory.recordHour(hourStart); } catch (RuntimeException e) { log.warn("score log {} failed", hourStart, e); }
     }
 }

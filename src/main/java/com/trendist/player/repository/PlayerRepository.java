@@ -25,4 +25,13 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     @Modifying(flushAutomatically = true)
     @Query("update Player p set p.commentScore = case when p.commentScore + :delta < 0 then 0 else p.commentScore + :delta end where p.id = :id")
     int addCommentScore(@Param("id") Long id, @Param("delta") int delta);
+
+    /** 점수 기록 대상(4.15): 그 시간 뒤에 행이 바뀐 플레이어(점수가 바뀌면 updated_at도 바뀐다). */
+    @Query("select p from Player p join fetch p.country where p.updatedAt >= :since")
+    List<Player> findChangedSince(@Param("since") java.time.Instant since);
+
+    /** 검색 횟수 +1(4.4). 일괄 UPDATE라 updated_at은 바뀌지 않는다(점수 기록 대상에 끼지 않게). */
+    @Modifying
+    @Query("update Player p set p.searchCount = p.searchCount + 1 where p.id = :id")
+    int incSearchCount(@Param("id") Long id);
 }

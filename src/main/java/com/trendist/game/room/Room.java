@@ -1,6 +1,5 @@
 package com.trendist.game.room;
 
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,7 +26,7 @@ public class Room {
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds,
                          double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds,
-                         int orbMax, double orbSpawnSeconds) {}
+                         int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent) {}
 
     /** 방 밖(서비스)으로 나가는 요청: 충돌로 키워드 잃기, 메시지 전송. */
     public interface Outbox {
@@ -105,7 +104,7 @@ public class Room {
     public void submit(Consumer<Room> task) { tasks.add(task); }
 
     /** 접속 중인 플레이어 한 명의 랭킹용 값. */
-    public record Live(long playerId, String nickname, int level, double score) {}
+    public record Live(long playerId, int entityNo, String nickname, int level, double score) {}
 
     /** 랭킹에서 쓰는 접속 중인 플레이어(1초마다 갱신되는 읽기 전용 복사본, 플레이어 번호 → 값). */
     public Map<Long, Live> liveView() { return liveView; }
@@ -270,7 +269,7 @@ public class Room {
         if (tick % MINIMAP_EVERY == 0) sendMinimap();
         if (tick % 20 == 0) {
             Map<Long, Live> view = new HashMap<>();
-            for (Member m : members.values()) view.put(m.playerId, new Live(m.playerId, m.nickname, m.level, m.score));
+            for (Member m : members.values()) view.put(m.playerId, new Live(m.playerId, m.entityNo, m.nickname, m.level, m.score));
             liveView = view;
             pairCooldown.values().removeIf(until -> until < clockSeconds);
             lastSeen.values().removeIf(seen -> seen.keepUntil() < clockSeconds);
@@ -348,7 +347,17 @@ public class Room {
         }
     }
 
-    /** 일정 간격으로 하나씩, 최대 개수까지 활동 영역 안 빈 곳에 만든다. 영역이 좁아져 밖에 남은 구슬은 지운다. */
+    /**
+     * 목표 개수 = 활동 영역 넓이 × 밀도(상한 orbMax). 맵이 넓어지거나 사람이 늘어 영역이 커지면 같은 비율로 늘어난다(4.20).
+     * 간격마다 목표의 일정 비율(기본 5%, 최소 1개)씩 빈 곳에 만들어서, 넓은 맵도 좁은 맵과 비슷한 시간에 다 찬다.
+     * 영역이 좁아져 밖에 남은 구슬은 지운다.
+     */
+    int orbTarget(Tuning tu, double half) {
+        double millionPx = (half * 2) * (half * 2) / 1_000_000;
+        return (int) Math.min(tu.orbMax(), Math.round(millionPx * tu.orbDensity()));
+    }
+
+
     private void spawnOrbs(Tuning tu, double half) {
         Iterator<Map.Entry<Integer, double[]>> it = orbs.entrySet().iterator();
         while (it.hasNext()) {
@@ -358,8 +367,15 @@ public class Room {
                 broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", 0));
             }
         }
-        if (members.isEmpty() || orbs.size() >= tu.orbMax() || clockSeconds < nextOrbAt) return;
+        int target = orbTarget(tu, half);
+        if (members.isEmpty() || orbs.size() >= target || clockSeconds < nextOrbAt) return;
         nextOrbAt = clockSeconds + tu.orbSpawnSeconds();
+        int batch = Math.min(target - orbs.size(), Math.max(1, (int) Math.ceil(target * tu.orbSpawnPercent() / 100)));
+        for (int i = 0; i < batch; i++) spawnOneOrb(half);
+    }
+
+    /** 활동 영역 안, 원 바로 위가 아닌 곳에 구슬 하나. 8번 안에 자리를 못 찾으면 이번에는 만들지 않는다. */
+    private void spawnOneOrb(double half) {
         double margin = 80;
         for (int tries = 0; tries < 8; tries++) {
             double x = (ThreadLocalRandom.current().nextDouble() * 2 - 1) * (half - margin);
@@ -498,10 +514,10 @@ public class Room {
         for (Member m : members.values()) outbox.sendText(m, msg);
     }
 
-    /** 인원이 적으면 활동 영역을 좁힌다(4.2). 1000명에서 기준 맵 한 변. */
+    /** 인원이 적으면 활동 영역을 좁힌다(4.2). 1000명에서 기준 맵 한 변, 아무리 적어도 그 1/4보다 좁히지 않는다. */
     double activeArea(int n) {
         double full = tuning.worldSize();
-        return clamp(full * Math.sqrt(Math.max(n, 1) / 1000.0), Math.min(3000, full), full);
+        return clamp(full * Math.sqrt(Math.max(n, 1) / 1000.0), full / 4, full);
     }
 
     public double radiusFor(double score) {
@@ -526,5 +542,4 @@ public class Room {
 
     static double clamp(double v, double lo, double hi) { return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)); }
 
-    public static double toDouble(BigDecimal v) { return v == null ? 0 : v.doubleValue(); }
 }

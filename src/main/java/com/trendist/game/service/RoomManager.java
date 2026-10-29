@@ -24,6 +24,9 @@ public interface RoomManager {
     /** 그 나라 방에 접속 중인 플레이어(랭킹용, 4.14). 방이 없으면 비어 있다. */
     Collection<Room.Live> livePlayers(long countryId);
 
+    /** 그 나라 방에서 세션 엔티티 번호로 찾은 접속 중인 플레이어(정보 팝업, 4.11). 1초마다 갱신되는 복사본에서 찾는다. */
+    java.util.Optional<Room.Live> livePlayerByEntity(long countryId, int entityNo);
+
     void sendText(Room.Member m, Map<String, Object> message);
 
     /** DB·외부 호출처럼 틱 스레드에서 하면 안 되는 일을 작업 스레드에서 돌린다. */

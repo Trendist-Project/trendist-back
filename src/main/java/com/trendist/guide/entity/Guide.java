@@ -18,7 +18,7 @@ public class Guide extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false) private User user;
     @Column(nullable = false, length = 100) private String title;
     @Column(nullable = false, columnDefinition = "MEDIUMTEXT") private String body;
-    @Column(name = "sort_order", nullable = false) private int sortOrder;
+    @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
 
     public Guide(GuideCategory category, User author, String title, String body, int sortOrder) {

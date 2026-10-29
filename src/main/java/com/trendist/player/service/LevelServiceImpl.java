@@ -32,8 +32,8 @@ public class LevelServiceImpl implements LevelService {
 
     /** 다음 레벨에 필요한 누적 EXP. 최고 레벨이면 -1. */
     @Override
-    public long nextRequired(int level) {
+    public long nextRequired(long level) {
         long[] req = cache.get("all");
-        return level < req.length ? req[level] : -1;
+        return level < req.length ? req[(int) level] : -1;
     }
 }

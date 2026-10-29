@@ -1,7 +1,6 @@
 package com.trendist.keyword.repository;
 
 import com.trendist.keyword.entity.PlayerKeyword;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +24,7 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     @Query("""
             select coalesce(sum(k.trendValue), 0) from PlayerKeyword pk join pk.keyword k
             where pk.player.id = :playerId and pk.expiresAt > :now and k.keywordState.id = :activeStateId""")
-    BigDecimal sumActiveTrendValue(@Param("playerId") Long playerId, @Param("now") Instant now,
+    long sumActiveTrendValue(@Param("playerId") Long playerId, @Param("now") Instant now,
                                    @Param("activeStateId") Long activeStateId);
 
     @Query("select count(pk) from PlayerKeyword pk where pk.player.id = :playerId and pk.expiresAt > :now")
@@ -51,4 +50,12 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     /** 그 시각 뒤에 +되어 아직 남아 있는 행 수. 직전 기록이 없을 때 그 시간의 + 수를 어림한다(9.9). */
     @Query("select count(pk) from PlayerKeyword pk where pk.keyword.id = :keywordId and pk.createdAt >= :since")
     long countPlusedSince(@Param("keywordId") Long keywordId, @Param("since") Instant since);
+
+    /** 정보 팝업의 상위 키워드(4.11): 만료 전·금지 아님, 트렌드 값 높은 순(같으면 최근에 넣은 순). */
+    @Query("""
+            select pk from PlayerKeyword pk join fetch pk.keyword k join fetch k.keywordState
+            where pk.player.id = :playerId and pk.expiresAt > :now and k.keywordState.id <> :bannedStateId
+            order by k.trendValue desc, pk.createdAt desc""")
+    List<PlayerKeyword> findTopByPlayer(@Param("playerId") Long playerId, @Param("now") Instant now,
+                                        @Param("bannedStateId") Long bannedStateId, Pageable pageable);
 }

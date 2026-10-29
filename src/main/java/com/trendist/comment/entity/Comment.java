@@ -24,10 +24,10 @@ public class Comment extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "keyword_id", nullable = false) private Keyword keyword;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "player_id", nullable = false) private Player player;
     @Column(nullable = false, length = 400) private String body;
-    @Column(name = "like_count", nullable = false) private int likeCount;
-    @Column(name = "dislike_count", nullable = false) private int dislikeCount;
+    @Column(name = "like_count", nullable = false) private long likeCount;
+    @Column(name = "dislike_count", nullable = false) private long dislikeCount;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
-    @Column(name = "report_count", nullable = false) private int reportCount;
+    @Column(name = "report_count", nullable = false) private long reportCount;
 
     public Comment(Keyword keyword, Player player, String body) {
         this.keyword = keyword; this.player = player; this.body = body;

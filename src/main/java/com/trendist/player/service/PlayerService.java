@@ -2,7 +2,6 @@ package com.trendist.player.service;
 
 import com.trendist.player.dto.PlayerDtos;
 import com.trendist.player.entity.Player;
-import java.math.BigDecimal;
 import java.util.Optional;
 
 /** 플레이어(사용자 × 나라): 입장, 닉네임, 현재 유행도 재합산(4.1, 4.8). */
@@ -28,10 +27,10 @@ public interface PlayerService {
     PlayerDtos.PlayerSummary summary(Player p);
 
     /**
-     * 현재 유행도를 다시 합산한다(4.8): min(EXP, 100) + Σ 🔥 키워드 trend_value × 계수.
+     * 현재 유행도를 다시 합산한다(4.8): min(EXP, 100) + Σ 🔥 키워드 trend_value(모두 정수).
      * 호출하는 쪽이 players 행을 잠근 트랜잭션 안에서 부른다. 결과는 커밋 뒤 방에 전달된다.
      */
-    BigDecimal recompute(Player p);
+    long recompute(Player p);
 
     /** 다른 트랜잭션에서 한 플레이어를 잠그고 다시 합산한다(재합산 잡, 전체 점검). */
     void recomputeLocked(long playerId, boolean fixHoldCount);

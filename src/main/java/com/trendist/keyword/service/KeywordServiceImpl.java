@@ -21,7 +21,6 @@ import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.service.PlayerService;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -67,6 +66,8 @@ public class KeywordServiceImpl implements KeywordService {
         Player p = playerService.requireCurrent(userId);
         String text = KeywordNormalizer.display(q);
         String normalized = KeywordNormalizer.validate(text);
+        // 검색할 때마다 플레이어의 누적 검색 횟수 +1(찾았는지·금지인지와 관계없이). 형식에 맞지 않아 거절된 입력은 세지 않는다
+        players.incSearchCount(p.getId());
         Country country = p.getCountry();
         Instant now = Instant.now(clock);
 
@@ -85,7 +86,7 @@ public class KeywordServiceImpl implements KeywordService {
             searchCounter.count(userId, k.getId());
             return new KeywordDtos.SearchResult("FOUND", card(k, p, now));
         }
-        var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, BigDecimal.ZERO,
+        var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, 0,
                 0, 0, 0, false, null);
         return new KeywordDtos.SearchResult("NEW", preview);
     }
@@ -116,8 +117,8 @@ public class KeywordServiceImpl implements KeywordService {
     private KeywordDtos.PlusResult addHolding(Player p, Keyword k, Optional<PlayerKeyword> existing, Instant now) {
         Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
         Country country = p.getCountry();
-        BigDecimal oldTrend = k.getTrendValue();
-        BigDecimal oldScore = p.getCurrentScore();
+        long oldTrend = k.getTrendValue();
+        long oldScore = p.getCurrentScore();
         boolean newHolder;
         if (existing.isPresent()) {
             existing.get().renew(now, expires); // 만료 행 재사용: 가진 사람 수는 그대로
@@ -136,13 +137,13 @@ public class KeywordServiceImpl implements KeywordService {
         if (isState(k, CodeTables.KW_INACTIVE) && k.getHolderCount() >= settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
             k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now); // 내부 확산으로 활성(4.6)
         }
-        BigDecimal newTrend = updateTrend(k);
+        long newTrend = updateTrend(k);
         keywords.flush();
         playerKeywords.flush();
-        BigDecimal newScore = playerService.recompute(p);
+        long newScore = playerService.recompute(p);
         publishTrendChange(k, oldTrend, newTrend, p.getId());
         if (newHolder) events.publishEvent(new GameEvents.HoldingChanged(country.getId(), p.getId(), k.getId(), true));
-        return new KeywordDtos.PlusResult(card(k, p, now), newScore.subtract(oldScore), playerService.summary(p));
+        return new KeywordDtos.PlusResult(card(k, p, now), newScore - oldScore, playerService.summary(p));
     }
 
     // ---------------------------------------------------------------- 구슬(4.20)
@@ -164,7 +165,7 @@ public class KeywordServiceImpl implements KeywordService {
         if (existing.isPresent() && !existing.get().isExpired(now)) {
             // 이미 보관함에 있는 키워드가 나오면 아무것도 바뀌지 않는다
             return new KeywordDtos.OrbResult("DUPLICATE", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
-                    k.getHolderCount(), BigDecimal.ZERO, existing.get().getExpiresAt());
+                    k.getHolderCount(), 0L, existing.get().getExpiresAt());
         }
         KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
         return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
@@ -211,9 +212,9 @@ public class KeywordServiceImpl implements KeywordService {
                 && k.getExternalUntil().isAfter(now);
         k.holdExternal(source, externalHoldUntil(now)); // 목록에 보일 때마다 지금부터 다시 7일
         if (holding) return false;
-        BigDecimal old = k.getTrendValue();
+        long old = k.getTrendValue();
         k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now);
-        BigDecimal nw = updateTrend(k);
+        long nw = updateTrend(k);
         publishTrendChange(k, old, nw, null);
         return true;
     }
@@ -242,13 +243,13 @@ public class KeywordServiceImpl implements KeywordService {
             k.holdExternal(source, externalHoldUntil(now)); // 유지 기간이 끝나도 아직 목록에 있으면 지금부터 다시
             return false;
         }
-        BigDecimal old = k.getTrendValue();
+        long old = k.getTrendValue();
         k.dropExternal(codes.dataSource(DataSource.INTERNAL));
         // 내부 데이터만으로는 가진 사람이 3명 이상이어야 🔥(4.7)
         if (isState(k, CodeTables.KW_ACTIVE) && k.getHolderCount() < settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
             k.deactivate(codes.keywordState(CodeTables.KW_INACTIVE), now);
         }
-        BigDecimal nw = updateTrend(k);
+        long nw = updateTrend(k);
         publishTrendChange(k, old, nw, null);
         return true;
     }
@@ -311,7 +312,7 @@ public class KeywordServiceImpl implements KeywordService {
 
     private void removeHolding(Player p, Long keywordId, Instant now) {
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();
-        BigDecimal oldTrend = k.getTrendValue();
+        long oldTrend = k.getTrendValue();
         k.decHolder();
         p.decHold();
         // 외부 데이터가 없고 가진 사람이 3명 미만이면 💤(4.7)
@@ -319,7 +320,7 @@ public class KeywordServiceImpl implements KeywordService {
                 && k.getHolderCount() < settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
             k.deactivate(codes.keywordState(CodeTables.KW_INACTIVE), now);
         }
-        BigDecimal newTrend = updateTrend(k);
+        long newTrend = updateTrend(k);
         keywords.flush();
         playerService.recompute(p);
         publishTrendChange(k, oldTrend, newTrend, p.getId());
@@ -361,11 +362,11 @@ public class KeywordServiceImpl implements KeywordService {
 
     private void tryExternalActivate(Keyword k, Instant now) {
         externalConfirm(k.getCountry().getCode(), k.getNormalized()).ifPresent(c -> {
-            BigDecimal old = k.getTrendValue();
+            long old = k.getTrendValue();
             if (isListSource(c.source())) k.holdExternal(c.source(), externalHoldUntil(now));
             else k.setDataSource(c.source());
             k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now);
-            BigDecimal nw = updateTrend(k);
+            long nw = updateTrend(k);
             publishTrendChange(k, old, nw, null);
         });
     }
@@ -388,17 +389,17 @@ public class KeywordServiceImpl implements KeywordService {
         return k;
     }
 
-    private BigDecimal updateTrend(Keyword k) {
-        BigDecimal v = formula.trendValue(isState(k, CodeTables.KW_ACTIVE), k.getHolderCount(), k.getDataSource().getWeight().doubleValue());
+    private long updateTrend(Keyword k) {
+        long v = formula.trendValue(isState(k, CodeTables.KW_ACTIVE), k.getHolderCount(), k.getDataSource().getWeight().doubleValue());
         k.setTrendValue(v);
         return v;
     }
 
-    private void publishTrendChange(Keyword k, BigDecimal oldTrend, BigDecimal newTrend, Long excludePlayerId) {
-        if (oldTrend.compareTo(newTrend) == 0) return;
+    private void publishTrendChange(Keyword k, long oldTrend, long newTrend, Long excludePlayerId) {
+        if (oldTrend == newTrend) return;
         dirtyKeywords.add(k.getId());
         events.publishEvent(new GameEvents.KeywordTrendChanged(k.getCountry().getId(), k.getId(),
-                newTrend.subtract(oldTrend), excludePlayerId));
+                newTrend - oldTrend, excludePlayerId));
     }
 
     @Override

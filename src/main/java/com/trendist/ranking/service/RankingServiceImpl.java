@@ -5,8 +5,6 @@ import com.trendist.country.service.CountryService;
 import com.trendist.game.room.Room;
 import com.trendist.game.service.RoomManager;
 import com.trendist.ranking.dto.RankingEntry;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -33,7 +31,7 @@ public class RankingServiceImpl implements RankingService {
         for (int i = 0; i < live.size(); i++) {
             Room.Live l = live.get(i);
             out.add(new RankingEntry(i + 1, l.playerId(), l.nickname(), l.level(),
-                    BigDecimal.valueOf(l.score()).setScale(2, RoundingMode.HALF_UP)));
+                    Math.round(l.score())));
         }
         return out;
     }

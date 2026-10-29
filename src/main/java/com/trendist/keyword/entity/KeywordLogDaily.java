@@ -19,17 +19,17 @@ public class KeywordLogDaily extends BaseTimeEntity {
     @Column(name = "record_date", nullable = false) private LocalDate recordDate;
     @Column(name = "search_count", nullable = false) private long searchCount;
     @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
-    @Column(name = "holder_count", nullable = false) private int holderCount;
+    @Column(name = "holder_count", nullable = false) private long holderCount;
     @Column(name = "search_inc", nullable = false) private long searchInc;
     @Column(name = "total_plus_inc", nullable = false) private long totalPlusInc;
-    @Column(name = "holder_inc", nullable = false) private int holderInc;
+    @Column(name = "holder_inc", nullable = false) private long holderInc;
 
     public KeywordLogDaily(Keyword keyword, LocalDate recordDate) {
         this.keyword = keyword; this.recordDate = recordDate;
     }
 
     /** 그날 마지막 누적값과 그날의 증분 합으로 다시 쓴다. */
-    public void overwrite(long searchCount, long totalPlusCount, int holderCount, long searchInc, long totalPlusInc, int holderInc) {
+    public void overwrite(long searchCount, long totalPlusCount, long holderCount, long searchInc, long totalPlusInc, long holderInc) {
         this.searchCount = searchCount; this.totalPlusCount = totalPlusCount; this.holderCount = holderCount;
         this.searchInc = searchInc; this.totalPlusInc = totalPlusInc; this.holderInc = holderInc;
     }

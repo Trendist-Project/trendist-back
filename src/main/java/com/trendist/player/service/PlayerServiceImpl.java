@@ -15,8 +15,6 @@ import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.user.entity.User;
 import com.trendist.user.repository.UserRepository;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -53,7 +51,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional(readOnly = true)
     public Optional<JoinInfo> joinInfo(long userId) {
         return findCurrent(userId).map(p -> new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(),
-                p.getLevel(), p.getCurrentScore().doubleValue()));
+                Math.toIntExact(p.getLevel()), p.getCurrentScore()));
     }
 
     @Override
@@ -103,16 +101,15 @@ public class PlayerServiceImpl implements PlayerService {
     public PlayerDtos.PlayerSummary summary(Player p) {
         return new PlayerDtos.PlayerSummary(p.getId(), p.getNickname(), p.getCountry().getCode(), p.getLevel(), p.getExp(),
                 levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getTotalPlusCount(),
-                p.getCommentScore(), changeableAt(p));
+                p.getCommentScore(), p.getSearchCount(), changeableAt(p));
     }
 
     @Override
-    public BigDecimal recompute(Player p) {
+    public long recompute(Player p) {
         Instant now = Instant.now(clock);
-        BigDecimal sum = playerKeywords.sumActiveTrendValue(p.getId(), now, codes.keywordStateId(CodeTables.KW_ACTIVE));
-        BigDecimal score = BigDecimal.valueOf(formula.expScore(p.getExp()))
-                .add(sum)
-                .setScale(2, RoundingMode.HALF_UP);
+        // 키워드 점수가 모두 정수라 합도 정수다(4.8)
+        long sum = playerKeywords.sumActiveTrendValue(p.getId(), now, codes.keywordStateId(CodeTables.KW_ACTIVE));
+        long score = formula.expScore(p.getExp()) + sum;
         p.setCurrentScore(score);
         p.setLevel(levels.levelFor(p.getExp()));
         events.publishEvent(new GameEvents.PlayerScoreChanged(p.getCountry().getId(), p.getId(), score, p.getExp(),

@@ -79,7 +79,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.LOSE_PROTECT_SECONDS),
                 settings.getDouble(SettingKeys.JOIN_PROTECT_SECONDS),
                 settings.getInt(SettingKeys.ORB_MAX),
-                settings.getDouble(SettingKeys.ORB_SPAWN_SECONDS));
+                settings.getDouble(SettingKeys.ORB_SPAWN_SECONDS),
+                settings.getDouble(SettingKeys.ORB_DENSITY),
+                settings.getDouble(SettingKeys.ORB_SPAWN_PERCENT));
     }
 
     /** 클라이언트 예측에 필요한 값(9.2 설정값 전달). */
@@ -104,6 +106,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
+    public java.util.Optional<Room.Live> livePlayerByEntity(long countryId, int entityNo) {
+        return livePlayers(countryId).stream().filter(l -> l.entityNo() == entityNo).findFirst();
+    }
+
+    @Override
     public Collection<Room.Live> livePlayers(long countryId) {
         Room r = rooms.get(countryId);
         return r == null ? List.of() : r.liveView().values();
@@ -116,7 +123,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         Room r = rooms.get(e.countryId());
         if (r == null) return;
         r.submit(room -> {
-            room.applyScore(e.playerId(), e.score().doubleValue(), e.level());
+            room.applyScore(e.playerId(), e.score(), Math.toIntExact(e.level())); // 방 메모리의 레벨은 int(1~100)
             Room.Member m = room.byPlayer(e.playerId());
             if (m != null) sendText(m, Map.of("type", "score", "score", e.score(), "exp", e.exp(), "level", e.level(),
                     "holdCount", e.holdCount()));
@@ -126,7 +133,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.KeywordTrendChanged e) {
         Room r = rooms.get(e.countryId());
-        if (r != null) r.submit(room -> room.applyKeywordDelta(e.keywordId(), e.deltaScore().doubleValue(), e.excludePlayerId()));
+        if (r != null) r.submit(room -> room.applyKeywordDelta(e.keywordId(), e.deltaScore(), e.excludePlayerId()));
     }
 
     @TransactionalEventListener(fallbackExecution = true)

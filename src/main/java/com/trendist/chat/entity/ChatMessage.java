@@ -20,7 +20,7 @@ public class ChatMessage {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "country_id", nullable = false) private Country country;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "player_id", nullable = false) private Player player;
     @Column(nullable = false, length = 100) private String body;
-    @Column(name = "report_count", nullable = false) private int reportCount;
+    @Column(name = "report_count", nullable = false) private long reportCount;
     @Column(name = "created_at", nullable = false, columnDefinition = "DATETIME(6)") private Instant createdAt;
 
     public ChatMessage(Country country, Player player, String body, Instant createdAt) {

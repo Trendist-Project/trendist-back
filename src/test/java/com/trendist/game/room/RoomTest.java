@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
-    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 0, 3);
+    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 0, 3, 2.2, 5);
 
     static class Out implements Room.Outbox {
         final List<long[]> loses = new ArrayList<>();
@@ -86,7 +86,7 @@ class RoomTest {
 
     @Test
     void orbsSpawnUpToMax() {
-        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 5, 0.5), new Out());
+        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 5, 0.5, 2.2, 5), new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         for (int i = 0; i < 20 * 10; i++) r.tick(); // 10초
         assertThat(r.orbCount()).isEqualTo(5);
@@ -94,7 +94,7 @@ class RoomTest {
 
     @Test
     void rejoinWithinOneMinuteKeepsLastPositionAndProtection() {
-        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 5, 0, 3);
+        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 5, 0, 3, 2.2, 5);
         Room r = new Room(1, withProtect, new Out());
         Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
         m.x = 321; m.y = -123;
@@ -159,9 +159,40 @@ class RoomTest {
         r.join(2, "s2", "나", 5, 120, List.of());
         for (int i = 0; i < 20; i++) r.tick();
         assertThat(r.liveView()).containsOnlyKeys(1L, 2L);
-        assertThat(r.liveView().get(2L)).isEqualTo(new Room.Live(2, "나", 5, 120));
+        assertThat(r.liveView().get(2L)).isEqualTo(new Room.Live(2, 2, "나", 5, 120));
         r.leave(a);
         for (int i = 0; i < 20; i++) r.tick();
         assertThat(r.liveView()).containsOnlyKeys(2L);
+    }
+
+    @Test
+    void activeAreaScalesWithWorldSize() {
+        // 적은 인원에서도 기준 맵 한 변의 1/4, 1000명이면 한 변 전체(4.2)
+        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 0, 3, 2.2, 5), new Out());
+        assertThat(small.activeArea(1)).isEqualTo(6000);
+        assertThat(small.activeArea(1000)).isEqualTo(24000);
+        assertThat(new Room(1, T, new Out()).activeArea(1)).isEqualTo(3000);
+    }
+
+    @Test
+    void orbTargetFollowsArea() {
+        // 3,000×3,000px에 20개였던 비율(밀도 2.2)을 넓이에 비례해 유지한다. 상한 orbMax를 넘지 않는다(4.20)
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 1500, 3, 2.2, 5);
+        Room r = new Room(1, tu, new Out());
+        assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
+        assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역(지금 최소)
+        assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
+        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 100, 3, 2.2, 5);
+        assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
+    }
+
+    @Test
+    void orbsFillInBatches() {
+        // 목표 79개면 간격마다 5%(4개)씩 생긴다
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.5, 10, 0, 1500, 3, 2.2, 5);
+        Room r = new Room(1, tu, new Out());
+        r.join(1, "s1", "a", 1, 0, List.of());
+        r.tick();
+        assertThat(r.orbCount()).isEqualTo(4);
     }
 }

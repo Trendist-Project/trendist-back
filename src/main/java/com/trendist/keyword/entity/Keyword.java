@@ -3,7 +3,6 @@ package com.trendist.keyword.entity;
 import com.trendist.common.entity.BaseTimeEntity;
 import com.trendist.country.entity.Country;
 import jakarta.persistence.*;
-import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -21,10 +20,10 @@ public class Keyword extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "keyword_state_id", nullable = false) private KeywordState keywordState;
     @Column(nullable = false, length = 20) private String text;
     @Column(nullable = false, length = 100) private String normalized;
-    @Column(name = "trend_value", nullable = false, precision = 5, scale = 2) private BigDecimal trendValue = BigDecimal.ZERO;
+    @Column(name = "trend_value", nullable = false) private long trendValue; // 정수 점수(4.8)
     @Column(name = "search_count", nullable = false) private long searchCount;
     @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
-    @Column(name = "holder_count", nullable = false) private int holderCount;
+    @Column(name = "holder_count", nullable = false) private long holderCount;
     @Column(name = "activated_at", columnDefinition = "DATETIME(6)") private Instant activatedAt;
     @Column(name = "inactive_at", columnDefinition = "DATETIME(6)") private Instant inactiveAt;
     @Column(name = "banned_at", columnDefinition = "DATETIME(6)") private Instant bannedAt;
@@ -37,7 +36,7 @@ public class Keyword extends BaseTimeEntity {
     }
 
     public void setDataSource(DataSource dataSource) { this.dataSource = dataSource; }
-    public void setTrendValue(BigDecimal trendValue) { this.trendValue = trendValue; }
+    public void setTrendValue(long trendValue) { this.trendValue = trendValue; }
     public void incTotalPlus() { totalPlusCount++; }
     public void incHolder() { holderCount++; }
     public void decHolder() { holderCount = Math.max(0, holderCount - 1); }

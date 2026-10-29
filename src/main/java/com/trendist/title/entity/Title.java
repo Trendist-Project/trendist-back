@@ -17,7 +17,7 @@ public class Title extends BaseTimeEntity {
     @Column(length = 100) private String icon;
     @Column(name = "condition_type", nullable = false, length = 20) private String conditionType;
     @Column(name = "condition_params", nullable = false, columnDefinition = "JSON") private String conditionParams;
-    @Column(name = "sort_order", nullable = false) private int sortOrder;
+    @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
 
     public Title(String name, String description, String conditionType, String conditionParams, int sortOrder) {
