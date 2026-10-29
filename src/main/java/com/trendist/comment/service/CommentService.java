@@ -11,7 +11,7 @@ public interface CommentService {
     /** 최신순 페이지(추천 상위 3개는 뺀다). size는 최대 50. */
     CommentDtos.Page latest(long userId, long keywordId, int page, int size);
 
-    /** 쓰기: 5~200자, 링크·전화번호 불가. 댓글 점수 +1. */
+    /** 쓰기: 200자까지(빈 댓글만 안 된다), 링크·전화번호 불가. 댓글 점수 +1. */
     CommentDtos.Item write(long userId, long keywordId, String body);
 
     /** 고치기: 내 댓글, 작성 후 5분 안. */

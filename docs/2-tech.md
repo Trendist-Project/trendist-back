@@ -145,7 +145,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404 |
 | `GET /api/admin/trends?country=&state=&source=&q=&sort=&page=&size=` | 관리자 트렌드 키워드 목록(`ROLE_ADMIN`, 1분 캐시, 13.6) |
 | `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |
-| `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(5~200자, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
+| `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
 | `PATCH /api/comments/{id}`, `DELETE /api/comments/{id}` | 내 댓글 고치기(작성 후 5분 안, 지나면 409 `COMMENT_EDIT_EXPIRED`), 지우기(소프트 삭제, 댓글 점수 −1) |
 | `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT", "targetId": 1, "reason": "..." }`. 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |

@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommentServiceImpl implements CommentService {
     private static final int TOP = 3;
-    private static final int MIN_LENGTH = 5, MAX_LENGTH = 200;
+    private static final int MIN_LENGTH = 1, MAX_LENGTH = 200; // 최소 글자 수 제한은 없다. 빈 댓글만 막는다
     private static final Duration EDIT_WINDOW = Duration.ofMinutes(5);
     private static final String DELETED_TEXT = "삭제된 댓글이에요";
     private static final String WITHDRAWN_TEXT = "탈퇴한 사용자의 댓글이에요";

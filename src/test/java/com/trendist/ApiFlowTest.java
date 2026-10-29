@@ -272,8 +272,8 @@ class ApiFlowTest {
         String auth = "Bearer " + a;
         // 길이·링크 검사
         mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", auth)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"짧음\"}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMENT_LENGTH"));
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"   \"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMENT_LENGTH")); // 빈 댓글만 막는다
         mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"여기 보세요 www.example.com\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMENT_LINK"));
