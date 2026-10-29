@@ -26,4 +26,6 @@ public class Setting extends BaseTimeEntity {
 
     /** 값을 바꾼다. 허용 범위 검사는 호출하는 쪽에서 한다. */
     public void changeValue(String value) { this.value = value; }
+
+    public void changeDescription(String description) { this.description = description; }
 }

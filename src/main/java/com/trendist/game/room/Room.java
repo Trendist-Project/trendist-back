@@ -713,16 +713,17 @@ public class Room {
         return n;
     }
 
-    /** 봇 유행도 상한: 그 방 1등(사람) 현재 유행도 × botCapRatio(기본 0.7). */
+    /** 봇 유행도 상한: 그 방에 접속 중인 사람들의 현재 유행도 평균 × botCapRatio(기본 1, 즉 평균). 봇은 평균에 넣지 않는다. */
     double botCap(Tuning tu) {
-        double top = 0;
-        for (Member m : members.values()) if (!m.bot) top = Math.max(top, m.score);
-        return Math.floor(top * tu.botCapRatio());
+        double sum = 0;
+        int n = 0;
+        for (Member m : members.values()) if (!m.bot) { sum += m.score; n++; }
+        return n == 0 ? 0 : Math.floor(sum / n * tu.botCapRatio());
     }
 
     /**
      * 1초마다: 사람이 있으면 사람 + 봇이 botPlayers가 되도록 봇을 하나씩 넣거나 뺀다(사람이 없으면 봇도 없다).
-     * 1등 점수가 내려가 상한을 넘은 봇은 키워드를 하나씩 내려놓고, EXP만으로도 넘으면 빼고 새 봇으로 바꾼다.
+     * 사람들 평균이 내려가 상한을 넘은 봇은 키워드를 하나씩 내려놓고, EXP만으로도 넘으면 빼고 새 봇으로 바꾼다.
      */
     void maintainBots(Tuning tu) {
         double cap = botCap(tu);
@@ -742,7 +743,7 @@ public class Room {
 
     /**
      * 사람과 같은 기준으로 봇을 만든다: EXP를 정하고(레벨은 레벨표로), 그 EXP 안에서 키워드 몇 개를 가진 것으로 한다.
-     * 유행도 = min(EXP, 100) + 키워드 점수 합이고 상한(1등 × 1.5)을 넘지 않는다.
+     * 유행도 = min(EXP, 100) + 키워드 점수 합이고 상한(사람 평균)을 넘지 않는다.
      */
     private void addBot(Tuning tu) {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
@@ -752,7 +753,7 @@ public class Room {
         m.nickname = "Bot";
         // EXP를 정하고, 많이 추가한 사람은 대개 가진 키워드도 많으므로 EXP에 비례해 가진 키워드 수를 정한다
         // (최근 30번 추가 중 30~100%를 아직 가진 것으로 본다. 추가한 횟수(EXP)보다 많을 수는 없다).
-        // 합이 상한(1등 × 1.5)을 넘으면 키워드만 빼지 않고 EXP 범위를 줄여 다시 뽑는다. 작은 원인데 레벨만 높은 봇이 되지 않게
+        // 합이 상한(사람 평균)을 넘으면 키워드만 빼지 않고 EXP 범위를 줄여 다시 뽑는다. 작은 원인데 레벨만 높은 봇이 되지 않게
         double expMax = Math.min(300, cap);
         for (int attempt = 0; attempt < 12; attempt++) {
             m.botExp = expMax < 1 ? 0 : rnd.nextLong((long) expMax + 1);
@@ -796,7 +797,7 @@ public class Room {
         return lo + ThreadLocalRandom.current().nextDouble() * (hi - lo);
     }
 
-    /** 봇의 "추가": 사람처럼 EXP +1과 키워드 하나. 상한(1등 × 1.5)을 넘으면 하지 않는다. */
+    /** 봇의 "추가": 사람처럼 EXP +1과 키워드 하나. 상한(사람 평균)을 넘으면 하지 않는다. */
     private void botPlus(Member b, Tuning tu) {
         int v = (int) Math.round(botStep(tu));
         double next = Math.min(b.botExp + 1, tu.expScoreCap()) + b.botKeywords.stream().mapToInt(Integer::intValue).sum() + v;

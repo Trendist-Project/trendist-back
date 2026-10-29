@@ -26,6 +26,7 @@ import com.trendist.user.repository.UserRepository;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,13 +102,17 @@ public class DataSeeder implements ApplicationRunner {
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
                 settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description()));
                 added++;
-            } else if (SettingKeys.REPLACED_DEFAULTS.containsKey(d.name())) {
+            } else {
                 Setting s = settings.findByName(d.name()).get();
-                if (s.getValue().equals(SettingKeys.REPLACED_DEFAULTS.get(d.name()))) {
+                boolean changed = false;
+                if (SettingKeys.REPLACED_DEFAULTS.getOrDefault(d.name(), Set.of()).contains(s.getValue())) {
+                    log.info("설정 기본값 변경 반영: {} {} → {}", d.name(), s.getValue(), d.value());
                     s.changeValue(d.value());
-                    settings.save(s);
-                    log.info("설정 기본값 변경 반영: {} {} → {}", d.name(), SettingKeys.REPLACED_DEFAULTS.get(d.name()), d.value());
+                    changed = true;
                 }
+                // 설명은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게)
+                if (!d.description().equals(s.getDescription())) { s.changeDescription(d.description()); changed = true; }
+                if (changed) settings.save(s);
             }
         }
         if (levels.count() < 100) {

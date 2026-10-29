@@ -228,7 +228,7 @@ class RoomTest {
 
     @Test
     void botsFollowPlayerRulesAndCap() {
-        // 봇도 유행도 = min(EXP, 100) + 키워드 점수 합, 레벨 = 레벨표(EXP), 1등 사람 × 1.5를 넘지 않는다
+        // 봇도 유행도 = min(EXP, 100) + 키워드 점수 합, 레벨 = 레벨표(EXP), 사람 평균 × 1.5(이 테스트의 배수)를 넘지 않는다
         Room r = new Room(1, withBots(10), new Out());
         r.join(1, "s1", "사람", 1, 400, List.of());
         for (int i = 0; i < 20 * 12; i++) r.tick();
@@ -240,7 +240,7 @@ class RoomTest {
             assertThat(b.score).isLessThanOrEqualTo(600); // 400 × 1.5
             assertThat((long) b.botKeywords.size()).isLessThanOrEqualTo(b.botExp); // 추가한 횟수보다 많이 가질 수 없다
         }
-        // 1등이 작아지면 상한을 넘는 봇은 키워드를 내려놓거나 바뀐다
+        // 사람 평균이 작아지면 상한을 넘는 봇은 키워드를 내려놓거나 바뀐다
         r.members().stream().filter(m -> !m.bot).forEach(m -> m.score = 50);
         for (int i = 0; i < 20 * 30; i++) r.tick();
         assertThat(r.members().stream().filter(m -> m.bot)).allMatch(m -> m.score <= 75);
@@ -379,5 +379,19 @@ class RoomTest {
         for (int i = 0; i < 400; i++) r.tick(); // 구슬이 다 찰 때까지
         assertThat(out.texts).noneMatch(t -> "orbSpawn".equals(t.get("type"))
                 && Math.abs((double) t.get("x")) <= 300 + 14 && Math.abs((double) t.get("y")) <= 300 + 14);
+    }
+
+    @Test
+    void botCapIsAverageOfConnectedHumans() {
+        // 봇 상한 = 접속 중인 사람 유행도 평균 × 배수(기본 1). 봇은 평균에 들어가지 않는다(4.21)
+        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, 10, 1.0, 20, 50, 100);
+        Room r = new Room(1, avg, new Out());
+        r.join(1, "s1", "작은", 1, 100, List.of());
+        r.join(2, "s2", "큰", 1, 500, List.of());
+        assertThat(r.botCap(avg)).isEqualTo(300.0);
+        for (int i = 0; i < 20 * 12; i++) r.tick(); // 봇이 들어와도 평균은 사람만으로
+        assertThat(r.members().stream().filter(m -> m.bot)).isNotEmpty();
+        assertThat(r.botCap(avg)).isEqualTo(300.0);
+        assertThat(r.members().stream().filter(m -> m.bot)).allMatch(m -> m.score <= 300);
     }
 }
