@@ -37,7 +37,7 @@
 | 트렌드 상자 | 생성 간격 / 유지 시간 / 방당 최대 개수 | 5분 / 3분 / 3개 |
 | | 키워드 최소 트렌드 값 / 열기 거리 / 공개 시간 | 20 / 150px / 60초 |
 | ? 구슬 | 밀도(`orb_density`, 1,000×1,000px마다 개수, 0이면 끔) / 방당 상한(`orb_max`, 0이면 끔) / 생성 간격(`orb_spawn_seconds`) / 간격마다 생기는 양(`orb_spawn_percent`, 목표 개수 대비, 최소 1개) / 🔥 키워드가 나올 확률(`orb_active_percent`, 나머지는 꽝) | 4.4개 / 3,000개 / 3초 / 5% / 33% |
-| 세이프존 | 가운데 고정 존 한 변(`safe_center_ratio` 활동 영역 대비, 최소 `safe_center_min`) / 무작위 존 한 변(`safe_zone_ratio`, 최소 `safe_zone_min`) / 무작위 존 수(`safe_zone_density`, 10,000×10,000px마다, 상한 `safe_zone_max`) / 유지 시간(`safe_zone_seconds`) | 6%·600px / 3.5%·400px / 6개·40개 / 300초 |
+| 세이프존 | 가운데 고정 존 한 변(`safe_center_ratio` 활동 영역 대비, 최소 `safe_center_min`) / 무작위 존 한 변(`safe_zone_ratio`, 최소 `safe_zone_min`) / 무작위 존 수(`safe_zone_density`, 10,000×10,000px마다, 상한 `safe_zone_max`) / 유지 시간(`safe_zone_seconds`) | 9%·900px / 5%·600px / 12개·80개 / 300초 |
 | NPC 봇 | 사람 + 봇 인원(`bot_players`, 0이면 끔) / 봇 유행도 상한(`bot_cap_ratio`, 방 1등 사람 유행도의 배수) / 봇 키워드 하나의 점수(`bot_step_min`~`bot_step_max`) | 10명 / 0.7배 / 20~50 |
 | 데이터 수집 | BigQuery 순위별 점수 | 급상승 100→60, 인기 80→40 |
 | | 구글 실시간 인기 조회 간격(코드) / 목록에 오른 키워드의 활성 유지 시간(`external_hold_hours`, 목록에 보일 때마다 지금부터 다시 셈) | 5분 / 168시간(7일) |

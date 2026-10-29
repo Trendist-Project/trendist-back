@@ -81,10 +81,11 @@ class RoomTest {
     void orbIsEatenWhenCircleCoversIt() {
         Out out = new Out();
         Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
-        m.x = 0; m.y = 0;
-        r.placeOrb(5, 0);     // 원(반지름 16) 안
-        r.placeOrb(300, 300); // 멀리
+        m.x = 1000; m.y = 1000; // 가운데 세이프존 밖(존 안의 구슬은 사라진다)
+        r.placeOrb(1005, 1000); // 원(반지름 16) 안
+        r.placeOrb(1300, 1300); // 멀리
         r.tick();
         assertThat(out.orbEaters).containsExactly(1L);
         assertThat(r.orbCount()).isEqualTo(1);
@@ -344,8 +345,8 @@ class RoomTest {
         Room r = new Room(1, T, out);
         for (int i = 0; i < 20; i++) {
             Room.Member m = r.join(100 + i, "s" + i, "new", 1, 0, List.of(), true);
-            assertThat(Math.abs(m.x)).isLessThanOrEqualTo(300);
-            assertThat(Math.abs(m.y)).isLessThanOrEqualTo(300);
+            assertThat(Math.abs(m.x)).isLessThanOrEqualTo(450); // 가운데 존 한 변 900px
+            assertThat(Math.abs(m.y)).isLessThanOrEqualTo(450);
         }
         assertThat(out.texts).anyMatch(t -> "safeZones".equals(t.get("type")));
     }
@@ -362,5 +363,21 @@ class RoomTest {
         assertThat(r.centerZoneSize()).isEqualTo(600.0);
         for (int i = 0; i < 30; i++) r.tick(); // 2초가 지나면 사라지고 1초 뒤 다시 생긴다
         assertThat(r.zoneCount()).isLessThanOrEqualTo(1);
+    }
+
+    @Test
+    void orbsInsideSafeZonesAreRemovedAndNotSpawned() {
+        // 세이프존이 생기면 그 안의 구슬은 사라지고, 세이프존 위에는 구슬이 생기지 않는다(4.22)
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        r.join(1, "s1", "a", 1, 0, List.of());
+        int inside = r.placeOrb(0, 0), outside = r.placeOrb(1200, 1200);
+        r.tick();
+        assertThat(out.texts).anyMatch(t -> "orbEaten".equals(t.get("type")) && t.get("id").equals(inside) && t.get("e").equals(0));
+        assertThat(out.texts).noneMatch(t -> "orbEaten".equals(t.get("type")) && t.get("id").equals(outside));
+        for (int i = 0; i < 400; i++) r.tick(); // 구슬이 다 찰 때까지
+        assertThat(out.texts).noneMatch(t -> "orbSpawn".equals(t.get("type"))
+                && Math.abs((double) t.get("x")) <= 300 + 14 && Math.abs((double) t.get("y")) <= 300 + 14);
     }
 }

@@ -55,7 +55,10 @@ public final class SettingKeys {
      * (관리자가 직접 바꾼 값은 그대로 둔다).
      */
     public static final Map<String, String> REPLACED_DEFAULTS = Map.of(
-            BOT_CAP_RATIO, "1.5"); // 봇이 1등 사람보다 커지지 않게 1.5 → 0.7(4.21)
+            BOT_CAP_RATIO, "1.5", // 봇이 1등 사람보다 커지지 않게 1.5 → 0.7(4.21)
+            // 세이프존을 더 크게, 무작위 존을 2배로(4.22)
+            SAFE_CENTER_RATIO, "0.06", SAFE_CENTER_MIN, "600", SAFE_ZONE_RATIO, "0.035", SAFE_ZONE_MIN, "400",
+            SAFE_ZONE_DENSITY, "6", SAFE_ZONE_MAX, "40");
 
     public static final List<Def> DEFAULTS = List.of(
             new Def(TREND_BASE_POPULATION, "1000", 1, 10000, "트렌드 값 식의 기준 인원(g(n)=1)"),
@@ -95,12 +98,12 @@ public final class SettingKeys {
             new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),
             new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),
             // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
-            new Def(SAFE_CENTER_RATIO, "0.06", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
-            new Def(SAFE_CENTER_MIN, "600", 100, 5000, "가운데 고정 세이프존 한 변 최소(px)"),
-            new Def(SAFE_ZONE_RATIO, "0.035", 0.005, 0.2, "무작위 세이프존 한 변: 활동 영역 한 변의 이 비율"),
-            new Def(SAFE_ZONE_MIN, "400", 100, 3000, "무작위 세이프존 한 변 최소(px)"),
-            new Def(SAFE_ZONE_DENSITY, "6", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
-            new Def(SAFE_ZONE_MAX, "40", 0, 200, "무작위 세이프존 동시 개수 상한"),
+            new Def(SAFE_CENTER_RATIO, "0.09", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
+            new Def(SAFE_CENTER_MIN, "900", 100, 5000, "가운데 고정 세이프존 한 변 최소(px)"),
+            new Def(SAFE_ZONE_RATIO, "0.05", 0.005, 0.2, "무작위 세이프존 한 변: 활동 영역 한 변의 이 비율"),
+            new Def(SAFE_ZONE_MIN, "600", 100, 3000, "무작위 세이프존 한 변 최소(px)"),
+            new Def(SAFE_ZONE_DENSITY, "12", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
+            new Def(SAFE_ZONE_MAX, "80", 0, 300, "무작위 세이프존 동시 개수 상한"),
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

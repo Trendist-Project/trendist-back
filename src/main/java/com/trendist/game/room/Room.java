@@ -35,7 +35,7 @@ public class Room {
      */
     public record ZoneTuning(double centerRatio, double centerMin, double zoneRatio, double zoneMin,
                              double density, int max, double seconds) {
-        public static final ZoneTuning DEFAULT = new ZoneTuning(0.06, 600, 0.035, 400, 6, 40, 300);
+        public static final ZoneTuning DEFAULT = new ZoneTuning(0.09, 900, 0.05, 600, 12, 80, 300);
     }
 
     /** 무작위 세이프존 하나. 정사각형 중심(x, y)과 한 변, 사라지는 시각(방 시계 초). */
@@ -379,11 +379,15 @@ public class Room {
     // ------------------------------------------------------------ 세이프존(4.22)
 
     /** 원의 중심이 가운데 고정 존이나 무작위 존 안에 있는지. */
-    boolean inSafeZone(double x, double y) {
-        double c = centerSize / 2;
+    boolean inSafeZone(double x, double y) { return inSafeZone(x, y, 0); }
+
+    /** 존을 margin만큼 넓혀서 본다(구슬이 존 가장자리에 걸치지 않게). */
+    private boolean inSafeZone(double x, double y, double margin) {
+        double c = centerSize / 2 + margin;
         if (Math.abs(x) <= c && Math.abs(y) <= c) return true;
         for (SafeZone z : zones) {
-            if (Math.abs(x - z.x()) <= z.size() / 2 && Math.abs(y - z.y()) <= z.size() / 2) return true;
+            double h = z.size() / 2 + margin;
+            if (Math.abs(x - z.x()) <= h && Math.abs(y - z.y()) <= h) return true;
         }
         return false;
     }
@@ -401,7 +405,22 @@ public class Room {
                 || Math.abs(z.x()) + z.size() / 2 > half || Math.abs(z.y()) + z.size() / 2 > half);
         int target = (int) Math.min(zt.max(), Math.round(area * area / 1e8 * zt.density()));
         if (!members.isEmpty() && zones.size() < target && tick % 20 == 0) changed |= spawnZone(half, zt);
-        if (changed) { sentCenterSize = centerSize; broadcast(zonesMessage()); }
+        if (changed) {
+            sentCenterSize = centerSize;
+            broadcast(zonesMessage());
+            removeOrbsInZones();
+        }
+    }
+
+    /** 세이프존이 생기거나 커지면 그 안에 있던 ? 구슬은 사라진다(모두의 화면에서 지운다). */
+    private void removeOrbsInZones() {
+        Iterator<Map.Entry<Integer, double[]>> it = orbs.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, double[]> o = it.next();
+            if (!inSafeZone(o.getValue()[0], o.getValue()[1], ORB_RADIUS)) continue;
+            it.remove();
+            broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", 0));
+        }
     }
 
     /** 다른 존과 겹치지 않는 무작위 위치에 존 하나. 10번 안에 자리를 못 찾으면 다음 기회에. */
@@ -499,8 +518,9 @@ public class Room {
         for (int tries = 0; tries < 8; tries++) {
             double x = (ThreadLocalRandom.current().nextDouble() * 2 - 1) * (half - margin);
             double y = (ThreadLocalRandom.current().nextDouble() * 2 - 1) * (half - margin);
-            boolean blocked = false;
+            boolean blocked = inSafeZone(x, y, ORB_RADIUS); // 세이프존 위에는 만들지 않는다(4.22)
             for (Member m : members.values()) {
+                if (blocked) break;
                 if (Math.hypot(m.x - x, m.y - y) < m.displayRadius + 60) { blocked = true; break; } // 원 바로 위에는 만들지 않는다
             }
             if (blocked) continue;
