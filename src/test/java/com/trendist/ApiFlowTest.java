@@ -195,8 +195,9 @@ class ApiFlowTest {
         assertThat(score).isBetween(21.5, 22.0);
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
+        // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다
         mvc.perform(get("/api/rankings").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rank").value(1));
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

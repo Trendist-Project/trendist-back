@@ -8,7 +8,9 @@ import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import jakarta.annotation.PreDestroy;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import org.slf4j.Logger;
@@ -96,13 +98,15 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @Override
     public Double liveScore(long countryId, long playerId) {
         Room r = rooms.get(countryId);
-        return r == null ? null : r.scoreView().get(playerId);
+        if (r == null) return null;
+        Room.Live live = r.liveView().get(playerId);
+        return live == null ? null : live.score();
     }
 
     @Override
-    public Map<Long, Double> liveScores(long countryId) {
+    public Collection<Room.Live> livePlayers(long countryId) {
         Room r = rooms.get(countryId);
-        return r == null ? Map.of() : r.scoreView();
+        return r == null ? List.of() : r.liveView().values();
     }
 
     // ------------------------------------------------------------ 서비스 이벤트 → 방

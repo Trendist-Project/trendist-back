@@ -1,6 +1,7 @@
 package com.trendist.game.service;
 
 import com.trendist.game.room.Room;
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -20,8 +21,8 @@ public interface RoomManager {
     /** 접속 중인 플레이어 점수. 접속 중이 아니면 null. */
     Double liveScore(long countryId, long playerId);
 
-    /** 그 나라 방의 접속 중인 플레이어 점수(랭킹 실시간 보정용). */
-    Map<Long, Double> liveScores(long countryId);
+    /** 그 나라 방에 접속 중인 플레이어(랭킹용, 4.14). 방이 없으면 비어 있다. */
+    Collection<Room.Live> livePlayers(long countryId);
 
     void sendText(Room.Member m, Map<String, Object> message);
 

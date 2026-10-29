@@ -150,4 +150,18 @@ class RoomTest {
         assertThat(b.score).isEqualTo(15);
         assertThat(b.radius).isGreaterThan(a.radius);
     }
+
+    @Test
+    void liveViewHoldsOnlyConnectedPlayers() {
+        // 랭킹은 지금 방에 있는 사람만 집계한다(4.14). 나가면 다음 갱신(1초)에 빠진다
+        Room r = new Room(1, T, new Out());
+        Room.Member a = r.join(1, "s1", "가", 3, 40, List.of());
+        r.join(2, "s2", "나", 5, 120, List.of());
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(r.liveView()).containsOnlyKeys(1L, 2L);
+        assertThat(r.liveView().get(2L)).isEqualTo(new Room.Live(2, "나", 5, 120));
+        r.leave(a);
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(r.liveView()).containsOnlyKeys(2L);
+    }
 }

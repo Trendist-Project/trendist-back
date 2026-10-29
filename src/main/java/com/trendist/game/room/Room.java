@@ -79,7 +79,7 @@ public class Room {
     private long tick;
     private double clockSeconds;
     private volatile int size;
-    private volatile Map<Long, Double> scoreView = Map.of();
+    private volatile Map<Long, Live> liveView = Map.of();
 
     /** 조작 하나: 방향키 입력(target 없음) 또는 클릭 목표. at은 틱 구간 안에서의 비율(0~1). */
     record Control(double at, double dx, double dy, Double targetX, Double targetY) {}
@@ -101,8 +101,11 @@ public class Room {
     public Tuning tuning() { return tuning; }
     public void submit(Consumer<Room> task) { tasks.add(task); }
 
-    /** 랭킹에서 쓰는 접속 중인 플레이어 점수(틱마다 갱신되는 읽기 전용 복사본). */
-    public Map<Long, Double> scoreView() { return scoreView; }
+    /** 접속 중인 플레이어 한 명의 랭킹용 값. */
+    public record Live(long playerId, String nickname, int level, double score) {}
+
+    /** 랭킹에서 쓰는 접속 중인 플레이어(1초마다 갱신되는 읽기 전용 복사본, 플레이어 번호 → 값). */
+    public Map<Long, Live> liveView() { return liveView; }
 
     // ------------------------------------------------------------ 틱 스레드에서만 부른다
 
@@ -249,9 +252,9 @@ public class Room {
         if (tick % SNAPSHOT_EVERY == 0) sendSnapshots(half);
         if (tick % MINIMAP_EVERY == 0) sendMinimap();
         if (tick % 20 == 0) {
-            Map<Long, Double> view = new HashMap<>();
-            for (Member m : members.values()) view.put(m.playerId, m.score);
-            scoreView = view;
+            Map<Long, Live> view = new HashMap<>();
+            for (Member m : members.values()) view.put(m.playerId, new Live(m.playerId, m.nickname, m.level, m.score));
+            liveView = view;
             pairCooldown.values().removeIf(until -> until < clockSeconds);
             lastSeen.values().removeIf(seen -> seen.keepUntil() < clockSeconds);
         }
