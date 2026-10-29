@@ -28,6 +28,9 @@ trendist:
     access-ttl-minutes: 15
   cookie:
     secure: false
+  # 구글 로그인(9.3). 클라이언트 ID는 공개 값이다. 브라우저가 받은 ID 토큰을 서버가 구글 공개 키로 검증만 하므로 보안 비밀번호는 쓰지 않는다
+  google:
+    client-id: ${TRENDIST_GOOGLE_CLIENT_ID:241731311282-45is2ai9skpf33gmgljlv423r1f2j2vt.apps.googleusercontent.com}
   ws:
     allowed-origins: http://localhost:8080,http://127.0.0.1:8080
   # 구글 트렌드 실시간 인기 RSS를 5분마다 읽어 키워드로 넣는다(10.2). 자동 테스트에서는 끈다.

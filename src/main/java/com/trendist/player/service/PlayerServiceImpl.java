@@ -55,6 +55,12 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean isGuest(long userId) {
+        return users.findById(userId).map(com.trendist.user.entity.User::isGuest).orElse(true);
+    }
+
+    @Override
     public Player requireCurrent(long userId) {
         return findCurrent(userId).orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 먼저 정해 주세요"));
     }

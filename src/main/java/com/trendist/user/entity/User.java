@@ -28,6 +28,8 @@ public class User extends BaseTimeEntity {
     @Column(name = "banned_until", columnDefinition = "DATETIME(6)") private Instant bannedUntil;
     @Column(name = "upload_banned_until", columnDefinition = "DATETIME(6)") private Instant uploadBannedUntil;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
+    /** 로그아웃한 시각. 이 시각 이전에 발급한 액세스 토큰(JWT)은 남은 수명과 관계없이 거절한다(9.3). */
+    @Column(name = "tokens_revoked_at", columnDefinition = "DATETIME(6)") private Instant tokensRevokedAt;
 
     public static User guest(String visitorId, UserState state) {
         User u = new User();
@@ -46,6 +48,30 @@ public class User extends BaseTimeEntity {
         u.role = ROLE_ADMIN;
         return u;
     }
+
+    public static final String OAUTH_GOOGLE = "GOOGLE";
+
+    /** 구글로 처음 로그인한 새 계정: OAuth 종류와 ID(구글 sub의 SHA-256 해시)만 둔다. 이름·이메일·사진은 쓰지 않는다(4.1). */
+    public static User google(String oauthId, UserState state) {
+        User u = new User();
+        u.oauthType = OAUTH_GOOGLE;
+        u.oauthId = oauthId;
+        u.userState = state;
+        return u;
+    }
+
+    /** 게스트로 플레이하던 계정에 구글을 연결한다. OAuth 값만 채우고 나머지(플레이어·기록)는 그대로라 기록이 이어진다. */
+    public void linkGoogle(String oauthId) {
+        this.oauthType = OAUTH_GOOGLE;
+        this.oauthId = oauthId;
+    }
+
+    public boolean isGuest() { return oauthId == null; }
+
+    public void touchLogin(Instant now) { this.lastLoginAt = now; }
+
+    /** 로그아웃: 지금까지 발급한 액세스 토큰을 모두 무효로 한다. */
+    public void revokeTokens(Instant now) { this.tokensRevokedAt = now; }
 
     public boolean isBanned(Instant now) { return bannedUntil != null && bannedUntil.isAfter(now); }
     public void setCountry(Country country) { this.country = country; }

@@ -71,6 +71,7 @@ CREATE TABLE users (
   banned_until        DATETIME(6) NULL COMMENT '계정 금지 만료 시각(NULL이면 정상, 지금보다 뒤면 금지 중, 영구는 9999-12-31 23:59:59)',
   upload_banned_until DATETIME(6) NULL COMMENT '이미지 업로드 정지 만료 시각(NULL이면 정상, 지금보다 뒤면 정지 중, 영구는 9999-12-31 23:59:59)',
   deleted_at          DATETIME(6) NULL COMMENT '탈퇴 시각(탈퇴 상태일 때만 값이 있고 복구하면 NULL). 화면 표시만 덮어씀',
+  tokens_revoked_at   DATETIME(6) NULL COMMENT '로그아웃 시각. 이전에 발급한 액세스 토큰(JWT iat)은 거절',
   created_at          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),

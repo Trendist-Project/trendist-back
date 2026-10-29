@@ -5,7 +5,10 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "trendist")
-public record AppProperties(Jwt jwt, Cookie cookie, Ws ws, DevTrends devTrends) {
+public record AppProperties(Jwt jwt, Cookie cookie, Ws ws, DevTrends devTrends, Google google) {
+
+    /** 구글 로그인 클라이언트 ID(공개 값). */
+    public record Google(String clientId) {}
 
     public record Jwt(String secret, int accessTtlMinutes) {}
 

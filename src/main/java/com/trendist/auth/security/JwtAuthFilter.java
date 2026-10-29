@@ -27,8 +27,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String h = req.getHeader("Authorization");
         if (h != null && h.startsWith("Bearer ")) {
-            jwt.verify(h.substring(7)).filter(guard::isUsable).ifPresent(uid -> {
-                var auth = new UsernamePasswordAuthenticationToken(new AuthUser(uid), null,
+            jwt.verify(h.substring(7)).filter(guard::accepts).ifPresent(t -> {
+                var auth = new UsernamePasswordAuthenticationToken(new AuthUser(t.userId()), null,
                         List.of(new SimpleGrantedAuthority("ROLE_USER")));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             });

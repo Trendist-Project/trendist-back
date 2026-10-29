@@ -4,6 +4,7 @@ import com.trendist.game.event.GameEvents;
 import com.trendist.game.room.Room;
 import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.service.KeywordService;
+import com.trendist.player.service.LevelService;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import jakarta.annotation.PreDestroy;
@@ -33,10 +34,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor(); // DB·외부 호출은 틱 밖에서
     private final SettingService settings;
     private final KeywordService keywordService;
+    private final LevelService levels;
     private final ObjectMapper json;
 
-    public RoomManagerImpl(SettingService settings, KeywordService keywordService, ObjectMapper json) {
+    public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json) {
         this.settings = settings;
+        this.levels = levels;
         this.keywordService = keywordService;
         this.json = json;
         tuningRefresher.scheduleAtFixedRate(() -> {
@@ -53,6 +56,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     public Room room(long countryId) {
         return rooms.computeIfAbsent(countryId, id -> {
             Room r = new Room(id, tuning(), this);
+            r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
             ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(
                     run -> { Thread t = new Thread(run, "room-" + id); t.setDaemon(true); return t; }); // 틱은 플랫폼 스레드
             ex.scheduleAtFixedRate(() -> {
@@ -75,13 +79,20 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.BIG_RATIO),
                 settings.getDouble(SettingKeys.KNOCKBACK_CAP),
                 settings.getDouble(SettingKeys.KNOCKBACK_SECONDS),
+                settings.getDouble(SettingKeys.KNOCKBACK_DISTANCE),
                 settings.getDouble(SettingKeys.COLLISION_COOLDOWN),
                 settings.getDouble(SettingKeys.LOSE_PROTECT_SECONDS),
                 settings.getDouble(SettingKeys.JOIN_PROTECT_SECONDS),
                 settings.getInt(SettingKeys.ORB_MAX),
                 settings.getDouble(SettingKeys.ORB_SPAWN_SECONDS),
                 settings.getDouble(SettingKeys.ORB_DENSITY),
-                settings.getDouble(SettingKeys.ORB_SPAWN_PERCENT));
+                settings.getDouble(SettingKeys.ORB_SPAWN_PERCENT),
+                settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT),
+                settings.getInt(SettingKeys.BOT_PLAYERS),
+                settings.getDouble(SettingKeys.BOT_CAP_RATIO),
+                settings.getDouble(SettingKeys.BOT_STEP_MIN),
+                settings.getDouble(SettingKeys.BOT_STEP_MAX),
+                settings.getDouble(SettingKeys.EXP_SCORE_CAP));
     }
 
     /** 클라이언트 예측에 필요한 값(9.2 설정값 전달). */
@@ -153,12 +164,16 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @Override
     public void requestLose(Room room, Room.Member loser, Room.Member winner) {
         long loserId = loser.playerId;
-        String winnerName = winner.nickname;
+        String winnerName = winner.nickname, loserName = loser.nickname; // 봇(이름 Bot)에게 져도 키워드를 잃는다(4.21)
+        Long winnerId = winner.bot ? null : winner.playerId;
         workers.submit(() -> {
             try {
-                keywordService.loseRandom(loserId).ifPresent(text -> room.submit(r -> {
+                keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
+                    // 잃은 사람에게는 어떤 키워드인지 숨기고 점수만, 이긴 사람에게는 키워드와 점수를 보여 준다(4.3)
                     Room.Member m = r.byPlayer(loserId);
-                    if (m != null) sendText(m, Map.of("type", "lost", "keyword", text, "by", winnerName));
+                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "score", lost.score()));
+                    Room.Member w = winnerId == null ? null : r.byPlayer(winnerId);
+                    if (w != null) sendText(w, Map.of("type", "hit", "target", loserName, "keyword", lost.text(), "score", lost.score()));
                 }));
             } catch (RuntimeException e) {
                 log.warn("lose keyword failed for player {}", loserId, e);
@@ -191,6 +206,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void send(Room.Member m, ByteBuffer binary) {
+        if (m.bot) return; // 봇은 연결이 없다
         WebSocketSession s = (WebSocketSession) m.session;
         if (!s.isOpen()) return;
         try { s.sendMessage(new BinaryMessage(binary)); } catch (Exception e) { /* 느린 연결: 데코레이터가 버린다 */ }
@@ -198,6 +214,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void sendText(Room.Member m, Map<String, Object> message) {
+        if (m.bot) return; // 봇은 연결이 없다
         WebSocketSession s = (WebSocketSession) m.session;
         if (!s.isOpen()) return;
         try { s.sendMessage(new TextMessage(json.writeValueAsString(message))); } catch (Exception e) { /* 연결 종료 */ }

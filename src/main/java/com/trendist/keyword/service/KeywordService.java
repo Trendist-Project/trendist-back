@@ -22,8 +22,11 @@ public interface KeywordService {
     /** 만료된 + 하나를 지우고 인원·트렌드 값·점수를 고친다. 지웠으면 true. */
     boolean expireOne(long playerKeywordId);
 
-    /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. 잃은 키워드 표시명을 돌려준다. */
-    Optional<String> loseRandom(long playerId);
+    /** 충돌로 잃은 키워드: 이름과 잃는 순간의 키워드 점수(💤면 0). 이름은 이긴 쪽에만, 점수는 양쪽에 보여 준다(4.3). */
+    record LostKeyword(String text, long score) {}
+
+    /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. */
+    Optional<LostKeyword> loseRandom(long playerId);
 
     /** 트렌드 값이 바뀐 키워드를 비우면서 돌려준다. 1분 잡이 보유자 점수를 다시 합산한다(9.4). */
     Set<Long> drainDirtyKeywords();

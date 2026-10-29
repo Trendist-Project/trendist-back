@@ -15,6 +15,9 @@ public interface PlayerService {
 
     Optional<JoinInfo> joinInfo(long userId);
 
+    /** 구글이 연결되지 않은 게스트 계정인지(4.1). */
+    boolean isGuest(long userId);
+
     /** 현재 나라 플레이어. 없으면 NO_PLAYER(닉네임을 먼저 정해야 함). */
     Player requireCurrent(long userId);
 

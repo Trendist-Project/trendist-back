@@ -70,11 +70,12 @@
 - 검증 정규식: `^\d{14}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`. 모르는 값이나 형식 오류면 쿠키를 지우고 401을 돌려준다(새 ID는 [시작]을 누를 때 발급한다). 클라이언트가 만든 값은 받지 않는다.
 - 쿠키: `HttpOnly`, `Secure`, `SameSite=Lax`, 1년. 서블릿 필터 하나에서 발급·검증한다.
 - 액세스 토큰: JWT, 15분. `sub`에는 방문자 ID가 아니라 사용자 내부 번호(`users.id`)를 넣는다. 브라우저 메모리에만 두고 REST는 `Authorization: Bearer`로 보낸다. 수명과 값은 기본값이다.
-- 갱신 토큰: 서버가 만든 무작위 값(32바이트 이상)을 `HttpOnly`, `Secure`, `SameSite=Lax` 쿠키(경로 `/api/auth`)로 준다. 1일이고 쓸 때마다 새 값으로 교체(회전)하며 만료도 1일 뒤로 늦춘다. 하루 넘게 접속하지 않으면 만료되어 구글로 다시 로그인해야 한다(게스트는 방문자 ID로 이어진다). DB(`refresh_tokens`)에는 SHA-256 해시만 둔다. 이미 폐기된 토큰이 다시 오면 탈취로 보고 그 사용자의 갱신 토큰을 모두 폐기한다.
+- 갱신 토큰: 서버가 만든 무작위 값(32바이트 이상)을 `HttpOnly`, `Secure`, `SameSite=Lax` 쿠키(경로 `/`)로 준다. 경로를 `/api/auth`로 좁히면 개발자 도구 쿠키 목록에 안 보이고 쿠키 지우기로도 지워지지 않아 `/`로 둔다. 1일이고 쓸 때마다 새 값으로 교체(회전)하며 만료도 1일 뒤로 늦춘다. 하루 넘게 접속하지 않으면 만료되어 구글로 다시 로그인해야 한다(게스트는 방문자 ID로 이어진다). DB(`refresh_tokens`)에는 SHA-256 해시만 둔다. 이미 폐기된 토큰이 다시 오면 탈취로 보고 그 사용자의 갱신 토큰을 모두 폐기한다.
 - 게스트: 방문자 ID 쿠키(`visitor_id`, HttpOnly)가 오래 가는 신원이다. [시작]을 누르면 `POST /api/auth/guest`가 방문자 ID를 발급하고 게스트 행을 만들어 액세스 토큰을 준다(유효한 방문자 ID 쿠키가 이미 있으면 새로 만들지 않고 그 행을 쓴다). 이후 토큰이 없거나 만료되면 `POST /api/auth/session`이 방문자 ID로 사용자를 찾아 발급하고, 찾지 못하면 401을 돌려 메인 화면을 보여 준다. 방문자 ID로는 구글이 연결되지 않은 게스트 행만 토큰을 받을 수 있다. 계정은 갱신 토큰으로만 이어 간다.
 - 로그인: `POST /api/auth/google`에서 구글 ID 토큰을 검증한다. 구글 계정이 아직 어디에도 연결되지 않았으면 지금 게스트 행에 연결하고(게스트 행이 없으면 새 계정 행을 만든다), 이미 있는 계정이면 그 계정으로 전환한다(탈퇴 상태인 계정은 아래 복구 확인을 거친다). 어느 쪽이든 계정의 액세스·갱신 토큰을 발급하고 브라우저의 방문자 ID 쿠키를 지운다. 그래서 갱신 토큰이 끝난 뒤에도 옛 게스트 행으로 되돌아가지 않는다.
+- 구현: 버튼을 누르면 구글 계정 선택 페이지(`https://accounts.google.com/o/oauth2/v2/auth`, `response_type=id_token`, `scope=openid`, `prompt=select_account`)로 이동한다. `prompt=select_account`라 브라우저에 로그인된 계정이 자동으로 쓰이지 않고 매번 계정을 고르거나 다른 계정을 추가할 수 있다. 시작할 때 만든 state·nonce를 탭 저장소(sessionStorage)에 두고, 돌아오는 `/oauth/google-callback.html`이 state를 비교한 뒤 ID 토큰을 넘기면 앱이 `POST /api/auth/google {idToken, nonce}`로 보낸다(서버는 토큰 안의 nonce와 비교). 게임 중에 로그인해도 페이지를 다녀와 바로 게임으로 다시 들어온다. 서버는 구글 공개 키(JWKS, `https://www.googleapis.com/oauth2/v3/certs`)로 서명을 확인하고 발급자(accounts.google.com)·대상(우리 클라이언트 ID, 설정 `trendist.google.client-id`)·만료를 본 뒤, 이 사이트의 JWT(액세스 토큰, `sub`=`users.id`)와 갱신 토큰 쿠키(`refresh_token`, 경로 `/`)를 준다. 이후 모든 API·WebSocket은 이 사이트의 JWT로만 인증하고 구글 토큰은 다시 쓰지 않는다. 클라이언트 보안 비밀번호는 쓰지 않으므로 코드·설정·저장소 어디에도 두지 않는다. 구글 콘솔의 OAuth 클라이언트(웹 애플리케이션)에 "승인된 리디렉션 URI"로 `사이트 주소/oauth/google-callback.html`(로컬은 `http://localhost:8080/oauth/google-callback.html`)을 넣어야 한다.
 - 탈퇴 계정 복구: 로그인한 구글 계정이 탈퇴 상태이면 서버는 토큰을 발급하지 않고 `{ "status": "WITHDRAWN" }`을 돌려준다. 클라이언트가 복구 여부를 묻고, 확인하면 같은 구글 ID 토큰으로 `POST /api/auth/google/restore`를 부른다. 서버가 토큰을 다시 검증하고, 탈퇴 상태일 때만 상태를 정상으로 되돌리고 `deleted_at`을 비운 뒤 액세스·갱신 토큰을 발급한다(탈퇴 상태가 아니면 거절). 취소하면 요청을 보내지 않으므로 아무것도 바뀌지 않는다.
-- 로그아웃·탈퇴·계정 금지: 그 사용자의 갱신 토큰을 폐기한다. 액세스 토큰이 살아 있는 15분 동안도 막으려고 입장, WebSocket 연결, 민감한 요청에서는 `banned_until`과 사용자 상태(`user_state_id`)를 짧은 캐시(Caffeine)로 확인하고, 접속 중이면 연결을 끊는다. 탈퇴 상태인 사용자는 구글 로그인 후 복구 확인으로만 돌아올 수 있다(4.1).
+- 로그아웃·탈퇴·계정 금지: 그 사용자의 갱신 토큰을 폐기한다. 로그아웃은 `users.tokens_revoked_at`에 시각을 남겨, 그보다 먼저 발급한 액세스 토큰(JWT의 `iat`)을 남은 수명과 관계없이 바로 거절한다(입장·WebSocket·API 모두, 30초 캐시를 지운다). 액세스 토큰이 살아 있는 15분 동안도 막으려고 입장, WebSocket 연결, 민감한 요청에서는 `banned_until`과 사용자 상태(`user_state_id`)를 짧은 캐시(Caffeine)로 확인하고, 접속 중이면 연결을 끊는다. 탈퇴 상태인 사용자는 구글 로그인 후 복구 확인으로만 돌아올 수 있다(4.1).
 - WebSocket: 토큰을 연결 주소의 쿼리에 담지 않고(로그에 남는다) 연결 직후 첫 메시지로 액세스 토큰을 보낸다. 5초 안에 인증하지 못하면 끊는다. 이미 연결된 뒤에 토큰이 만료되어도 그 연결은 유지하고, 다시 접속할 때 새 토큰을 쓴다.
 - 갱신 요청은 `POST`이고 `SameSite=Lax` 쿠키라 다른 사이트에서 보낼 수 없다. CORS는 우리 도메인에만 허용한다. 방문자 ID와 토큰은 URL·쿼리·로그에 넣지 않는다.
 - OAuth 제공자의 사용자 ID(구글은 `sub`)는 SHA-256 해시로만 저장하고, 제공자 종류와 함께 `oauth_type`·`oauth_id`에 둔다. 금지된 계정(`users.banned_until`이 지금보다 뒤)은 입장과 WebSocket 연결을 막는다. 관리자 API는 `ROLE_ADMIN`을 서버에서 검사한다.
@@ -132,7 +133,7 @@ WHERE p.id IN (/* 500명 */)
 | `POST /api/auth/session` | 갱신 토큰 쿠키가 있으면 회전하고 새 액세스 토큰을 발급한다. 없으면 방문자 ID로 게스트를 찾아 발급하고, 찾지 못하면 401 |
 | `POST /api/auth/google` | `{ "id_token": "..." }`. 구글 계정을 연결하거나 전환하고 액세스·갱신 토큰을 발급한다. 탈퇴한 계정이면 토큰 없이 `{ "status": "WITHDRAWN" }`을 돌려준다 |
 | `POST /api/auth/google/restore` | `{ "id_token": "..." }`. 탈퇴한 계정을 복구하고(사용자가 확인한 뒤에만 호출) 액세스·갱신 토큰을 발급한다. 탈퇴 상태가 아니면 거절 |
-| `POST /api/auth/logout` | 갱신 토큰을 폐기하고 쿠키를 지운다 |
+| `POST /api/auth/logout` | 갱신 토큰을 폐기하고 쿠키를 지운다(204) |
 | `POST /api/comments/{id}/vote` | `{ "vote": "LIKE" \| "DISLIKE" }`. 응답은 내 상태와 `like_count`, `dislike_count` |
 | `GET /api/keywords/{id}/comments/top` | 추천 상위 3개(10초 캐시) |
 | `GET /api/keywords/{id}/comments?page=&size=` | 최신순, `size` 최대 50 |

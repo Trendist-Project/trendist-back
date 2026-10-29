@@ -93,7 +93,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     }
 
     private void authenticate(WebSocketSession session, String token) {
-        Optional<Long> uid = jwt.verify(token).filter(guard::isUsable);
+        Optional<Long> uid = jwt.verify(token).filter(guard::accepts).map(JwtService.Verified::userId);
         if (uid.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("AUTH_FAILED")); return; }
         rooms.submitWork(() -> {
             try {

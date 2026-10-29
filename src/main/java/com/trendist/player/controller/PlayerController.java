@@ -19,7 +19,7 @@ public class PlayerController {
     @Transactional(readOnly = true)
     public PlayerDtos.Me me(@AuthenticationPrincipal AuthUser user) {
         var p = playerService.findCurrent(user.userId()).map(playerService::summary).orElse(null);
-        return new PlayerDtos.Me(user.userId(), true, p);
+        return new PlayerDtos.Me(user.userId(), playerService.isGuest(user.userId()), p);
     }
 
     /** 닉네임 정하기(첫 입장). */

@@ -420,4 +420,94 @@ class ApiFlowTest {
         mvc.perform(get("/api/room/players/1/score-history?range=30d").header("Authorization", "Bearer " + t))
                 .andExpect(status().isBadRequest());
     }
+
+    // ---------------------------------------------------------------- 구글 로그인(9.3)
+
+    private MvcResult googleLogin(String sub, Cookie... cookies) throws Exception {
+        var req = post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"test-google:" + sub + "\"}");
+        if (cookies.length > 0) req.cookie(cookies);
+        return mvc.perform(req).andReturn();
+    }
+
+    private static String body(MvcResult r, String path) {
+        try { return JsonPath.read(r.getResponse().getContentAsString(), path).toString(); } catch (Exception e) { throw new IllegalStateException(e); }
+    }
+
+    @Test
+    void googleLinksGuestAndKeepsRecords() throws Exception {
+        // 게스트로 플레이하던 사람이 로그인하면 OAuth 값만 채워 같은 계정·기록을 이어 간다
+        MvcResult g = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
+        Cookie visitor = g.getResponse().getCookie("visitor_id");
+        String guestToken = body(g, "$.accessToken");
+        mvc.perform(post("/api/players").header("Authorization", "Bearer " + guestToken)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"연결테스트\"}")).andExpect(status().isOk());
+        long userId = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + guestToken)).andReturn(), "$.userId"));
+
+        MvcResult login = googleLogin("sub-link", visitor);
+        assertThat(login.getResponse().getStatus()).isEqualTo(200);
+        assertThat(body(login, "$.result")).isEqualTo("LINKED");
+        assertThat(login.getResponse().getCookie("refresh_token").getValue()).isNotBlank();
+        assertThat(login.getResponse().getCookie("visitor_id").getMaxAge()).isZero(); // 방문자 ID 쿠키는 지운다
+        String account = body(login, "$.accessToken"); // 이 사이트의 JWT
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + account))
+                .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.guest").value(false))
+                .andExpect(jsonPath("$.player.nickname").value("연결테스트"));
+        // 연결된 뒤에는 방문자 ID만으로 이 계정에 들어갈 수 없다
+        mvc.perform(post("/api/auth/session").cookie(visitor)).andExpect(status().isUnauthorized());
+
+        // 다른 브라우저(새 게스트)에서 같은 구글로 로그인하면 기존 계정으로 들어가고, 게스트 기록은 합치지 않는다
+        Cookie otherVisitor = mvc.perform(post("/api/auth/guest")).andReturn().getResponse().getCookie("visitor_id");
+        MvcResult again = googleLogin("sub-link", otherVisitor);
+        assertThat(body(again, "$.result")).isEqualTo("EXISTING");
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + body(again, "$.accessToken")))
+                .andExpect(jsonPath("$.userId").value(userId));
+    }
+
+    @Test
+    void googleCreatesAccountWithOauthOnly() throws Exception {
+        MvcResult login = googleLogin("sub-new");
+        assertThat(body(login, "$.result")).isEqualTo("CREATED");
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + body(login, "$.accessToken")))
+                .andExpect(jsonPath("$.guest").value(false))
+                .andExpect(jsonPath("$.player").doesNotExist()); // 그 나라에서 처음이면 닉네임부터
+        mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"forged\"}"))
+                .andExpect(status().isUnauthorized());
+        // 로그인을 시작할 때 만든 nonce와 토큰 안의 nonce가 달라야 하면 거절(가로챈 토큰 재사용 방지)
+        mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"test-google:sub-nonce:abc\",\"nonce\":\"xyz\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"test-google:sub-nonce:abc\",\"nonce\":\"abc\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void refreshRotatesAndDetectsReuseAndLogout() throws Exception {
+        Cookie first = googleLogin("sub-refresh").getResponse().getCookie("refresh_token");
+        MvcResult r1 = mvc.perform(post("/api/auth/session").cookie(first)).andExpect(status().isOk()).andReturn();
+        Cookie second = r1.getResponse().getCookie("refresh_token");
+        assertThat(second.getValue()).isNotEqualTo(first.getValue()); // 쓸 때마다 새 값(회전)
+        // 이미 쓴 토큰이 다시 오면 탈취로 보고 그 사용자의 세션을 모두 끊는다(새 토큰도 못 쓴다)
+        mvc.perform(post("/api/auth/session").cookie(first)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/session").cookie(second)).andExpect(status().isUnauthorized());
+
+        // 로그아웃하면 그 갱신 토큰을 더는 쓸 수 없다
+        Cookie fresh = googleLogin("sub-refresh").getResponse().getCookie("refresh_token");
+        mvc.perform(post("/api/auth/logout").cookie(fresh)).andExpect(status().isNoContent());
+        mvc.perform(post("/api/auth/session").cookie(fresh)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutInvalidatesAccessTokenImmediately() throws Exception {
+        // 로그아웃하면 갱신 토큰뿐 아니라, 아직 15분이 안 지난 액세스 토큰(JWT)도 바로 거절된다
+        MvcResult login = googleLogin("sub-logout");
+        String jwtToken = body(login, "$.accessToken");
+        Cookie refresh = login.getResponse().getCookie("refresh_token");
+        assertThat(refresh.getPath()).isEqualTo("/"); // 개발자 도구에서 보이고 쿠키 지우기로 지워지게 "/"
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + jwtToken)).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + jwtToken).cookie(refresh)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + jwtToken)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/session").cookie(refresh)).andExpect(status().isUnauthorized());
+    }
 }

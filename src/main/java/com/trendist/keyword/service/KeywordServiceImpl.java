@@ -295,7 +295,7 @@ public class KeywordServiceImpl implements KeywordService {
     /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. 잃은 키워드 표시명을 돌려준다. */
     @Override
     @Transactional
-    public Optional<String> loseRandom(long playerId) {
+    public Optional<LostKeyword> loseRandom(long playerId) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null || p.getHoldCount() == 0) return Optional.empty();
         Instant now = Instant.now(clock);
@@ -304,10 +304,12 @@ public class KeywordServiceImpl implements KeywordService {
         PlayerKeyword pk = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
         String text = pk.getKeyword().getText();
         Long keywordId = pk.getKeyword().getId();
+        // 잃는 순간 이 키워드가 내 유행도에 더해 주던 점수(🔥만, 💤는 0)
+        long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0;
         playerKeywords.delete(pk);
         playerKeywords.flush();
         removeHolding(p, keywordId, now);
-        return Optional.of(text);
+        return Optional.of(new LostKeyword(text, score));
     }
 
     private void removeHolding(Player p, Long keywordId, Instant now) {

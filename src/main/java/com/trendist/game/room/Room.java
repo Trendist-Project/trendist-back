@@ -24,9 +24,10 @@ public class Room {
 
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
-                         double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds,
+                         double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
                          double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds,
-                         int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent) {}
+                         int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
+                         int botPlayers, double botCapRatio, double botStepMin, double botStepMax, double expScoreCap) {}
 
     /** 방 밖(서비스)으로 나가는 요청: 충돌로 키워드 잃기, 메시지 전송. */
     public interface Outbox {
@@ -48,9 +49,21 @@ public class Room {
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
-        public double kbX, kbY, kbTime;    // 튕김
+        public double kbX, kbY, kbTime;    // 튕김: 전체 밀려날 거리(벡터)와 남은 시간
         public double protectUntil;        // 키워드 잃기 보호 종료(방 시계 초)
         public final Set<Long> keywords = new HashSet<>();
+        /** NPC 봇(4.21). 연결도 키워드도 없고, 점수는 방 메모리에만 있다. playerId는 음수다. */
+        public boolean bot;
+        long botExp;         // 봇의 EXP(사람처럼 추가할 때마다 +1, 줄지 않는다). 레벨은 이것으로 정한다
+        final List<Integer> botKeywords = new ArrayList<>(); // 봇이 가진 키워드 점수들(메모리에만, 실제 키워드는 아니다)
+        double botNextPlusAt; // 다음에 스스로 "추가"하는 시각
+        int botStyle;        // 0 겁쟁이(큰 원을 멀리서부터 피함) / 1 사냥꾼(작은 원을 쫓음) / 2 구슬 수집가
+        double botThinkAt;   // 다음에 목표를 다시 고르는 시각(방 시계 초)
+        double botReact;     // 반응 속도(목표를 다시 고르는 간격, 초). 봇마다 다르다
+        double botHeading;   // 돌아다닐 때의 진행 방향(라디안). 조금씩 휘어서 곡선으로 걷는다
+        double botIdleUntil; // 이 시각까지 잠깐 멈춰 있는다(사람처럼 쉬기)
+        double botChaseFrom, botChaseCooldown; // 쫓기 시작한 시각, 쫓다 포기한 뒤 다시 쫓지 않는 끝 시각
+        Integer botOrb;      // 노리는 구슬(다른 봇과 같은 구슬로 몰리지 않게)
         /** 이번 틱 구간 안에 도착한 조작. 도착한 시점(구간 안 비율)부터 적용해 틱 경계로 반올림되지 않게 한다. */
         final List<Control> controls = new ArrayList<>();
 
@@ -133,7 +146,7 @@ public class Room {
         for (Long k : keywordIds) holders.computeIfAbsent(k, x -> new HashSet<>()).add(m);
         members.put(m.entityNo, m);
         byPlayer.put(playerId, m);
-        size = members.size();
+        size = humanCount();
         broadcastRoster();
         outbox.sendText(m, orbListMessage());
         outbox.sendText(m, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
@@ -161,7 +174,7 @@ public class Room {
             Set<Member> set = holders.get(k);
             if (set != null) { set.remove(m); if (set.isEmpty()) holders.remove(k); }
         }
-        size = members.size();
+        size = humanCount();
         broadcastRoster();
     }
 
@@ -257,6 +270,8 @@ public class Room {
         tick++;
         Tuning tu = tuning;
         double half = activeArea(members.size()) / 2;
+        if (tick % 20 == 0) maintainBots(tu);
+        thinkBots(tu, half);
         for (Member m : members.values()) move(m, dt, tu, half);
         collide(tu);
         eatOrbs();
@@ -269,7 +284,7 @@ public class Room {
         if (tick % MINIMAP_EVERY == 0) sendMinimap();
         if (tick % 20 == 0) {
             Map<Long, Live> view = new HashMap<>();
-            for (Member m : members.values()) view.put(m.playerId, new Live(m.playerId, m.entityNo, m.nickname, m.level, m.score));
+            for (Member m : members.values()) if (!m.bot) view.put(m.playerId, new Live(m.playerId, m.entityNo, m.nickname, m.level, m.score)); // 랭킹·정보 팝업은 사람만
             liveView = view;
             pairCooldown.values().removeIf(until -> until < clockSeconds);
             lastSeen.values().removeIf(seen -> seen.keepUntil() < clockSeconds);
@@ -292,13 +307,14 @@ public class Room {
         }
         m.controls.clear();
         advance(m, dt - done, tu);
-        double kx = 0, ky = 0;
         if (m.kbTime > 0) {
-            double f = m.kbTime / tu.knockbackSeconds(); // 0.4초에 걸쳐 감속
-            kx = m.kbX * f; ky = m.kbY * f;
+            // 튕김은 처음에 빠르고 점점 느려진다(속도 ∝ (남은 시간/T)²). 남은 거리 비율은 (남은 시간/T)³이라
+            // 이번 틱에 갈 거리를 정확히 구해서, 틱 간격과 관계없이 같은 거리만큼 밀려난다
+            double T = tu.knockbackSeconds(), before = m.kbTime / T, after = Math.max(0, m.kbTime - dt) / T;
+            double share = before * before * before - after * after * after;
+            m.x += m.kbX * share; m.y += m.kbY * share;
             m.kbTime = Math.max(0, m.kbTime - dt);
         }
-        m.x += kx * dt; m.y += ky * dt;
         double r = m.displayRadius;
         m.x = clamp(m.x, -half + r, half - r); m.y = clamp(m.y, -half + r, half - r);
     }
@@ -343,7 +359,8 @@ public class Room {
             if (eater == null) continue;
             it.remove();
             broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", eater.entityNo));
-            outbox.requestOrb(this, eater);
+            if (eater.bot) botOrb(eater);
+            else outbox.requestOrb(this, eater);
         }
     }
 
@@ -453,9 +470,16 @@ public class Room {
                     // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음.
                     if (a.score != b.score) {
                         Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
-                        if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
+                        if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                            outbox.requestLose(this, loser, winner);
+                            int lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 키워드 하나를 잃는다(4.21)
+                            shield(loser, tu);
+                            // 봇의 키워드는 이름이 없어 이긴 사람에게 점수만 보여 준다
+                            if (!winner.bot) outbox.sendText(winner, Map.of("type", "hit", "target", loser.nickname, "score", lost));
+                        } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
+                            loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
+                            shield(loser, tu);
+                            outbox.requestLose(this, loser, winner); // 이긴 쪽이 봇이어도 잃는다
                         }
                     }
                 }
@@ -463,9 +487,19 @@ public class Room {
         }
     }
 
+    /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
+    private void shield(Member m, Tuning tu) {
+        broadcast(Map.of("type", "shield", "e", m.entityNo, "ms", (long) (tu.loseProtectSeconds() * 1000)));
+    }
+
+    /**
+     * 튕김(4.3): 밀려나는 거리 = 최대 속도 × knockbackDistance(초) × 세기. 같은 크기끼리는 세기 1, 작은 쪽은 크기 비율만큼(상한 3배).
+     * 사람에게는 같은 튕김을 알려서 클라이언트 예측도 같이 밀려나게 한다(크게 밀려도 화면이 순간 이동하지 않게).
+     */
     private void knock(Member m, double nx, double ny, double strength, Tuning tu) {
-        double base = 420;
-        m.kbX = nx * base * strength; m.kbY = ny * base * strength; m.kbTime = tu.knockbackSeconds();
+        double dist = tu.maxSpeed() * tu.knockbackDistance() * strength;
+        m.kbX = nx * dist; m.kbY = ny * dist; m.kbTime = tu.knockbackSeconds();
+        if (!m.bot) outbox.sendText(m, Map.of("type", "knock", "dx", m.kbX, "dy", m.kbY, "ms", (long) (tu.knockbackSeconds() * 1000)));
     }
 
     /** 스냅샷: [u8 type=1][u32 tick][f32 half][u16 n] + n × [u32 entity][f32 x][f32 y][f32 r][f32 score][u16 level][u8 flags] */
@@ -485,6 +519,7 @@ public class Room {
         byte[] bytes = base.array();
         // 관심 영역(줌에 맞춘 주변 엔티티만 보내기)과 상한은 아직 넣지 않았다. 지금은 방 전원을 보낸다.
         for (int k = 0; k < order.size(); k++) {
+            if (order.get(k).bot) continue;
             byte[] copy = bytes.clone();
             copy[flagsPos[k]] = 1; // 나
             outbox.send(order.get(k), ByteBuffer.wrap(copy));
@@ -509,9 +544,246 @@ public class Room {
 
     private void broadcastRoster() {
         List<Map<String, Object>> list = new ArrayList<>();
-        for (Member m : members.values()) list.add(Map.of("e", m.entityNo, "nickname", m.nickname, "level", m.level));
+        for (Member m : members.values()) list.add(Map.of("e", m.entityNo, "nickname", m.nickname, "level", m.level, "bot", m.bot));
         Map<String, Object> msg = Map.of("type", "roster", "players", list);
         for (Member m : members.values()) outbox.sendText(m, msg);
+    }
+
+    // ------------------------------------------------------------ NPC 봇(4.21)
+
+    private long botSeq;
+    /** EXP → 레벨. 서버가 레벨표(levels)로 바꿔 끼운다. 기본값은 시드와 같은 곡선(4.9). */
+    private java.util.function.LongToIntFunction levelForExp = Room::defaultLevelForExp;
+
+    public void setLevelForExp(java.util.function.LongToIntFunction f) { this.levelForExp = f; }
+
+    static int defaultLevelForExp(long exp) {
+        long[] low = {0, 0, 1, 3, 8, 13, 22, 33, 50, 72, 100};
+        int level = 1;
+        for (int lv = 2; lv <= 100; lv++) {
+            long need = lv <= 10 ? low[lv] : Math.round(100 * Math.pow(lv / 10.0, 2));
+            if (exp >= need) level = lv; else break;
+        }
+        return level;
+    }
+
+    /** 사람 수. 방 정원(1000명) 검사와 접속 인원에 쓴다. 봇은 세지 않는다. */
+    private int humanCount() {
+        int n = 0;
+        for (Member m : members.values()) if (!m.bot) n++;
+        return n;
+    }
+
+    /** 봇 유행도 상한: 그 방 1등(사람) 현재 유행도 × botCapRatio(기본 1.5). */
+    double botCap(Tuning tu) {
+        double top = 0;
+        for (Member m : members.values()) if (!m.bot) top = Math.max(top, m.score);
+        return Math.floor(top * tu.botCapRatio());
+    }
+
+    /**
+     * 1초마다: 사람이 있으면 사람 + 봇이 botPlayers가 되도록 봇을 하나씩 넣거나 뺀다(사람이 없으면 봇도 없다).
+     * 1등 점수가 내려가 상한을 넘은 봇은 키워드를 하나씩 내려놓고, EXP만으로도 넘으면 빼고 새 봇으로 바꾼다.
+     */
+    void maintainBots(Tuning tu) {
+        double cap = botCap(tu);
+        for (Member b : List.copyOf(members.values())) {
+            if (!b.bot || b.score <= cap) continue;
+            if (!b.botKeywords.isEmpty()) { b.botKeywords.removeFirst(); botRecompute(b, tu); }
+            else { members.remove(b.entityNo); broadcastRoster(); }
+        }
+        int humans = humanCount(), bots = members.size() - humans;
+        int want = humans == 0 ? 0 : Math.max(0, tu.botPlayers() - humans);
+        if (bots < want) addBot(tu);
+        else if (bots > want) members.values().stream().filter(m -> m.bot).findFirst().ifPresent(b -> {
+            members.remove(b.entityNo);
+            broadcastRoster();
+        });
+    }
+
+    /**
+     * 사람과 같은 기준으로 봇을 만든다: EXP를 정하고(레벨은 레벨표로), 그 EXP 안에서 키워드 몇 개를 가진 것으로 한다.
+     * 유행도 = min(EXP, 100) + 키워드 점수 합이고 상한(1등 × 1.5)을 넘지 않는다.
+     */
+    private void addBot(Tuning tu) {
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        double cap = botCap(tu);
+        Member m = new Member(nextEntity++, -(++botSeq), null);
+        m.bot = true;
+        m.nickname = "Bot";
+        // EXP를 정하고, 많이 추가한 사람은 대개 가진 키워드도 많으므로 EXP에 비례해 가진 키워드 수를 정한다
+        // (최근 30번 추가 중 30~100%를 아직 가진 것으로 본다. 추가한 횟수(EXP)보다 많을 수는 없다).
+        // 합이 상한(1등 × 1.5)을 넘으면 키워드만 빼지 않고 EXP 범위를 줄여 다시 뽑는다. 작은 원인데 레벨만 높은 봇이 되지 않게
+        double expMax = Math.min(300, cap);
+        for (int attempt = 0; attempt < 12; attempt++) {
+            m.botExp = expMax < 1 ? 0 : rnd.nextLong((long) expMax + 1);
+            m.botKeywords.clear();
+            long want = Math.round(Math.min(m.botExp, 30) * (0.3 + rnd.nextDouble() * 0.7));
+            int sum = 0;
+            while (m.botKeywords.size() < want) {
+                int v = (int) Math.round(botStep(tu));
+                m.botKeywords.add(v);
+                sum += v;
+            }
+            if (Math.min(m.botExp, tu.expScoreCap()) + sum <= cap) break;
+            expMax *= 0.7;
+            if (attempt == 11) { m.botExp = 0; m.botKeywords.clear(); } // 끝내 못 맞추면 가장 작은 봇
+        }
+        m.botStyle = rnd.nextInt(3);
+        m.botReact = 0.25 + rnd.nextDouble() * 0.45;
+        m.botHeading = rnd.nextDouble() * Math.PI * 2;
+        m.botNextPlusAt = clockSeconds + 15 + rnd.nextDouble() * 30;
+        botRecompute(m, tu);
+        m.displayRadius = m.radius;
+        double[] spawn = findSpawn(activeArea(members.size() + 1));
+        m.x = spawn[0]; m.y = spawn[1];
+        m.protectUntil = clockSeconds + tu.joinProtectSeconds();
+        members.put(m.entityNo, m);
+        broadcastRoster();
+    }
+
+    /** 봇의 유행도와 레벨을 사람과 같은 식으로 다시 정한다: min(EXP, 100) + Σ 키워드 점수, 레벨은 레벨표. */
+    private void botRecompute(Member b, Tuning tu) {
+        int sum = 0;
+        for (int v : b.botKeywords) sum += v;
+        b.score = Math.min(b.botExp, tu.expScoreCap()) + sum;
+        b.radius = radiusFor(b.score);
+        int lv = levelForExp.applyAsInt(b.botExp);
+        if (lv != b.level) { b.level = lv; broadcastRoster(); }
+    }
+
+    private double botStep(Tuning tu) {
+        double lo = Math.min(tu.botStepMin(), tu.botStepMax()), hi = Math.max(tu.botStepMin(), tu.botStepMax());
+        return lo + ThreadLocalRandom.current().nextDouble() * (hi - lo);
+    }
+
+    /** 봇의 "추가": 사람처럼 EXP +1과 키워드 하나. 상한(1등 × 1.5)을 넘으면 하지 않는다. */
+    private void botPlus(Member b, Tuning tu) {
+        int v = (int) Math.round(botStep(tu));
+        double next = Math.min(b.botExp + 1, tu.expScoreCap()) + b.botKeywords.stream().mapToInt(Integer::intValue).sum() + v;
+        if (next > botCap(tu)) return;
+        b.botExp++;
+        b.botKeywords.add(v);
+        botRecompute(b, tu);
+    }
+
+    /** 봇이 충돌로 지면 사람처럼 가진 키워드 하나를 잃는다. 없으면 잃을 것도 없다. 잃은 키워드 점수를 돌려준다. */
+    private int botLose(Member b, Tuning tu) {
+        int lost = b.botKeywords.remove(ThreadLocalRandom.current().nextInt(b.botKeywords.size()));
+        botRecompute(b, tu);
+        return lost;
+    }
+
+    /** 봇이 ? 구슬을 먹으면 사람과 같은 확률로 당첨되어 "추가"하고, 나머지는 꽝이다. */
+    private void botOrb(Member b) {
+        Tuning tu = tuning;
+        if (ThreadLocalRandom.current().nextDouble(100) < tu.orbActivePercent()) botPlus(b, tu);
+    }
+
+    /** 봇도 가끔 스스로 키워드를 추가하고, 오래된 키워드는 사라진다(사람의 24시간 삭제처럼 줄었다 늘었다 한다). */
+    private void botLife(Member b, Tuning tu) {
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        b.botNextPlusAt = clockSeconds + 15 + rnd.nextDouble() * 30;
+        if (!b.botKeywords.isEmpty() && rnd.nextDouble() < 0.35) { b.botKeywords.removeFirst(); botRecompute(b, tu); }
+        else botPlus(b, tu);
+    }
+
+    /**
+     * 봇이 사람처럼 움직이게 한다. 봇마다 반응 속도(0.25~0.7초)가 달라 그 간격으로 다시 판단한다.
+     * 1) 나를 이길 원이 가까우면 반대쪽으로 도망치되, 벽에 몰리지 않게 안쪽으로 꺾고 지그재그로 흔든다.
+     * 2) 내가 이길 원이 보이면 그 원이 갈 곳을 앞질러 쫓는다. 4~7초 안에 못 잡으면 포기하고 한동안 쫓지 않는다.
+     * 3) 아니면 다른 봇이 노리지 않는 가까운 구슬로 간다.
+     * 4) 할 일이 없으면 진행 방향을 조금씩 틀며 곡선으로 돌아다니고, 가끔 잠깐 멈춘다.
+     * 15~45초마다 스스로 키워드를 추가하거나 오래된 키워드가 사라진다(botLife).
+     */
+    private void thinkBots(Tuning tu, double half) {
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        Set<Integer> claimed = new HashSet<>();
+        for (Member m : members.values()) if (m.bot && m.botOrb != null && orbs.containsKey(m.botOrb)) claimed.add(m.botOrb);
+        for (Member b : members.values()) {
+            if (!b.bot) continue;
+            if (clockSeconds >= b.botNextPlusAt) botLife(b, tu);
+            if (clockSeconds < b.botThinkAt) continue;
+            b.botThinkAt = clockSeconds + b.botReact * (0.7 + rnd.nextDouble() * 0.6);
+            double fleeRange = b.botStyle == 0 ? 900 : 450, chaseRange = b.botStyle == 1 ? 1000 : 450, orbRange = b.botStyle == 2 ? 1600 : 700;
+            Member threat = null, prey = null;
+            double threatD = Double.MAX_VALUE, preyD = Double.MAX_VALUE;
+            for (Member o : members.values()) {
+                if (o == b) continue;
+                double d = Math.hypot(o.x - b.x, o.y - b.y) - o.displayRadius - b.displayRadius;
+                if (o.score > b.score && d < fleeRange && d < threatD) { threat = o; threatD = d; }
+                if (o.score < b.score && d < chaseRange && d < preyD) { prey = o; preyD = d; }
+            }
+            double limit = half - 60 - b.displayRadius;
+
+            if (threat != null) {
+                // 도망: 위협 반대 방향 + 벽에서 안쪽으로 미는 힘, 그리고 좌우로 흔들기
+                double dx = b.x - threat.x, dy = b.y - threat.y, len = Math.max(1, Math.hypot(dx, dy));
+                double ax = dx / len, ay = dy / len;
+                double wall = 500;
+                if (b.x > limit - wall) ax -= (b.x - (limit - wall)) / wall;
+                if (b.x < -limit + wall) ax += (-limit + wall - b.x) / wall;
+                if (b.y > limit - wall) ay -= (b.y - (limit - wall)) / wall;
+                if (b.y < -limit + wall) ay += (-limit + wall - b.y) / wall;
+                double ang = Math.atan2(ay, ax) + (rnd.nextDouble() - 0.5) * 0.9;
+                b.botHeading = ang; b.botIdleUntil = 0; b.botChaseFrom = 0;
+                setTarget(b, clamp(b.x + Math.cos(ang) * 550, -limit, limit), clamp(b.y + Math.sin(ang) * 550, -limit, limit));
+                continue;
+            }
+            if (clockSeconds < b.botIdleUntil) continue; // 잠깐 쉬는 중
+
+            if (prey != null && clockSeconds >= b.botChaseCooldown) {
+                if (b.botChaseFrom == 0) b.botChaseFrom = clockSeconds;
+                if (clockSeconds - b.botChaseFrom > 4 + (b.entityNo % 4)) {
+                    // 오래 쫓아도 못 잡으면 포기한다(끝없이 따라오지 않게)
+                    b.botChaseFrom = 0;
+                    b.botChaseCooldown = clockSeconds + 5 + rnd.nextDouble() * 5;
+                } else {
+                    double lead = 0.4 + rnd.nextDouble() * 0.4; // 상대가 갈 곳을 조금 앞질러 노린다
+                    setTarget(b, clamp(prey.x + prey.vx * lead, -limit, limit), clamp(prey.y + prey.vy * lead, -limit, limit));
+                    continue;
+                }
+            } else if (prey == null) {
+                b.botChaseFrom = 0;
+            }
+
+            double[] orb = nearestFreeOrb(b, orbRange, claimed);
+            if (orb != null) {
+                b.botOrb = (int) orb[2];
+                claimed.add(b.botOrb);
+                setTarget(b, orb[0], orb[1]);
+                continue;
+            }
+            b.botOrb = null;
+
+            // 돌아다니기: 진행 방향을 조금씩 틀어 곡선으로, 벽 가까이면 안쪽으로 꺾는다. 가끔 잠깐 멈춘다
+            if (rnd.nextDouble() < 0.06) {
+                b.botIdleUntil = clockSeconds + 0.6 + rnd.nextDouble() * 1.6;
+                b.targetX = null; b.targetY = null;
+                setInput(b, 0, 0);
+                continue;
+            }
+            b.botHeading += (rnd.nextDouble() - 0.5) * 0.9;
+            double nx = b.x + Math.cos(b.botHeading) * 400, ny = b.y + Math.sin(b.botHeading) * 400;
+            if (Math.abs(nx) > limit || Math.abs(ny) > limit) {
+                b.botHeading = Math.atan2(-b.y, -b.x) + (rnd.nextDouble() - 0.5) * 1.2; // 가운데 쪽으로 돌아선다
+                nx = b.x + Math.cos(b.botHeading) * 400; ny = b.y + Math.sin(b.botHeading) * 400;
+            }
+            setTarget(b, clamp(nx, -limit, limit), clamp(ny, -limit, limit));
+        }
+    }
+
+    /** 다른 봇이 노리지 않는 가장 가까운 구슬 {x, y, 번호}. */
+    private double[] nearestFreeOrb(Member b, double range, Set<Integer> claimed) {
+        double[] best = null;
+        double bestD = range;
+        for (Map.Entry<Integer, double[]> o : orbs.entrySet()) {
+            if (claimed.contains(o.getKey()) && !o.getKey().equals(b.botOrb)) continue;
+            double[] p = o.getValue();
+            double d = Math.hypot(p[0] - b.x, p[1] - b.y);
+            if (d < bestD) { bestD = d; best = new double[]{p[0], p[1], o.getKey()}; }
+        }
+        return best;
     }
 
     /** 인원이 적으면 활동 영역을 좁힌다(4.2). 1000명에서 기준 맵 한 변, 아무리 적어도 그 1/4보다 좁히지 않는다. */

@@ -24,6 +24,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation("org.springframework.security:spring-security-oauth2-jose") // 구글 ID 토큰(JWT) 서명 검증(9.3)
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
