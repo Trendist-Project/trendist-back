@@ -19,5 +19,8 @@ spring:
 trendist:
   cookie:
     secure: true
+  # 게임 WebSocket을 열 수 있는 사이트 주소(쉼표로 여러 개). 기본값은 운영 도메인
+  ws:
+    allowed-origins: ${PROD_ALLOWED_ORIGINS:https://trendist.kr,https://www.trendist.kr}
   dev-trends:
     enabled: false

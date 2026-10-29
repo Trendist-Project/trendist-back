@@ -21,6 +21,7 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 | `MYSQL_USERNAME`, `MYSQL_PASSWORD` | dev, prod | DB 계정 |
 | `PROD_SERVER_PORT` | prod | 운영 포트(서버 docker compose가 4001로 넘긴다) |
 | `TRENDIST_JWT_SECRET` | prod | JWT 서명 키(32바이트 이상). 없으면 개발용 기본값 |
+| `PROD_ALLOWED_ORIGINS` | prod | 게임 WebSocket을 허용할 사이트 주소(쉼표로 여러 개). 없으면 `https://trendist.kr,https://www.trendist.kr` |
 
 - 로컬 DB(처음 한 번): MariaDB에 DB `trendist`를 만들고, 이 PC의 DB 계정을 `src/main/resources/application.env`에 적는다(git 제외 파일, 계정 정보는 저장소에 올리지 않는다). `dev` 프로필이 이 파일을 읽는다.
   ```sql
@@ -33,7 +34,7 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
   MYSQL_PASSWORD=비밀번호
   ```
   테이블은 백엔드가 시작할 때 JPA가 만들고, 초기 데이터는 시더가 넣는다.
-- 운영 값은 서버의 `.env`(docker compose `env_file`)에 둔다.
+- 운영 값은 GitHub 시크릿 `ENV_FILE`에 `.env` 내용 그대로 두고, 배포할 때 서버 `/home/ubuntu/trendist/.env`(docker compose `env_file: ../.env`)로 보낸다.
 - 시스템 `JAVA_HOME`이 17 미만이면 프로젝트 폴더에 `.java-home` 파일을 만들고 JDK 25 경로를 한 줄 적는다(git 제외 파일). `gradlew`가 이 경로로 Gradle을 띄운다.
 - IntelliJ는 **Settings → Build Tools → Gradle → Gradle JVM**을 `temurin-25 (WSL)`로 둔다. `gradle/gradle-daemon-jvm.properties`(데몬 JVM 지정)는 WSL에서 IntelliJ가 JDK를 찾지 못해 동기화가 실패하므로 쓰지 않는다.
 
