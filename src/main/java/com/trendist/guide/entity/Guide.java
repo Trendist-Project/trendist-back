@@ -21,6 +21,9 @@ public class Guide extends BaseTimeEntity {
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
 
+    /** 지운 글(소프트 삭제). 목록에서 빠진다 */
+    public void delete(Instant now) { this.deletedAt = now; }
+
     public Guide(GuideCategory category, User author, String title, String body, int sortOrder) {
         this.guideCategory = category; this.user = author; this.title = title; this.body = body; this.sortOrder = sortOrder;
     }

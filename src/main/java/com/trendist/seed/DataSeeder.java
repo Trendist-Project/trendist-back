@@ -35,7 +35,9 @@ import com.trendist.user.repository.UserRepository;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -199,9 +201,28 @@ public class DataSeeder implements ApplicationRunner {
         for (Long pid : players.findCheckTargets()) playerService.recomputeLocked(pid, true);
     }
 
-    /** 가이드 카테고리와 글(4.17). 운영에서 고치는 데이터라 각 테이블이 비어 있을 때만 넣는다. */
+    /**
+     * 가이드 카테고리와 글(4.17). 운영에서 고치는 데이터라 각 테이블이 비어 있을 때만 넣는다.
+     * 예외: 처음 넣은 1판 글을 아무도 고치지 않았으면(133판에서 가이드를 다시 씀) 카테고리를 새 이름·순서로 바꾸고
+     * 예전 글은 지운 표시를 한 뒤 새 글을 넣는다. 한 번 바꾸면 카테고리 이름이 달라져 다시 바꾸지 않는다.
+     */
     private int seedGuides() {
         int added = 0;
+        if (guideV1Untouched()) {
+            Instant now = Instant.now(clock);
+            guides.findAll().forEach(g -> g.delete(now));
+            int order = 1;
+            for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
+                int o = order++;
+                guideCategories.findAll().stream().filter(gc -> gc.getCode().equals(c.code())).findFirst()
+                        .ifPresentOrElse(gc -> gc.change(c.name(), c.displayType(), o),
+                                () -> guideCategories.save(new GuideCategory(c.code(), c.name(), c.displayType(), o)));
+            }
+            guideCategories.flush();
+            added += insertGuideArticles();
+            log.info("가이드를 133판 글로 바꿈");
+            return added;
+        }
         if (guideCategories.count() == 0) {
             int order = 1;
             for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
@@ -209,19 +230,36 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        if (guides.count() == 0) {
-            User author = operator();
-            for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
-                GuideCategory category = guideCategories.findByCodeAndEnabledTrue(c.code()).orElse(null);
-                if (category == null) continue; // 관리자가 지우거나 끈 카테고리
-                int order = 1;
-                for (GuideSeed.Article a : c.articles()) {
-                    guides.save(new Guide(category, author, a.title(), a.body(), order++));
-                    added++;
-                }
+        if (guides.count() == 0) added += insertGuideArticles();
+        return added;
+    }
+
+    private int insertGuideArticles() {
+        int added = 0;
+        User author = operator();
+        for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
+            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(c.code()).orElse(null);
+            if (category == null) continue; // 관리자가 지우거나 끈 카테고리
+            int order = 1;
+            for (GuideSeed.Article a : c.articles()) {
+                guides.save(new Guide(category, author, a.title(), a.body(), order++));
+                added++;
             }
         }
         return added;
+    }
+
+    /** 1판 기본 가이드(카테고리 코드가 1판 그대로, "아이콘과 칭호" 이름 그대로)이고 글을 하나도 고치거나 지우지 않았는지. */
+    private boolean guideV1Untouched() {
+        List<GuideCategory> cats = guideCategories.findAll();
+        if (cats.isEmpty()) return false;
+        if (!cats.stream().map(GuideCategory::getCode).collect(java.util.stream.Collectors.toSet()).equals(new HashSet<>(GuideSeed.V1_CODES))) return false;
+        if (cats.stream().noneMatch(c -> c.getCode().equals("icons-and-titles") && c.getName().equals("아이콘과 칭호"))) return false;
+        List<Guide> all = guides.findAll();
+        if (all.isEmpty()) return false;
+        // 고친 적이 없으면 수정 시각이 만든 시각과 같다(같은 저장에서 찍혀 조금 다를 수 있어 1초까지 같게 본다)
+        return all.stream().allMatch(g -> g.getDeletedAt() == null
+                && Duration.between(g.getCreatedAt(), g.getUpdatedAt()).abs().compareTo(Duration.ofSeconds(1)) <= 0);
     }
 
     /** 공지·가이드 작성자로 쓰는 운영자 계정. 없으면 만든다. */

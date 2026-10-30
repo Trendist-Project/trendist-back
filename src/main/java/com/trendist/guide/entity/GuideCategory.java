@@ -21,6 +21,11 @@ public class GuideCategory extends BaseTimeEntity {
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
 
+    /** 시드가 예전 기본 글을 새 글로 바꿀 때 이름·형식·순서를 함께 바꾼다 */
+    public void change(String name, String displayType, long sortOrder) {
+        this.name = name; this.displayType = displayType; this.sortOrder = sortOrder;
+    }
+
     public GuideCategory(String code, String name, String displayType, int sortOrder) {
         this.code = code; this.name = name; this.displayType = displayType; this.sortOrder = sortOrder;
     }
