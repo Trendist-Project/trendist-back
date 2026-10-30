@@ -9,4 +9,8 @@ public interface GuideCategoryRepository extends JpaRepository<GuideCategory, Lo
     List<GuideCategory> findByEnabledTrueOrderBySortOrderAscIdAsc();
 
     Optional<GuideCategory> findByCodeAndEnabledTrue(String code);
+
+    List<GuideCategory> findAllByOrderBySortOrderAscIdAsc();
+
+    boolean existsByCode(String code);
 }

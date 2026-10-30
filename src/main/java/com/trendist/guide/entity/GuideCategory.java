@@ -26,6 +26,13 @@ public class GuideCategory extends BaseTimeEntity {
         this.name = name; this.displayType = displayType; this.sortOrder = sortOrder;
     }
 
+    /** 관리자 수정(13.4): 이름·형식·보이기 */
+    public void edit(String name, String displayType, boolean enabled) {
+        this.name = name; this.displayType = displayType; this.enabled = enabled;
+    }
+
+    public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
+
     public GuideCategory(String code, String name, String displayType, int sortOrder) {
         this.code = code; this.name = name; this.displayType = displayType; this.sortOrder = sortOrder;
     }

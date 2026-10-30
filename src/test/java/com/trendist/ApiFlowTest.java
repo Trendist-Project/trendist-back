@@ -43,6 +43,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 class ApiFlowTest {
     @Autowired MockMvc mvc;
+    @Autowired com.trendist.guide.service.AdminGuideService adminGuides;
     @Autowired TrendFormula formula;
     @Autowired KeywordService keywordService;
     @Autowired KeywordRepository keywords;
@@ -212,6 +213,39 @@ class ApiFlowTest {
 
     @Autowired com.trendist.notice.service.NoticeService noticeService;
     @Autowired com.trendist.user.repository.UserRepository userRepo;
+
+    @Test
+    void adminManagesGuideCategoriesAndArticles() throws Exception {
+        // 관리자 가이드 관리(4.17, 13.4): 관리자가 아니면 403
+        String t = player("가이드시험");
+        mvc.perform(get("/api/admin/guide/categories").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
+        long admin = userRepo.findFirstByRoleOrderByIdAsc(com.trendist.user.entity.User.ROLE_ADMIN).orElseThrow().getId();
+        var c = adminGuides.createCategory(new com.trendist.guide.dto.AdminGuideDtos.CategoryRequest("test-cat", " 🧪 시험 ", "ARTICLE", true));
+        assertThat(c.name()).isEqualTo("🧪 시험");
+        assertThatThrownBy(() -> adminGuides.createCategory(new com.trendist.guide.dto.AdminGuideDtos.CategoryRequest("test-cat", "중복", "FAQ", true)))
+                .hasMessageContaining("이미 있는");
+        assertThatThrownBy(() -> adminGuides.createCategory(new com.trendist.guide.dto.AdminGuideDtos.CategoryRequest("Bad Code", "이름", "FAQ", true)))
+                .hasMessageContaining("코드");
+        var a1 = adminGuides.createArticle(admin, c.id(), new com.trendist.guide.dto.AdminGuideDtos.ArticleRequest("첫 글", "본문 **하나**"));
+        var a2 = adminGuides.createArticle(admin, c.id(), new com.trendist.guide.dto.AdminGuideDtos.ArticleRequest("둘째 글", "본문 둘"));
+        mvc.perform(get("/api/guide/categories/test-cat/articles")).andExpect(jsonPath("$[0].title").value("첫 글"));
+        // 순서 바꾸기, 고치기
+        adminGuides.moveArticle(a2.id(), -1);
+        adminGuides.updateArticle(a1.id(), new com.trendist.guide.dto.AdminGuideDtos.ArticleRequest("첫 글(수정)", "새 본문"));
+        mvc.perform(get("/api/guide/categories/test-cat/articles")).andExpect(jsonPath("$[0].title").value("둘째 글"))
+                .andExpect(jsonPath("$[1].title").value("첫 글(수정)")).andExpect(jsonPath("$[1].body").value("새 본문"));
+        // 글이 있으면 카테고리는 못 지우고, 숨기면 사용자 목록에서 빠진다
+        assertThatThrownBy(() -> adminGuides.deleteCategory(c.id())).hasMessageContaining("글이 있는");
+        adminGuides.updateCategory(c.id(), new com.trendist.guide.dto.AdminGuideDtos.CategoryRequest(null, "🧪 시험", "FAQ", false));
+        mvc.perform(get("/api/guide/categories")).andExpect(jsonPath("$[?(@.code == 'test-cat')]").isEmpty());
+        mvc.perform(get("/api/guide/categories/test-cat/articles")).andExpect(status().isNotFound());
+        // 글을 모두 지우면 카테고리도 지울 수 있다
+        adminGuides.deleteArticle(a1.id());
+        adminGuides.deleteArticle(a2.id());
+        assertThat(adminGuides.articles(c.id())).isEmpty();
+        adminGuides.deleteCategory(c.id());
+        assertThat(adminGuides.categories()).noneMatch(x -> x.code().equals("test-cat"));
+    }
 
     @Test
     void adminWritesEditsAndDeletesNotices() throws Exception {

@@ -234,7 +234,10 @@ public class DataSeeder implements ApplicationRunner {
         return added + reviseGuides();
     }
 
-    /** 시드 뒤에 고친 글(GuideSeed.REVISIONS). 관리자가 고친 글(본문이 예전 시드와 다름)과 지운 글은 건드리지 않는다. */
+    /**
+     * 시드 뒤에 고친 글(GuideSeed.REVISIONS). 관리자가 고친 글(본문이 예전 시드와 다름)과 지운 글은 건드리지 않는다.
+     * 새 글은 지운 글을 포함해 같은 제목·본문이 없을 때만 넣는다(관리자가 지우거나 제목을 바꿔도 되살아나지 않게).
+     */
     private int reviseGuides() {
         int changed = 0;
         for (GuideSeed.Revision r : GuideSeed.REVISIONS) {
@@ -248,6 +251,9 @@ public class DataSeeder implements ApplicationRunner {
                 continue;
             }
             if (same != null) continue;
+            // 관리자가 지웠거나(소프트 삭제) 제목만 바꾼 글은 다시 넣지 않는다: 지운 글까지 보고 같은 제목이나 같은 본문이 있으면 건너뛴다
+            if (guides.findByGuideCategoryId(category.getId()).stream()
+                    .anyMatch(g -> g.getTitle().equals(r.title()) || g.getBody().equals(body))) continue;
             // 기준 글과 같은 순서 값이면 id가 커서 바로 뒤에 온다. 기준이 없으면 맨 앞
             long order = r.after() == null ? list.stream().mapToLong(Guide::getSortOrder).min().orElse(1) - 1
                     : list.stream().filter(g -> g.getTitle().equals(r.after())).mapToLong(Guide::getSortOrder).findFirst()
