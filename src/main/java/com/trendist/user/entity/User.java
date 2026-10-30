@@ -73,6 +73,21 @@ public class User extends BaseTimeEntity {
     /** 로그아웃: 지금까지 발급한 액세스 토큰을 모두 무효로 한다. */
     public void revokeTokens(Instant now) { this.tokensRevokedAt = now; }
 
+    /** 탈퇴(4.1): 저장된 값은 그대로 두고 상태와 시각만 바꾼다. 지금까지 발급한 액세스 토큰도 무효로 한다. */
+    public void withdraw(UserState withdrawn, Instant now) {
+        this.userState = withdrawn;
+        this.deletedAt = now;
+        this.tokensRevokedAt = now;
+    }
+
+    /** 복구(4.1): 같은 구글 계정으로 다시 로그인해 복구를 고르면 정상 상태로 되돌린다. 기록은 탈퇴 전 그대로다. */
+    public void restore(UserState normal) {
+        this.userState = normal;
+        this.deletedAt = null;
+    }
+
+    public boolean isWithdrawn() { return deletedAt != null; }
+
     public boolean isBanned(Instant now) { return bannedUntil != null && bannedUntil.isAfter(now); }
     public void setCountry(Country country) { this.country = country; }
 }

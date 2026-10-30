@@ -53,10 +53,32 @@ public class AuthController {
     @PostMapping("/google")
     public GoogleLoginResponse google(@Valid @RequestBody GoogleLoginRequest body, HttpServletRequest req, HttpServletResponse res) {
         AuthService.Login login = auth.google(body.idToken(), body.nonce(), readVisitorId(req));
+        if (login.token() == null) return new GoogleLoginResponse(null, 0, login.result()); // 탈퇴한 계정: 복구할지 묻는다
         writeRefreshCookie(res, login.refreshToken(), Duration.ofDays(1));
         writeVisitorCookie(res, "", Duration.ZERO);
         return new GoogleLoginResponse(login.token().accessToken(), login.token().expiresIn(), login.result());
     }
+
+    /** 탈퇴한 계정 복구(4.1): 사용자가 [복구]를 누른 뒤에만 부른다. 같은 구글 ID 토큰을 다시 검증하고 바로 로그인한다. */
+    @PostMapping("/google/restore")
+    public GoogleLoginResponse restore(@Valid @RequestBody GoogleLoginRequest body, HttpServletResponse res) {
+        AuthService.Login login = auth.restore(body.idToken(), body.nonce());
+        writeRefreshCookie(res, login.refreshToken(), Duration.ofDays(1));
+        writeVisitorCookie(res, "", Duration.ZERO);
+        return new GoogleLoginResponse(login.token().accessToken(), login.token().expiresIn(), login.result());
+    }
+
+    /** 탈퇴(4.1): 확인 문구를 직접 입력해야 한다. 갱신 토큰을 폐기하고 쿠키를 지운다. */
+    @PostMapping("/withdraw")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void withdraw(@AuthenticationPrincipal AuthUser user, @RequestBody WithdrawRequest body, HttpServletResponse res) {
+        if (user == null) throw ApiException.unauthorized("UNAUTHORIZED");
+        auth.withdraw(user.userId(), body.phrase());
+        writeRefreshCookie(res, "", Duration.ZERO);
+        writeVisitorCookie(res, "", Duration.ZERO);
+    }
+
+    public record WithdrawRequest(String phrase) {}
 
     /** 로그아웃: 갱신 토큰을 폐기하고 쿠키를 지운다. 다시 [시작]하면 새 게스트로 시작한다. */
     @PostMapping("/logout")

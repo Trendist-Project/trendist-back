@@ -559,6 +559,43 @@ class ApiFlowTest {
     }
 
     @Test
+    void withdrawThenRestoreWithSameGoogleAccount() throws Exception {
+        // 탈퇴(4.1): 확인 문구를 정확히 넣어야 하고, 게스트는 할 수 없다
+        String guestT = player("탈퇴게스트");
+        mvc.perform(post("/api/auth/withdraw").header("Authorization", "Bearer " + guestT)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"phrase\":\"탈퇴 합니다.\"}")).andExpect(status().isBadRequest());
+
+        MvcResult login = googleLogin("sub-withdraw");
+        String t = body(login, "$.accessToken");
+        mvc.perform(post("/api/players").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"탈퇴시험\"}")).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/withdraw").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"phrase\":\"탈퇴합니다\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/withdraw").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"phrase\":\"탈퇴 합니다.\"}")).andExpect(status().isNoContent());
+        // 탈퇴하면 이미 받은 토큰도 바로 거절된다
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isUnauthorized());
+
+        // 같은 구글 계정으로 다시 로그인하면 토큰 없이 WITHDRAWN만 온다
+        MvcResult again = googleLogin("sub-withdraw");
+        assertThat(again.getResponse().getStatus()).isEqualTo(200);
+        assertThat(body(again, "$.result")).isEqualTo("WITHDRAWN");
+        assertThat(again.getResponse().getCookie("refresh_token")).isNull();
+
+        // [복구]: 같은 ID 토큰으로 복구하면 바로 로그인되고 기록이 그대로다.
+        // 토큰 발급 시각(iat)은 초 단위라 탈퇴와 같은 초에 발급한 토큰은 거절된다. 사람이 복구를 누르기까지의 시간을 흉내 낸다
+        Thread.sleep(1100);
+        MvcResult restored = mvc.perform(post("/api/auth/google/restore").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idToken\":\"test-google:sub-withdraw\"}")).andExpect(status().isOk()).andReturn();
+        assertThat(body(restored, "$.result")).isEqualTo("RESTORED");
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + body(restored, "$.accessToken")))
+                .andExpect(jsonPath("$.player.nickname").value("탈퇴시험"));
+        // 탈퇴 상태가 아니면 복구는 거절
+        mvc.perform(post("/api/auth/google/restore").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idToken\":\"test-google:sub-withdraw\"}")).andExpect(status().isConflict());
+    }
+
+    @Test
     void googleCreatesAccountWithOauthOnly() throws Exception {
         MvcResult login = googleLogin("sub-new");
         assertThat(body(login, "$.result")).isEqualTo("CREATED");

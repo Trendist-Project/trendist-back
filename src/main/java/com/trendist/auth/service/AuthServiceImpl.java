@@ -67,17 +67,14 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public Login google(String idToken, String nonce, Optional<String> visitorId) {
-        GoogleIdTokenVerifier.GoogleIdentity id = google.verify(idToken).orElseThrow(() -> ApiException.unauthorized("GOOGLE_TOKEN_INVALID"));
-        if (nonce != null && !nonce.equals(id.nonce())) throw ApiException.unauthorized("GOOGLE_TOKEN_INVALID");
-        String sub = id.sub();
-        String oauthId = sha256(sub); // 구글 사용자 ID는 해시로만 저장한다
+        String oauthId = verifiedOauthId(idToken, nonce);
         Instant now = Instant.now(clock);
         Optional<User> account = users.findByOauthTypeAndOauthId(User.OAUTH_GOOGLE, oauthId);
         User u;
         String result;
         if (account.isPresent()) {
             u = account.get();
-            if (u.getDeletedAt() != null) throw ApiException.forbiddenCode("ACCOUNT_WITHDRAWN", "탈퇴한 계정이에요");
+            if (u.isWithdrawn()) return new Login(null, null, "WITHDRAWN"); // 복구할지는 사용자가 정한다(4.1)
             if (!guard.isUsable(u.getId())) throw ApiException.forbiddenCode("ACCOUNT_BANNED", "이용이 제한된 계정이에요");
             result = "EXISTING";
         } else {
@@ -93,6 +90,41 @@ public class AuthServiceImpl implements AuthService {
         }
         u.touchLogin(now);
         return new Login(token(u), issueRefresh(u, now), result);
+    }
+
+    @Override
+    @Transactional
+    public Login restore(String idToken, String nonce) {
+        String oauthId = verifiedOauthId(idToken, nonce);
+        User u = users.findByOauthTypeAndOauthId(User.OAUTH_GOOGLE, oauthId)
+                .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "계정을 찾을 수 없어요"));
+        if (!u.isWithdrawn()) throw ApiException.conflict("NOT_WITHDRAWN", "탈퇴한 계정이 아니에요");
+        u.restore(codes.userState(CodeTables.USER_NORMAL));
+        guard.evict(u.getId());
+        if (!guard.isUsable(u.getId())) throw ApiException.forbiddenCode("ACCOUNT_BANNED", "이용이 제한된 계정이에요");
+        Instant now = Instant.now(clock);
+        u.touchLogin(now);
+        return new Login(token(u), issueRefresh(u, now), "RESTORED");
+    }
+
+    @Override
+    @Transactional
+    public void withdraw(long userId, String phrase) {
+        if (!WITHDRAW_PHRASE.equals(phrase)) throw ApiException.badRequest("WITHDRAW_PHRASE", "확인 문구를 정확히 입력해 주세요");
+        User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "계정을 찾을 수 없어요"));
+        if (u.isGuest()) throw ApiException.badRequest("WITHDRAW_GUEST", "게스트는 탈퇴할 수 없어요. Google로 로그인한 계정만 탈퇴할 수 있어요");
+        if (u.isWithdrawn()) return;
+        Instant now = Instant.now(clock);
+        u.withdraw(codes.userState(CodeTables.USER_WITHDRAWN), now);
+        refreshTokens.revokeAll(u.getId(), now);
+        guard.evict(u.getId());
+    }
+
+    /** 구글 ID 토큰을 검증하고 구글 사용자 ID의 해시를 돌려준다. nonce를 주면 토큰 안의 nonce와 같아야 한다. */
+    private String verifiedOauthId(String idToken, String nonce) {
+        GoogleIdTokenVerifier.GoogleIdentity id = google.verify(idToken).orElseThrow(() -> ApiException.unauthorized("GOOGLE_TOKEN_INVALID"));
+        if (nonce != null && !nonce.equals(id.nonce())) throw ApiException.unauthorized("GOOGLE_TOKEN_INVALID");
+        return sha256(id.sub()); // 구글 사용자 ID는 해시로만 저장한다
     }
 
     @Override
