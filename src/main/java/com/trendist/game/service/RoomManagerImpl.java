@@ -240,10 +240,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Map<String, Object> msg = new HashMap<>();
                 msg.put("type", "hit");
                 msg.put("target", botName);
-                if ("GAINED".equals(r.status())) {
-                    msg.put("keyword", r.text()); msg.put("score", r.trendValue()); msg.put("stolen", "BOT"); msg.put("gained", r.gained());
+                if ("GAINED".equals(r.status()) || "RENEWED".equals(r.status())) {
+                    // BOT_RENEWED: 이미 가진 키워드라 남은 시간만 24시간으로 늘렸다
+                    msg.put("keyword", r.text()); msg.put("score", r.trendValue()); msg.put("gained", r.gained());
+                    msg.put("stolen", "RENEWED".equals(r.status()) ? "BOT_RENEWED" : "BOT");
                 } else {
-                    msg.put("score", 0); // 얻을 수 있는 🔥 키워드가 없다(모두 이미 가졌거나 🔥 키워드가 없음)
+                    msg.put("score", 0); // 🔥 키워드가 없다
                 }
                 room.submit(rr -> {
                     Room.Member m = rr.byPlayer(playerId);

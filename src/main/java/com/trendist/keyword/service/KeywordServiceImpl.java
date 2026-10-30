@@ -183,16 +183,19 @@ public class KeywordServiceImpl implements KeywordService {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
         Instant now = Instant.now(clock);
-        Set<Long> held = new HashSet<>();
-        for (PlayerKeyword pk : playerKeywords.findActiveByPlayer(p.getId(), now, codes.keywordStateId(CodeTables.KW_BANNED))) {
-            held.add(pk.getKeyword().getId());
-        }
-        // 구슬과 달리 꽝·중복이 없다: 이미 가진 키워드는 빼고 고른다
-        List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE))
-                .stream().filter(id -> !held.contains(id)).toList();
+        // 구슬과 달리 꽝이 없다. 🔥 키워드 전체에서 고른다
+        List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
         if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
         Keyword k = keywords.findByIdForUpdate(ids.get(ThreadLocalRandom.current().nextInt(ids.size()))).orElseThrow();
-        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()); // 만료됐지만 아직 안 지운 행
+        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()); // 만료됐지만 아직 안 지운 행일 수도 있다
+        if (existing.isPresent() && !existing.get().isExpired(now)) {
+            // 이미 가진 키워드: 사람에게서 빼앗을 때와 같이 남은 시간만 지금부터 다시 24시간(4.3)
+            Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
+            existing.get().renew(now, expires);
+            playerKeywords.flush();
+            return new KeywordDtos.OrbResult("RENEWED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
+                    k.getHolderCount(), 0L, expires);
+        }
         KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
         return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
                 k.getHolderCount(), r.gained(), r.keyword().myExpiresAt());

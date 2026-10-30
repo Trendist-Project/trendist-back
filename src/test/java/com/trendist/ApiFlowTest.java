@@ -263,6 +263,30 @@ class ApiFlowTest {
     }
 
     @Test
+    void botWinRenewsKeywordAlreadyHeld() throws Exception {
+        // 봇을 이기면 🔥 키워드 중 하나를 얻고, 이미 가진 키워드면 남은 시간만 24시간으로 늘린다(4.21)
+        keywordService.adminAdd("KR", "봇보상키워드");
+        String t = player("봇보상시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        boolean renewed = false;
+        for (int i = 0; i < 500 && !renewed; i++) {
+            long before = playerRepo.findById(pid).orElseThrow().getHoldCount();
+            var r = keywordService.gainFromBot(pid);
+            assertThat(r.status()).isIn("GAINED", "RENEWED");
+            long after = playerRepo.findById(pid).orElseThrow().getHoldCount();
+            if ("RENEWED".equals(r.status())) {
+                renewed = true;
+                assertThat(after).isEqualTo(before); // 보관함은 그대로
+                assertThat(r.gained()).isZero();
+                assertThat(r.expiresAt()).isAfter(java.time.Instant.now().plus(java.time.Duration.ofHours(23)));
+            } else {
+                assertThat(after).isEqualTo(before + 1);
+            }
+        }
+        assertThat(renewed).isTrue();
+    }
+
+    @Test
     void customizeUnlocksAtLevelElevenWithContrastCheck() throws Exception {
         // 꾸미기는 11레벨부터(4.9). 바닥과 비슷한 색은 거절, 테두리 두께는 1~8단계
         String t = player("꾸미기시험");

@@ -88,8 +88,9 @@ public interface KeywordService {
     KeywordDtos.OrbResult openOrb(long playerId);
 
     /**
-     * 봇을 이긴 보상(4.21): 그 나라 🔥 키워드 중 내 보관함에 없는 것 하나를 무작위로 일반 추가와 같이 넣는다(EXP +1, 24시간).
-     * 결과 형식은 구슬과 같다. status: GAINED / NONE(얻을 수 있는 🔥 키워드가 없음).
+     * 봇을 이긴 보상(4.21): 그 나라 🔥 키워드 중 하나를 무작위로 얻는다. 없던 키워드는 일반 추가와 같이 넣고(EXP +1, 24시간),
+     * 이미 가진 키워드면 사람에게서 빼앗을 때(4.3)처럼 남은 시간만 지금부터 다시 24시간으로 늘린다(점수·EXP 그대로).
+     * 결과 형식은 구슬과 같다. status: GAINED / RENEWED / NONE(🔥 키워드가 없음).
      */
     KeywordDtos.OrbResult gainFromBot(long playerId);
 }
