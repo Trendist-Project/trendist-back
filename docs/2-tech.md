@@ -359,7 +359,7 @@ record TrendBox(
 | `data_sources` | google 1, admin 1, internal 1 (10.3). 예전 DB에 남은 naver_datalab·bq_trends_rising 행은 지우고(그 소스를 쓰던 키워드는 internal로, 3명 미만이면 💤), 예전 기본값 2 그대로인 반영값은 1로 바꾼 뒤 트렌드 값과 점수를 다시 계산한다 |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
-| `titles` | 4.10의 22개를 번호 순서대로 |
+| `titles` | 4.10의 46개를 번호 순서대로(1~22는 테이블이 비어 있을 때만, 23~46은 같은 이름이 없을 때). 표시 순서는 종류별로 다시 매기되, 처음 순서(1~22) 그대로인 행만 바꾼다 |
 | `trail_effects` | 4.23의 7개(모두 FREE). 코드에 있는데 DB에 없는 코드만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리 6개와 놀이 방법 글(각 테이블이 비어 있을 때만) |

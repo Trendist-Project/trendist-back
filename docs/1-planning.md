@@ -367,10 +367,12 @@ zoom      = 1 / (1 + (radius − 16) / 170)               // 화면 배율(4.2)
 | METRIC | `{"metric": "total_plus_count", "gte": 100}` | 플레이어 수치가 기준값 이상 | 그 값이 바뀔 때 |
 | RANK | `{"metric": "current_score", "within": 10}` | 그 나라 리더보드(접속 중인 사람끼리의 순위, 4.14)에서 N위 안 | 리더보드 갱신 |
 
-- `metric`으로 쓸 수 있는 값은 `players`의 `total_plus_count`(누적 `+` 횟수), `level`, `hold_count`(지금 가진 키워드 수), `current_score`(현재 유행도), `comment_score`(댓글 점수)다. 새 지표가 필요하면 `players`에 컬럼을 추가하고 `metric` 이름만 늘린다.
+- `metric`으로 쓸 수 있는 값은 `players`의 `total_plus_count`(누적 `+` 횟수), `level`, `hold_count`(지금 가진 키워드 수), `current_score`(현재 유행도), `comment_score`(댓글 점수), `search_count`(누적 검색 횟수), `steal_count`(다른 플레이어에게서 키워드를 빼앗은 횟수, 4.3), `bot_win_count`(봇을 이겨 보상을 받은 횟수, 4.21), `orb_count`(? 구슬을 먹은 횟수, 꽝 포함, 4.20), `lose_count`(충돌로 키워드를 잃은 횟수), `active_days`(키워드를 얻은 날의 수, 그 나라 시간대로 서로 다른 날, 추가·구슬·봇·빼앗기 모두 포함)다. 새로 센 수치(`steal_count`~`active_days`)는 133판부터 세므로 그 전 기록은 들어 있지 않다. 새 지표가 필요하면 `players`에 컬럼을 추가하고 `metric` 이름만 늘린다.
 - 현재 유행도에는 EXP 점수 100이 들어 있어서 "현재 유행도 100"은 키워드 없이도 달성된다. 그래서 점수 조건은 500부터 시작한다.
 
-초기 칭호 예시 (`sort_order`는 번호 순서)
+초기 칭호 (#는 넣는 순서 = 칭호 ID. 1~22는 처음 넣은 것, 23~46은 133판에서 늘린 것)
+
+- 칭호함에는 번호가 아니라 종류별로 쉬운 것부터 보인다(`sort_order`): 추가 횟수 → 레벨 → 가진 키워드 수 → 현재 유행도 → 순위 → 댓글 점수 → 검색 → 빼앗기 → 봇 → 구슬 → 잃기 → 활동한 날. 시드는 1~22를 테이블이 비어 있을 때만 넣고, 23~46은 같은 이름이 없을 때 넣는다(이름을 바꾸면 새로 생기므로, 안 쓰는 칭호는 지우거나 이름을 바꾸지 말고 `enabled`를 끈다).
 
 | # | 칭호 | 설명 | condition_type | condition_params |
 |---|---|---|---|---|
@@ -396,6 +398,30 @@ zoom      = 1 / (1 + (radius − 16) / 170)               // 화면 배율(4.2)
 | 20 | 해설 새싹 | 댓글 점수 10점을 모았어요 | METRIC | `{"metric":"comment_score","gte":10}` |
 | 21 | 친절한 해설가 | 댓글 점수 100점을 모았어요 | METRIC | `{"metric":"comment_score","gte":100}` |
 | 22 | 해설 대장 | 댓글 점수 500점을 모았어요 | METRIC | `{"metric":"comment_score","gte":500}` |
+| 23 | 트렌드 탐험가 | 키워드를 30번 추가했어요 | METRIC | `{"metric":"total_plus_count","gte":30}` |
+| 24 | 일취월장 | 20레벨에 도달했어요 | METRIC | `{"metric":"level","gte":20}` |
+| 25 | 그랜드마스터 | 70레벨에 도달했어요 | METRIC | `{"metric":"level","gte":70}` |
+| 26 | 알뜰 수집가 | 키워드를 동시에 5개 가졌어요 | METRIC | `{"metric":"hold_count","gte":5}` |
+| 27 | 슈퍼스타 | 현재 유행도가 1,500에 도달했어요 | METRIC | `{"metric":"current_score","gte":1500}` |
+| 28 | 첫 마디 | 댓글 점수 1점을 모았어요 | METRIC | `{"metric":"comment_score","gte":1}` |
+| 29 | 호기심 많은 | 키워드를 10번 검색했어요 | METRIC | `{"metric":"search_count","gte":10}` |
+| 30 | 탐색가 | 키워드를 100번 검색했어요 | METRIC | `{"metric":"search_count","gte":100}` |
+| 31 | 정보통 | 키워드를 1,000번 검색했어요 | METRIC | `{"metric":"search_count","gte":1000}` |
+| 32 | 첫 승리 | 다른 플레이어에게서 키워드를 처음 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":1}` |
+| 33 | 사냥꾼의 본능 | 다른 플레이어에게서 키워드를 50번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":50}` |
+| 34 | 아레나의 포식자 | 다른 플레이어에게서 키워드를 300번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":300}` |
+| 35 | 봇 사냥 입문 | 봇을 10번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":10}` |
+| 36 | 봇 사냥꾼 | 봇을 100번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":100}` |
+| 37 | 기계 파괴자 | 봇을 500번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":500}` |
+| 38 | 행운 탐색자 | ? 구슬을 10개 먹었어요 | METRIC | `{"metric":"orb_count","gte":10}` |
+| 39 | 구슬 수집가 | ? 구슬을 100개 먹었어요 | METRIC | `{"metric":"orb_count","gte":100}` |
+| 40 | 구슬 마니아 | ? 구슬을 1,000개 먹었어요 | METRIC | `{"metric":"orb_count","gte":1000}` |
+| 41 | 오뚝이 | 키워드를 50번 잃고도 다시 일어났어요 | METRIC | `{"metric":"lose_count","gte":50}` |
+| 42 | 불굴 | 키워드를 300번 잃고도 포기하지 않았어요 | METRIC | `{"metric":"lose_count","gte":300}` |
+| 43 | 새내기 | 3일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":3}` |
+| 44 | 단골 | 7일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":7}` |
+| 45 | 터줏대감 | 30일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":30}` |
+| 46 | 산증인 | 100일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":100}` |
 
 ### 4.11 다른 플레이어 정보 팝업
 - PC는 다른 원을 우클릭, 모바일은 [🔍]을 누른 뒤 원을 탭하면 열린다(4.2): 아이콘·닉네임(관리자 배지)·활성 칭호, 현재 유행도·레벨·댓글 점수, 최근 7일 점수 그래프, 그 사람의 보관함 중 점수 상위 3개(이름, 상태 배지).

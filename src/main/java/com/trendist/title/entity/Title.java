@@ -20,6 +20,9 @@ public class Title extends BaseTimeEntity {
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
 
+    /** 표시 순서. 시드가 아직 처음 값 그대로인 행만 새 순서로 바꿀 때 쓴다 */
+    public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
+
     public Title(String name, String description, String conditionType, String conditionParams, int sortOrder) {
         this.name = name; this.description = description; this.conditionType = conditionType;
         this.conditionParams = conditionParams; this.sortOrder = sortOrder;

@@ -25,6 +25,7 @@ import com.trendist.setting.support.SettingKeys;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -73,6 +74,7 @@ public class KeywordServiceImpl implements KeywordService {
         String normalized = KeywordNormalizer.validate(text);
         // 검색할 때마다 플레이어의 누적 검색 횟수 +1(찾았는지·금지인지와 관계없이). 형식에 맞지 않아 거절된 입력은 세지 않는다
         players.incSearchCount(p.getId());
+        events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 검색 칭호(4.10)
         Country country = p.getCountry();
         Instant now = Instant.now(clock);
 
@@ -138,6 +140,7 @@ public class KeywordServiceImpl implements KeywordService {
         p.incTotalPlus();
         p.addExp(settings.getInt(SettingKeys.EXP_PER_PLUS)); // EXP는 💤 키워드에도 바로 준다(4.9)
         p.touchPlayed(now);
+        p.countActiveDay(now, ZoneId.of(p.getCountry().getTimezone())); // 활동한 날 칭호(4.10)
 
         if (isState(k, CodeTables.KW_INACTIVE) && k.getHolderCount() >= settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
             k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now); // 내부 확산으로 활성(4.6)
@@ -158,6 +161,8 @@ public class KeywordServiceImpl implements KeywordService {
     public KeywordDtos.OrbResult openOrb(long playerId) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        p.incOrb(); // 꽝이어도 먹은 횟수는 센다(칭호, 4.10)
+        events.publishEvent(new GameEvents.TitleCheck(p.getId()));
         // 설정 확률(기본 33%)로만 🔥활성 키워드가 나오고, 나머지는 꽝이다
         if (ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
             return new KeywordDtos.OrbResult("MISS", null, null, null, 0, null, null);
@@ -182,6 +187,8 @@ public class KeywordServiceImpl implements KeywordService {
     public KeywordDtos.OrbResult gainFromBot(long playerId) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        p.incBotWin(); // 칭호(4.10)
+        events.publishEvent(new GameEvents.TitleCheck(p.getId()));
         Instant now = Instant.now(clock);
         // 구슬과 달리 꽝이 없다. 🔥 키워드 전체에서 고른다
         List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
@@ -419,6 +426,7 @@ public class KeywordServiceImpl implements KeywordService {
         long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0;
         playerKeywords.delete(pk);
         playerKeywords.flush();
+        p.incLose(); // 칭호(4.10). removeHolding이 재합산하며 칭호를 검사한다
         removeHolding(p, keywordId, now);
         return Optional.of(new LostKeyword(text, score));
     }
@@ -441,6 +449,9 @@ public class KeywordServiceImpl implements KeywordService {
         long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0;
         playerKeywords.delete(pk);
         playerKeywords.flush();
+        loser.incLose(); // 칭호(4.10)
+        winner.incSteal();
+        events.publishEvent(new GameEvents.TitleCheck(winner.getId()));
         removeHolding(loser, keywordId, now);
 
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();

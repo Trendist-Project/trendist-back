@@ -264,6 +264,26 @@ class ApiFlowTest {
     }
 
     @Test
+    void newCounterTitlesAreGrantedFromOrbsAndActiveDays() throws Exception {
+        // 133판에서 늘린 칭호: ? 구슬 10개(꽝 포함)면 "행운 탐색자", 키워드를 얻은 첫날이면 활동한 날 1(4.10)
+        String t = player("구슬칭호시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        for (int i = 0; i < 10; i++) keywordService.openOrb(pid);
+        mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"구슬칭호키워드\"}")).andExpect(status().isOk());
+        var p = playerRepo.findById(pid).orElseThrow();
+        assertThat(p.getOrbCount()).isEqualTo(10);
+        assertThat(p.getActiveDays()).isEqualTo(1);
+        String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
+        assertThat(names).contains("행운 탐색자", "트렌드 워처");
+        java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
+        assertThat(all).hasSize(46);
+        // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
+        assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
+    }
+
+    @Test
     void botWinRenewsKeywordAlreadyHeld() throws Exception {
         // 봇을 이기면 🔥 키워드 중 하나를 얻고, 이미 가진 키워드면 남은 시간만 24시간으로 늘린다(4.21)
         keywordService.adminAdd("KR", "봇보상키워드");

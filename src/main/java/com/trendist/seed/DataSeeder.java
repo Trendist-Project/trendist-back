@@ -146,13 +146,7 @@ public class DataSeeder implements ApplicationRunner {
                 if (!existing.contains(lv)) { levels.save(new Level(lv, defaultRequiredExp(lv))); added++; }
             }
         }
-        if (titles.count() == 0) {
-            int order = 1;
-            for (String[] t : TITLES) {
-                titles.save(new Title(t[0], t[1], t[2], t[3], order++));
-                added++;
-            }
-        }
+        added += seedTitles();
         // 이동 효과(4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 효과만 넣는다(이름·조건·순서는 운영에서 고친다)
         for (int i = 0; i < TRAIL_EFFECTS.length; i++) {
             String[] t = TRAIL_EFFECTS[i];
@@ -242,6 +236,75 @@ public class DataSeeder implements ApplicationRunner {
         if (level <= 10) return early[level];
         return Math.round(100 * Math.pow(level / 10.0, 2));
     }
+
+    /**
+     * 칭호(4.10). 칭호 ID는 번역 키라서 넣는 순서를 고정한다: 처음 22개(TITLES) 다음에 133판에서 늘린 것(MORE_TITLES).
+     * 처음 22개는 테이블이 비어 있을 때만 넣고(관리자가 지운 것이 되살아나지 않게), 늘린 칭호는 같은 이름이 없을 때 넣는다.
+     * 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10. 처음 넣은 순서(1~22) 그대로인 행만 새 순서로 바꾼다.
+     */
+    private int seedTitles() {
+        int added = 0;
+        if (titles.count() == 0) {
+            for (String[] t : TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        for (String[] t : MORE_TITLES) {
+            if (titles.findByName(t[0]).isEmpty()) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        for (int i = 0; i < TITLES.length; i++) {
+            int original = i + 1;
+            titles.findByName(TITLES[i][0]).filter(t -> t.getSortOrder() == original)
+                    .ifPresent(t -> t.changeSortOrder(titleOrder(t.getName())));
+        }
+        return added;
+    }
+
+    private static int titleOrder(String name) {
+        int i = TITLE_ORDER.indexOf(name);
+        return (i < 0 ? TITLE_ORDER.size() : i) * 10 + 10;
+    }
+
+    /** 133판에서 늘린 칭호. ID가 처음 22개 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
+    private static final String[][] MORE_TITLES = {
+            {"트렌드 탐험가", "키워드를 30번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":30}"},
+            {"일취월장", "20레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":20}"},
+            {"그랜드마스터", "70레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":70}"},
+            {"알뜰 수집가", "키워드를 동시에 5개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":5}"},
+            {"슈퍼스타", "현재 유행도가 1,500에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":1500}"},
+            {"첫 마디", "댓글 점수 1점을 모았어요", "METRIC", "{\"metric\":\"comment_score\",\"gte\":1}"},
+            {"호기심 많은", "키워드를 10번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":10}"},
+            {"탐색가", "키워드를 100번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":100}"},
+            {"정보통", "키워드를 1,000번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":1000}"},
+            {"첫 승리", "다른 플레이어에게서 키워드를 처음 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":1}"},
+            {"사냥꾼의 본능", "다른 플레이어에게서 키워드를 50번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":50}"},
+            {"아레나의 포식자", "다른 플레이어에게서 키워드를 300번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":300}"},
+            {"봇 사냥 입문", "봇을 10번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":10}"},
+            {"봇 사냥꾼", "봇을 100번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":100}"},
+            {"기계 파괴자", "봇을 500번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":500}"},
+            {"행운 탐색자", "? 구슬을 10개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":10}"},
+            {"구슬 수집가", "? 구슬을 100개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":100}"},
+            {"구슬 마니아", "? 구슬을 1,000개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":1000}"},
+            {"오뚝이", "키워드를 50번 잃고도 다시 일어났어요", "METRIC", "{\"metric\":\"lose_count\",\"gte\":50}"},
+            {"불굴", "키워드를 300번 잃고도 포기하지 않았어요", "METRIC", "{\"metric\":\"lose_count\",\"gte\":300}"},
+            {"새내기", "3일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":3}"},
+            {"단골", "7일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":7}"},
+            {"터줏대감", "30일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":30}"},
+            {"산증인", "100일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":100}"},
+    };
+
+    /** 칭호함에 보이는 순서: 종류별로 쉬운 것부터 */
+    private static final List<String> TITLE_ORDER = List.of(
+            "트렌드 워처", "트렌드 탐험가", "트렌드 수집가", "트렌드 사냥꾼", "트렌드 장인", "트렌드 전설",
+            "완전체", "스타일리스트", "일취월장", "베테랑", "마스터", "그랜드마스터", "레전드",
+            "알뜰 수집가", "멀티태스커", "키워드 부자", "키워드 재벌",
+            "떠오르는 별", "큰손", "슈퍼스타", "거인",
+            "핫스타", "시상대", "정상",
+            "첫 마디", "해설 새싹", "친절한 해설가", "해설 대장",
+            "호기심 많은", "탐색가", "정보통",
+            "첫 승리", "사냥꾼의 본능", "아레나의 포식자",
+            "봇 사냥 입문", "봇 사냥꾼", "기계 파괴자",
+            "행운 탐색자", "구슬 수집가", "구슬 마니아",
+            "오뚝이", "불굴",
+            "새내기", "단골", "터줏대감", "산증인");
 
     /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */
     private static final String[][] TRAIL_EFFECTS = {

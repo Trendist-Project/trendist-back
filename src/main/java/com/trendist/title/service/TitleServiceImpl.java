@@ -75,6 +75,12 @@ public class TitleServiceImpl implements TitleService {
             case "hold_count" -> p.getHoldCount();
             case "current_score" -> p.getCurrentScore();
             case "comment_score" -> p.getCommentScore();
+            case "search_count" -> p.getSearchCount();
+            case "steal_count" -> p.getStealCount();
+            case "bot_win_count" -> p.getBotWinCount();
+            case "orb_count" -> p.getOrbCount();
+            case "lose_count" -> p.getLoseCount();
+            case "active_days" -> p.getActiveDays();
             default -> 0;
         };
     }
