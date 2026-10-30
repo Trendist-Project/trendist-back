@@ -23,6 +23,8 @@ public class Guide extends BaseTimeEntity {
 
     /** 지운 글(소프트 삭제). 목록에서 빠진다 */
     public void delete(Instant now) { this.deletedAt = now; }
+    /** 시드 글 고침(DataSeeder): 본문만 바꾼다 */
+    public void changeBody(String body) { this.body = body; }
 
     public Guide(GuideCategory category, User author, String title, String body, int sortOrder) {
         this.guideCategory = category; this.user = author; this.title = title; this.body = body; this.sortOrder = sortOrder;

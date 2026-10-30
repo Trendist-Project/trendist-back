@@ -231,7 +231,32 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         if (guides.count() == 0) added += insertGuideArticles();
-        return added;
+        return added + reviseGuides();
+    }
+
+    /** 시드 뒤에 고친 글(GuideSeed.REVISIONS). 관리자가 고친 글(본문이 예전 시드와 다름)과 지운 글은 건드리지 않는다. */
+    private int reviseGuides() {
+        int changed = 0;
+        for (GuideSeed.Revision r : GuideSeed.REVISIONS) {
+            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(r.code()).orElse(null);
+            if (category == null) continue;
+            List<Guide> list = guides.findByGuideCategoryIdAndDeletedAtIsNullOrderBySortOrderAscIdAsc(category.getId());
+            String body = GuideSeed.article(r.code(), r.title()).body();
+            Guide same = list.stream().filter(g -> g.getTitle().equals(r.title())).findFirst().orElse(null);
+            if (r.oldBody() != null) {
+                if (same != null && same.getBody().equals(r.oldBody())) { same.changeBody(body); changed++; }
+                continue;
+            }
+            if (same != null) continue;
+            // 기준 글과 같은 순서 값이면 id가 커서 바로 뒤에 온다. 기준이 없으면 맨 앞
+            long order = r.after() == null ? list.stream().mapToLong(Guide::getSortOrder).min().orElse(1) - 1
+                    : list.stream().filter(g -> g.getTitle().equals(r.after())).mapToLong(Guide::getSortOrder).findFirst()
+                    .orElse(list.stream().mapToLong(Guide::getSortOrder).max().orElse(0));
+            guides.save(new Guide(category, operator(), r.title(), body, Math.toIntExact(order)));
+            changed++;
+        }
+        if (changed > 0) log.info("가이드 글 {}개 고침·추가", changed);
+        return changed;
     }
 
     private int insertGuideArticles() {
