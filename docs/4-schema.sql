@@ -148,7 +148,7 @@ CREATE TABLE keywords (
   keyword_state_id BIGINT NOT NULL COMMENT '키워드 상태 ID(활성/비활성/금지)',
   text             VARCHAR(20) NOT NULL COMMENT '표시용 키워드(최대 20자, 입력한 표기 유지)',
   normalized       VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '정규화 키워드(같은 단어 판정용 유일 키, 바이트 비교. NFKC·소문자·공백 제거, 규칙은 4.18)',
-  trend_value      BIGINT NOT NULL DEFAULT 0 COMMENT '트렌드 값(0~100 정수, 반올림). 활성 상태면 반영 소스 가중치 × (10 + 40 × g(holder_count)), 그 외 0. g는 4.8. 키워드 점수 = trend_value',
+  trend_value      BIGINT NOT NULL DEFAULT 0 COMMENT '트렌드 값(0~100 정수, 반올림). 활성 상태면 반영 소스 가중치 × (3 + 47 × g(가진 비율)), 그 외 0. 가진 비율 = holder_count / 그 나라 활동 인원, g는 4.8. 키워드 점수 = trend_value',
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '누적 검색 수(매시 메모리 카운터를 더함)',
   total_plus_count BIGINT NOT NULL DEFAULT 0 COMMENT '누적 + 수(삭제·잃기로 줄지 않음)',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진 사람 수(player_keywords 행 수 캐시)',

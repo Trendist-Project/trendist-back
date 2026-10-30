@@ -58,6 +58,8 @@ public class KeywordJobs {
             }
         } while (ids.size() == 500);
 
+        // 활동 인원이 바뀌거나 관리자가 식의 설정을 바꾸면 트렌드 값이 달라진다. 바뀐 키워드는 아래에서 보유자 점수를 다시 합산한다
+        try { keywordService.refreshTrendValues(); } catch (RuntimeException e) { log.warn("trend refresh failed", e); }
         Set<Long> playerIds = new HashSet<>();
         for (Long keywordId : keywordService.drainDirtyKeywords()) playerIds.addAll(keywordService.holderPlayerIds(keywordId));
         for (Long pid : playerIds) {

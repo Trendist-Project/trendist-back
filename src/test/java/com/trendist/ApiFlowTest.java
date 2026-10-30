@@ -69,14 +69,14 @@ class ApiFlowTest {
 
     @Test
     void trendFormulaMatchesDocumentTable() {
-        // 4.8 표: 외부(w=2) 0명 20.0, 100명 53.2, 1000명 100 / 내부(w=1) 3명 11.1
-        // 점수는 정수로 반올림한다: 20.0 → 20, 20.75 → 21, 53.2 → 53, 11.1 → 11
-        assertThat(formula.trendValue(true, 0, 2)).isEqualTo(20);
-        assertThat(formula.trendValue(true, 1, 2)).isEqualTo(21);
-        assertThat(formula.trendValue(true, 100, 2)).isEqualTo(53);
-        assertThat(formula.trendValue(true, 1000, 2)).isEqualTo(100);
-        assertThat(formula.trendValue(true, 3, 1)).isEqualTo(11);
-        assertThat(formula.trendValue(false, 50, 2)).isZero();
+        // 4.8: 가진 비율 = 가진 사람 / max(활동 인원, 최소 인원 20), 50%에서 최고점. 정수로 반올림한다
+        assertThat(formula.trendValue(true, 0, 1, 0)).isEqualTo(3);     // 가진 사람이 없으면 기본 비율
+        assertThat(formula.trendValue(true, 1, 1, 5)).isEqualTo(12);    // 5명뿐이어도 최소 인원 20으로 계산(1/20)
+        assertThat(formula.trendValue(true, 5, 1, 20)).isEqualTo(34);   // 25%
+        assertThat(formula.trendValue(true, 25, 1, 100)).isEqualTo(34); // 인원이 늘어도 같은 비율이면 같은 점수
+        assertThat(formula.trendValue(true, 50, 1, 100)).isEqualTo(50); // 50%에서 최고점
+        assertThat(formula.trendValue(true, 80, 1, 100)).isEqualTo(50); // 그 이상은 같다
+        assertThat(formula.trendValue(false, 50, 1, 100)).isZero();
     }
 
     @Test
@@ -251,7 +251,7 @@ class ApiFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FOUND"))
                 .andExpect(jsonPath("$.keyword.state").value("활성"))
-                .andExpect(jsonPath("$.keyword.trendValue").value(10));
+                .andExpect(jsonPath("$.keyword.trendValue").value(3));
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔깐루\"}"))
                 .andExpect(status().isOk())
@@ -262,10 +262,10 @@ class ApiFlowTest {
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔 깐루\"}"))
                 .andExpect(status().isConflict());
-        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 10(반영값 1, 10.37을 반올림) = 11, 정수
+        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 12(활동 인원이 최소 인원 20보다 적어 1/20로 계산) = 13, 정수
         MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
         Object score = JsonPath.read(me.getResponse().getContentAsString(), "$.player.currentScore");
-        assertThat(score).isEqualTo(11);
+        assertThat(score).isEqualTo(13);
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
         // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다

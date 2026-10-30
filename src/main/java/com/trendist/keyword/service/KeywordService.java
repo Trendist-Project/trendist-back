@@ -60,6 +60,12 @@ public interface KeywordService {
     /** 관리자 금지·해제(13.1). 금지하면 트렌드 값이 0이 되어 보유자 점수에서 바로 빠지고, 해제하면 💤비활성이다. */
     AdminKeywordRow adminBan(long keywordId, boolean banned);
 
+    /**
+     * 1분 점검(4.8): 나라별 활동 인원을 다시 세고, 🔥 키워드 중 지금 식으로 구한 트렌드 값이 저장값과 다른 것만 고친다.
+     * 활동 인원 변화와 관리자 설정 변경(13.3)이 여기서 반영된다. 고친 키워드 수를 돌려준다.
+     */
+    int refreshTrendValues();
+
     /** 트렌드 값이 바뀐 키워드를 비우면서 돌려준다. 1분 잡이 보유자 점수를 다시 합산한다(9.4). */
     Set<Long> drainDirtyKeywords();
 

@@ -10,7 +10,8 @@ public final class SettingKeys {
 
     public record Def(String name, String value, double min, double max, String description) {}
 
-    public static final String TREND_BASE_POPULATION = "trend_base_population";
+    public static final String TREND_FULL_SHARE = "trend_full_share";
+    public static final String TREND_MIN_POPULATION = "trend_min_population";
     public static final String TREND_LOG_SOFTNESS = "trend_log_softness";
     public static final String TREND_BASE_RATIO = "trend_base_ratio";
     public static final String TREND_MAX_BASE = "trend_max_base";
@@ -56,6 +57,8 @@ public final class SettingKeys {
      * (관리자가 직접 바꾼 값은 그대로 둔다).
      */
     public static final Map<String, Set<String>> REPLACED_DEFAULTS = Map.of(
+            // 트렌드 값을 고정 인원(1,000명)이 아니라 활동 인원 대비 비율로 계산하면서 기본 점수와 완만도의 단위가 바뀜(4.8)
+            TREND_BASE_RATIO, Set.of("10"), TREND_LOG_SOFTNESS, Set.of("30"),
             // 봇 상한: 1등 × 1.5 → 1등 × 0.7 → 접속 중인 사람 평균 × 1.0(4.21). 운영 DB에 들어간 1.1도 1.0으로 맞춘다
             BOT_CAP_RATIO, Set.of("1.5", "0.7", "1.1"),
             // 세이프존을 더 크게, 무작위 존을 2배로(4.22)
@@ -63,9 +66,11 @@ public final class SettingKeys {
             SAFE_ZONE_MIN, Set.of("400"), SAFE_ZONE_DENSITY, Set.of("6"), SAFE_ZONE_MAX, Set.of("40"));
 
     public static final List<Def> DEFAULTS = List.of(
-            new Def(TREND_BASE_POPULATION, "1000", 1, 10000, "트렌드 값 식의 기준 인원(g(n)=1)"),
-            new Def(TREND_LOG_SOFTNESS, "30", 0.0001, 100000, "로그 완만도"),
-            new Def(TREND_BASE_RATIO, "10", 0, 100, "기본 비율"),
+            // 트렌드 값(4.8): 가진 비율 s = 가진 사람 / max(활동 인원, 최소 인원). s가 최고점 비율이면 최대 기준값
+            new Def(TREND_FULL_SHARE, "0.5", 0.01, 1, "최고점 비율: 활동 인원 중 이 비율이 가지면 최대 기준값(그 이상은 같음)"),
+            new Def(TREND_MIN_POPULATION, "20", 1, 10000, "최소 인원: 활동 인원(키워드를 가진 플레이어)이 이보다 적으면 이 수로 계산"),
+            new Def(TREND_LOG_SOFTNESS, "0.3", 0.0001, 100000, "로그 완만도: 작을수록 처음 몇 명에서 크게 오르고, 클수록 비율에 비례"),
+            new Def(TREND_BASE_RATIO, "3", 0, 100, "기본 비율: 가진 사람이 없는 🔥 키워드의 점수"),
             new Def(TREND_MAX_BASE, "50", 1, 50, "최대 기준값(× 최대 가중치 2 ≤ 100)"),
             new Def(EXTERNAL_CONFIRM_HEAT, "10", 0, 100, "외부 확인 관심도"),
             new Def(EXP_SCORE_CAP, "100", 0, 1000, "EXP 점수 반영 상한"),

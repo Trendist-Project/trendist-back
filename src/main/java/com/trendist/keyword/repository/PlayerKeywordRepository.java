@@ -27,6 +27,13 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     long sumActiveTrendValue(@Param("playerId") Long playerId, @Param("now") Instant now,
                                    @Param("activeStateId") Long activeStateId);
 
+    /** 나라별 활동 인원: 만료 전 키워드를 하나 이상 가진 플레이어 수(탈퇴 제외, 4.8). [country_id, count] */
+    @Query("""
+            select p.country.id, count(distinct p.id) from PlayerKeyword pk join pk.player p join p.user u
+            where pk.expiresAt > :now and u.userState.id <> :withdrawnStateId
+            group by p.country.id""")
+    List<Object[]> countHoldingPlayersByCountry(@Param("now") Instant now, @Param("withdrawnStateId") Long withdrawnStateId);
+
     @Query("select count(pk) from PlayerKeyword pk where pk.player.id = :playerId and pk.expiresAt > :now")
     long countUnexpired(@Param("playerId") Long playerId, @Param("now") Instant now);
 

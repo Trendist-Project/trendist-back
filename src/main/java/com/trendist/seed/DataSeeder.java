@@ -13,6 +13,7 @@ import com.trendist.keyword.entity.KeywordState;
 import com.trendist.keyword.repository.DataSourceRepository;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.KeywordStateRepository;
+import com.trendist.keyword.support.ActivePopulation;
 import com.trendist.keyword.support.TrendFormula;
 import com.trendist.player.entity.Level;
 import com.trendist.player.repository.LevelRepository;
@@ -55,6 +56,8 @@ public class DataSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
     /** 125판에서 없앤 데이터 소스. 예전 DB에 남아 있으면 지운다. */
     private static final List<String> REMOVED_SOURCES = List.of("naver_datalab", "bq_trends_rising");
+    /** 쓰지 않게 된 설정. 예전 DB에 남아 있으면 지운다(128판: 기준 인원은 활동 인원으로 바뀜, 4.8). */
+    private static final List<String> REMOVED_SETTINGS = List.of("trend_base_population");
     /** 124판까지 외부 소스의 기본 반영값. 이 값 그대로인 행은 1로 바꾼다. */
     private static final BigDecimal OLD_DEFAULT_WEIGHT = new BigDecimal("2");
 
@@ -74,6 +77,7 @@ public class DataSeeder implements ApplicationRunner {
     private final PlayerService playerService;
     private final SettingService settingService;
     private final TrendFormula formula;
+    private final ActivePopulation population;
     private final Clock clock;
     private final CodeTables codeTables;
 
@@ -110,6 +114,9 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
+        for (String name : REMOVED_SETTINGS) {
+            settings.findByName(name).ifPresent(s -> { settings.delete(s); log.info("설정 삭제: {}", name); });
+        }
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
             if (settings.findByName(d.name()).isEmpty()) {
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
@@ -123,8 +130,10 @@ public class DataSeeder implements ApplicationRunner {
                     s.changeValue(d.value());
                     changed = true;
                 }
-                // 설명은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게)
+                // 설명과 값 형식은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
                 if (!d.description().equals(s.getDescription())) { s.changeDescription(d.description()); changed = true; }
+                String type = d.value().contains(".") ? "DECIMAL" : "INT";
+                if (!type.equals(s.getValueType())) { s.changeValueType(type); changed = true; }
                 if (changed) settings.save(s);
             }
         }
@@ -182,7 +191,7 @@ public class DataSeeder implements ApplicationRunner {
         if (!changed) return;
         for (Keyword k : keywords.findAll()) {
             k.setTrendValue(formula.trendValue(k.getKeywordState().getId().equals(active.getId()), k.getHolderCount(),
-                    k.getDataSource().getWeight().doubleValue()));
+                    k.getDataSource().getWeight().doubleValue(), population.get(k.getCountry().getId())));
         }
         keywords.flush();
         for (Long pid : players.findCheckTargets()) playerService.recomputeLocked(pid, true);

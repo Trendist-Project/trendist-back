@@ -28,4 +28,7 @@ public class Setting extends BaseTimeEntity {
     public void changeValue(String value) { this.value = value; }
 
     public void changeDescription(String description) { this.description = description; }
+
+    /** 값 형식(INT·DECIMAL). 기본값의 형식이 바뀐 설정을 시더가 맞춘다. */
+    public void changeValueType(String valueType) { this.valueType = valueType; }
 }

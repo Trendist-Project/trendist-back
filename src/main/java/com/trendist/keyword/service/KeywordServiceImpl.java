@@ -13,6 +13,7 @@ import com.trendist.keyword.entity.PlayerKeyword;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
 import com.trendist.keyword.source.ExternalTrendSource;
+import com.trendist.keyword.support.ActivePopulation;
 import com.trendist.keyword.support.KeywordNormalizer;
 import com.trendist.keyword.support.SearchCounter;
 import com.trendist.keyword.support.TrendFormula;
@@ -48,6 +49,7 @@ public class KeywordServiceImpl implements KeywordService {
     private final PlayerRepository players;
     private final PlayerService playerService;
     private final TrendFormula formula;
+    private final ActivePopulation population;
     private final SettingService settings;
     private final CodeTables codes;
     private final List<ExternalTrendSource> sources;
@@ -440,6 +442,31 @@ public class KeywordServiceImpl implements KeywordService {
         events.publishEvent(new GameEvents.HoldingChanged(p.getCountry().getId(), p.getId(), keywordId, false));
     }
 
+    @Override
+    public int refreshTrendValues() {
+        population.refresh();
+        Long activeId = codes.keywordStateId(CodeTables.KW_ACTIVE);
+        int changed = 0;
+        for (Keyword k : keywords.findAllByStateWithSource(activeId)) {
+            long v = formula.trendValue(true, k.getHolderCount(), k.getDataSource().getWeight().doubleValue(),
+                    population.get(k.getCountry().getId()));
+            if (v == k.getTrendValue()) continue;
+            try {
+                // 그 사이 +·삭제로 바뀌었을 수 있으니 행을 잠그고 다시 계산한다. 키워드 행만 잠그므로 플레이어 → 키워드 잠금 순서와 부딪히지 않는다
+                Boolean r = tx.execute(st -> keywords.findByIdForUpdate(k.getId()).map(locked -> {
+                    long old = locked.getTrendValue();
+                    long nw = updateTrend(locked);
+                    publishTrendChange(locked, old, nw, null);
+                    return old != nw;
+                }).orElse(false));
+                if (Boolean.TRUE.equals(r)) changed++;
+            } catch (RuntimeException e) {
+                log.warn("trend refresh {} failed", k.getId(), e);
+            }
+        }
+        return changed;
+    }
+
     /** 1분 잡: 트렌드 값이 바뀐 키워드의 보유자 점수를 DB 기준으로 다시 합산한다. */
     @Override
     public Set<Long> drainDirtyKeywords() {
@@ -503,7 +530,8 @@ public class KeywordServiceImpl implements KeywordService {
     }
 
     private long updateTrend(Keyword k) {
-        long v = formula.trendValue(isState(k, CodeTables.KW_ACTIVE), k.getHolderCount(), k.getDataSource().getWeight().doubleValue());
+        long v = formula.trendValue(isState(k, CodeTables.KW_ACTIVE), k.getHolderCount(), k.getDataSource().getWeight().doubleValue(),
+                population.get(k.getCountry().getId()));
         k.setTrendValue(v);
         return v;
     }

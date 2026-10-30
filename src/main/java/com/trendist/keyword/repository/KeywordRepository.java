@@ -18,6 +18,10 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("select k from Keyword k where k.id = :id")
     Optional<Keyword> findByIdForUpdate(@Param("id") Long id);
 
+    /** 한 상태의 키워드 전체와 반영 소스(1분 트렌드 값 점검). */
+    @Query("select k from Keyword k join fetch k.dataSource where k.keywordState.id = :stateId")
+    List<Keyword> findAllByStateWithSource(@Param("stateId") Long stateId);
+
     /** 그 소스를 반영 소스로 쓰는 키워드. */
     List<Keyword> findByDataSourceId(Long dataSourceId);
 
