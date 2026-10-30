@@ -37,7 +37,8 @@ public class NoticeServiceImpl implements NoticeService {
         return notices.findByDeletedAtIsNullOrderByPinnedDescCreatedAtDesc(PageRequest.of(0, LIMIT)).stream()
                 .map(n -> new NoticeItem(n.getId(), n.getTitle(), n.getBody(), n.isPinned(), n.getCreatedAt(),
                         n.getUpdatedAt().isAfter(n.getCreatedAt().plus(EDIT_GRACE)),
-                        n.getCreatedAt().isAfter(now.minus(FRESH))))
+                        n.getCreatedAt().isAfter(now.minus(FRESH)),
+                        n.isPopupEnabled() && n.getPopupUntil() != null && n.getPopupUntil().isAfter(now)))
                 .toList();
     }
 

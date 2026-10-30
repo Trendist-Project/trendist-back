@@ -216,9 +216,11 @@ class ApiFlowTest {
         var created = noticeService.create(admin, req);
         assertThat(created.title()).isEqualTo("점검 안내");
         assertThat(created.popupDays()).isEqualTo(3);
-        mvc.perform(get("/api/notices")).andExpect(jsonPath("$[?(@.id == " + created.id() + ")].pinned").value(true));
+        mvc.perform(get("/api/notices")).andExpect(jsonPath("$[?(@.id == " + created.id() + ")].pinned").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + created.id() + ")].popup").value(true)); // 팝업 기간 안
         var updated = noticeService.update(created.id(), new com.trendist.notice.dto.AdminNoticeDtos.Request("점검 안내(수정)", "본문", false, false, null));
         assertThat(updated.popupUntil()).isNull();
+        mvc.perform(get("/api/notices")).andExpect(jsonPath("$[?(@.id == " + created.id() + ")].popup").value(false));
         assertThat(updated.pinned()).isFalse();
         // 제목 50자 초과, 빈 본문, 팝업 기간 범위 밖은 거절
         assertThatThrownBy(() -> noticeService.create(admin, new com.trendist.notice.dto.AdminNoticeDtos.Request("가".repeat(51), "본문", false, false, null)))
