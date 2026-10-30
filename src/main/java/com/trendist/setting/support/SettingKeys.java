@@ -51,6 +51,7 @@ public final class SettingKeys {
     public static final String SAFE_ZONE_DENSITY = "safe_zone_density";
     public static final String SAFE_ZONE_MAX = "safe_zone_max";
     public static final String SAFE_ZONE_SECONDS = "safe_zone_seconds";
+    public static final String CUSTOMIZE_UNLOCK_LEVEL = "customize_unlock_level";
 
     /**
      * 기본값을 바꾼 설정과 예전 기본값들. 시더는 기존 행을 덮어쓰지 않지만, 아직 예전 기본값 그대로인 행만 새 기본값으로 바꾼다
@@ -112,5 +113,6 @@ public final class SettingKeys {
             new Def(SAFE_ZONE_DENSITY, "12", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
             new Def(SAFE_ZONE_MAX, "80", 0, 300, "무작위 세이프존 동시 개수 상한"),
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
+            new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꿀 수 있다"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

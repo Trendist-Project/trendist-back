@@ -54,6 +54,7 @@ class ApiFlowTest {
     @Autowired PlayerService playerService;
     @Autowired ScoreHistoryService scoreHistory;
     @Autowired KeywordActivityService activityService;
+    @Autowired com.trendist.player.repository.PlayerRepository playerRepo;
 
     private String guest() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -259,6 +260,29 @@ class ApiFlowTest {
         mvc.perform(put("/api/me/title").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"titleId\":" + owned.getFirst() + "}")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.activeTitleId").value(owned.getFirst()));
+    }
+
+    @Test
+    void customizeUnlocksAtLevelElevenWithContrastCheck() throws Exception {
+        // 꾸미기는 11레벨부터(4.9). 바닥과 비슷한 색은 거절, 테두리 두께는 1~8단계
+        String t = player("꾸미기시험");
+        mvc.perform(get("/api/me/profile").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.unlocked").value(false)).andExpect(jsonPath("$.presets.length()").value(24));
+        String good = "{\"background\":\"#FF6B6B\",\"borderColor\":\"#ffffff\",\"borderWidth\":4}";
+        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
+                .andExpect(status().isForbidden());
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(121); p.setLevel(11); });
+        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"background\":\"#222b38\"}")).andExpect(status().isBadRequest()); // 바닥색과 거의 같다
+        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"background\":\"#ff6b6b\",\"borderWidth\":9}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.look.background").value("#ff6b6b")).andExpect(jsonPath("$.look.borderWidth").value(4));
+        // 5초에 한 번
+        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test

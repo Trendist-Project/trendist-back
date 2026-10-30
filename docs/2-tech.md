@@ -165,6 +165,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `POST /api/auth/withdraw` | `{ "phrase": "탈퇴 합니다." }`. 탈퇴(4.1): 문구가 다르면 400 `WITHDRAW_PHRASE`, 게스트면 400 `WITHDRAW_GUEST`. 갱신 토큰 폐기, 쿠키 삭제(204) |
 | `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 떼기). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
+| `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
 - 투표 토글: 없음 → INSERT, 같은 값 → DELETE, 반대 값 → UPDATE. 조건부 쿼리의 영향 행 수가 1일 때만 `comments.like_count`·`dislike_count`를 바꾸고, 같은 때 작성자의 `comment_score`도 같이 바꾼다(추천 +1, 비추천 −1, 취소·변경은 반대로, `GREATEST(값, 0)`으로 0 아래 방지). 첫 투표 경합은 UNIQUE 오류 후 다시 읽어 처리한다.

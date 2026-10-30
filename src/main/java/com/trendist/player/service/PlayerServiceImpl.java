@@ -5,12 +5,15 @@ import com.trendist.common.exception.ApiException;
 import com.trendist.country.entity.Country;
 import com.trendist.country.service.CountryService;
 import com.trendist.game.event.GameEvents;
+import com.trendist.game.room.Room;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
 import com.trendist.keyword.support.TrendFormula;
 import com.trendist.player.dto.PlayerDtos;
 import com.trendist.player.entity.Player;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.support.NicknameValidator;
+import com.trendist.profile.entity.Profile;
+import com.trendist.profile.repository.ProfileRepository;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.title.entity.Title;
@@ -39,6 +42,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final ApplicationEventPublisher events;
     private final SettingService settings;
     private final TitleRepository titles;
+    private final ProfileRepository profiles;
     private final Clock clock;
 
     @Override
@@ -56,8 +60,10 @@ public class PlayerServiceImpl implements PlayerService {
         return findCurrent(userId).map(p -> {
             String title = p.getTitleId() == null ? null
                     : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
+            var look = profiles.findFirstByPlayerIdAndEquippedTrue(p.getId());
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
-                    p.getTotalPlusCount() == 0, title);
+                    p.getTotalPlusCount() == 0, title, look.map(Profile::getBackgroundColor).orElse(Room.DEFAULT_BACKGROUND),
+                    look.map(Profile::getBorderColor).orElse(null), look.map(Profile::getBorderWidth).orElse(null));
         });
     }
 

@@ -24,4 +24,7 @@ public final class GameEvents {
 
     /** 활성 칭호가 바뀌었다(title이 null이면 숨김). 접속 중이면 방의 이름표 아래 칭호를 바꾼다. */
     public record TitleChanged(long countryId, long playerId, String title) {}
+
+    /** 꾸미기가 바뀌었다(4.9). 접속 중이면 방의 원 모습을 바꾼다. */
+    public record LookChanged(long countryId, long playerId, String background, String borderColor, Integer borderWidth) {}
 }

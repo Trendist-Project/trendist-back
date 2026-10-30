@@ -175,6 +175,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         if (r != null) r.submit(room -> room.applyTitle(e.playerId(), e.title()));
     }
 
+    @TransactionalEventListener(fallbackExecution = true)
+    public void on(GameEvents.LookChanged e) {
+        Room r = rooms.get(e.countryId());
+        if (r != null) r.submit(room -> room.applyLook(e.playerId(), e.background(), e.borderColor(), e.borderWidth()));
+    }
+
     /** 새 칭호를 받았다(4.10). 접속 중이면 그 사람에게만 알린다. */
     @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.TitleGranted e) {
