@@ -139,8 +139,7 @@ public class KeywordServiceImpl implements KeywordService {
         k.incTotalPlus();
         p.incTotalPlus();
         p.addExp(settings.getInt(SettingKeys.EXP_PER_PLUS)); // EXP는 💤 키워드에도 바로 준다(4.9)
-        p.touchPlayed(now);
-        p.countActiveDay(now, ZoneId.of(p.getCountry().getTimezone())); // 활동한 날 칭호(4.10)
+        p.touchPlayed(now, ZoneId.of(p.getCountry().getTimezone())); // 활동한 날 칭호(4.10)
 
         if (isState(k, CodeTables.KW_INACTIVE) && k.getHolderCount() >= settings.getInt(SettingKeys.ACTIVATE_HOLDERS)) {
             k.activate(codes.keywordState(CodeTables.KW_ACTIVE), now); // 내부 확산으로 활성(4.6)

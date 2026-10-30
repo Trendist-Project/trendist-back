@@ -33,6 +33,7 @@ public class Player extends BaseTimeEntity {
     @Column(name = "comment_score", nullable = false) private long commentScore;
     /** 누적 검색 횟수(4.4). 검색할 때마다 +1. 줄지 않는다. */
     @Column(name = "search_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long searchCount;
+    /** 마지막으로 키워드를 얻은 시각(처음 만든 시각 포함). 활동한 날을 셀 때 하루에 한 번만 세는 기준이다 */
     @Column(name = "last_played_at", columnDefinition = "DATETIME(6)") private Instant lastPlayedAt;
     // 칭호용 누적 수치(4.10). 모두 줄지 않는다. 예전 행에도 0이 들어가게 DEFAULT를 둔다
     /** 다른 플레이어에게서 키워드를 빼앗은 횟수(4.3) */
@@ -43,9 +44,8 @@ public class Player extends BaseTimeEntity {
     @Column(name = "orb_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long orbCount;
     /** 충돌로 키워드를 잃은 횟수(4.3) */
     @Column(name = "lose_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long loseCount;
-    /** 키워드를 얻은 날의 수(나라 시간대 기준으로 서로 다른 날). last_active_day는 마지막으로 센 날 */
+    /** 키워드를 얻은 날의 수(나라 시간대 기준으로 서로 다른 날, 처음 만든 날 포함) */
     @Column(name = "active_days", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long activeDays;
-    @Column(name = "last_active_day") private LocalDate lastActiveDay;
 
     public Player(User user, Country country, String nickname) {
         this.user = user; this.country = country; this.nickname = nickname;
@@ -58,18 +58,15 @@ public class Player extends BaseTimeEntity {
     public void incHold() { this.holdCount++; }
     public void decHold() { this.holdCount = Math.max(0, holdCount - 1); }
     public void setHoldCount(long holdCount) { this.holdCount = Math.max(0, holdCount); }
-    public void touchPlayed(Instant now) { this.lastPlayedAt = now; }
+    /** 플레이했다(만들기·키워드 얻기). 직전 플레이와 그 나라 시간대로 다른 날이면 활동한 날 +1(4.10) */
+    public void touchPlayed(Instant now, ZoneId zone) {
+        if (lastPlayedAt == null || !LocalDate.ofInstant(lastPlayedAt, zone).equals(LocalDate.ofInstant(now, zone))) activeDays++;
+        this.lastPlayedAt = now;
+    }
     public void incSteal() { this.stealCount++; }
     public void incBotWin() { this.botWinCount++; }
     public void incOrb() { this.orbCount++; }
     public void incLose() { this.loseCount++; }
-    /** 키워드를 얻었다. 그 나라 시간대로 오늘 처음이면 활동한 날 +1 */
-    public void countActiveDay(Instant now, ZoneId zone) {
-        LocalDate today = LocalDate.ofInstant(now, zone);
-        if (today.equals(lastActiveDay)) return;
-        this.lastActiveDay = today;
-        this.activeDays++;
-    }
     /** 활성 칭호(4.10). null이면 숨김. 가진 칭호인지는 서비스가 확인한다. */
     public void changeTitle(Long titleId) { this.titleId = titleId; }
     /** 이동 효과(4.23). null이면 끔. 얻었는지는 서비스가 확인한다. */

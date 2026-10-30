@@ -339,7 +339,7 @@ record TrendBox(
 
 ### 11.3 스키마 자동 반영과 초기 데이터 (개발·테스트)
 스키마
-- 애플리케이션이 시작할 때마다 JPA(Hibernate)가 엔티티를 보고 DB 스키마를 맞춘다(`spring.jpa.hibernate.ddl-auto=update`). 엔티티에 테이블·컬럼·인덱스를 추가하면 다음 실행에 반영된다. 이 환경에서는 Flyway를 끈다.
+- 애플리케이션이 시작할 때마다 JPA(Hibernate)가 엔티티를 보고 DB 스키마를 맞춘다(`spring.jpa.hibernate.ddl-auto=update`). 엔티티에 테이블·컬럼·인덱스를 추가하면 다음 실행에 반영된다. 이 환경에서는 Flyway를 끈다. `update`는 컬럼을 지우지 않으므로, 엔티티에서 뺀 컬럼은 시작할 때 `DroppedColumns`가 있으면 지운다(시더보다 먼저, 트랜잭션 밖에서. 136판: `players.last_active_day`).
 - `update`는 새 테이블·컬럼·인덱스를 추가하지만 컬럼 이름 변경, 타입 변경, 컬럼·테이블 삭제는 하지 않는다. 그런 변경을 했거나 스키마가 꼬였을 때는 아래 빠른 초기화를 쓴다.
 - 엔티티가 만드는 스키마가 17절(`4-schema.sql`)과 같아지도록 `columnDefinition`, `@Table(indexes, uniqueConstraints)`, `@Comment`로 맞춘다. JPA로 표현하기 어려운 것(`utf8mb4_bin` 콜레이션, `DEFAULT CURRENT_TIMESTAMP(6)`, `guides`의 ngram FULLTEXT 인덱스)은 `columnDefinition`이나 시작 시 보조 SQL로 처리한다(없을 때만 만든다).
 

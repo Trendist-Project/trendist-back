@@ -367,7 +367,7 @@ zoom      = 1 / (1 + (radius − 16) / 170)               // 화면 배율(4.2)
 | METRIC | `{"metric": "total_plus_count", "gte": 100}` | 플레이어 수치가 기준값 이상 | 그 값이 바뀔 때 |
 | RANK | `{"metric": "current_score", "within": 10}` | 그 나라 리더보드(접속 중인 사람끼리의 순위, 4.14)에서 N위 안 | 리더보드 갱신 |
 
-- `metric`으로 쓸 수 있는 값은 `players`의 `total_plus_count`(누적 `+` 횟수), `level`, `hold_count`(지금 가진 키워드 수), `current_score`(현재 유행도), `comment_score`(댓글 점수), `search_count`(누적 검색 횟수), `steal_count`(다른 플레이어에게서 키워드를 빼앗은 횟수, 4.3), `bot_win_count`(봇을 이겨 보상을 받은 횟수, 4.21), `orb_count`(? 구슬을 먹은 횟수, 꽝 포함, 4.20), `lose_count`(충돌로 키워드를 잃은 횟수), `active_days`(키워드를 얻은 날의 수, 그 나라 시간대로 서로 다른 날, 추가·구슬·봇·빼앗기 모두 포함)다. 새로 센 수치(`steal_count`~`active_days`)는 133판부터 세므로 그 전 기록은 들어 있지 않다. 새 지표가 필요하면 `players`에 컬럼을 추가하고 `metric` 이름만 늘린다.
+- `metric`으로 쓸 수 있는 값은 `players`의 `total_plus_count`(누적 `+` 횟수), `level`, `hold_count`(지금 가진 키워드 수), `current_score`(현재 유행도), `comment_score`(댓글 점수), `search_count`(누적 검색 횟수), `steal_count`(다른 플레이어에게서 키워드를 빼앗은 횟수, 4.3), `bot_win_count`(봇을 이겨 보상을 받은 횟수, 4.21), `orb_count`(? 구슬을 먹은 횟수, 꽝 포함, 4.20), `lose_count`(충돌로 키워드를 잃은 횟수), `active_days`(플레이한 날의 수: 플레이어를 만든 날과 키워드를 얻은 날, 그 나라 시간대로 서로 다른 날, 추가·구슬·봇·빼앗기 모두 포함. 136판부터 `last_played_at`과 날짜가 다를 때 센다)다. 새로 센 수치(`steal_count`~`active_days`)는 133판부터 세므로 그 전 기록은 들어 있지 않다. 새 지표가 필요하면 `players`에 컬럼을 추가하고 `metric` 이름만 늘린다.
 - 현재 유행도에는 EXP 점수 100이 들어 있어서 "현재 유행도 100"은 키워드 없이도 달성된다. 그래서 점수 조건은 500부터 시작한다.
 
 초기 칭호 (#는 넣는 순서 = 칭호 ID. 1~22는 처음 넣은 것, 23~46은 133판에서 늘린 것)

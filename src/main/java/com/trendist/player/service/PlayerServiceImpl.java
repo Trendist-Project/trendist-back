@@ -25,6 +25,7 @@ import com.trendist.user.repository.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -94,7 +95,7 @@ public class PlayerServiceImpl implements PlayerService {
         }
         u.setCountry(c);
         Player p = players.save(new Player(u, c, nickname));
-        p.touchPlayed(Instant.now(clock));
+        p.touchPlayed(Instant.now(clock), ZoneId.of(c.getTimezone()));
         return p;
     }
 
