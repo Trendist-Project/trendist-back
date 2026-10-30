@@ -46,6 +46,8 @@ public class Room {
         void requestLose(Room room, Member loser, Member winner);
         /** ? 구슬을 먹었다. 보상(무작위 🔥 키워드)은 틱 밖에서 정하고 먹은 사람에게 알린다(4.20). */
         void requestOrb(Room room, Member eater);
+        /** 사람이 봇을 이겼다. 보상(내 보관함에 없는 무작위 🔥 키워드)은 틱 밖에서 정하고 이긴 사람에게 알린다(4.21). */
+        void requestBotWin(Room room, Member winner, Member bot);
         void send(Member m, ByteBuffer binary);
         void sendText(Member m, Map<String, Object> message);
         /** 오래 응답이 없는 접속을 끊는다(방에서는 이미 뺐다). */
@@ -595,10 +597,10 @@ public class Room {
                         Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
                         if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                            int lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 키워드 하나를 잃는다(4.21)
+                            botLose(loser, tu); // 봇도 사람처럼 (메모리의) 키워드 하나를 잃는다(4.21)
                             shield(loser, tu);
-                            // 봇의 키워드는 이름이 없어 이긴 사람에게 점수만 보여 준다
-                            if (!winner.bot) outbox.sendText(winner, Map.of("type", "hit", "target", loser.nickname, "score", lost));
+                            // 봇의 키워드는 이름이 없으므로, 이긴 사람은 대신 내 보관함에 없는 무작위 🔥 키워드를 얻는다
+                            if (!winner.bot) outbox.requestBotWin(this, winner, loser);
                         } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                             shield(loser, tu);

@@ -208,6 +208,31 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
+    public void requestBotWin(Room room, Room.Member winner, Room.Member bot) {
+        long playerId = winner.playerId;
+        String botName = bot.nickname;
+        workers.submit(() -> {
+            try {
+                KeywordDtos.OrbResult r = keywordService.gainFromBot(playerId);
+                Map<String, Object> msg = new HashMap<>();
+                msg.put("type", "hit");
+                msg.put("target", botName);
+                if ("GAINED".equals(r.status())) {
+                    msg.put("keyword", r.text()); msg.put("score", r.trendValue()); msg.put("stolen", "BOT"); msg.put("gained", r.gained());
+                } else {
+                    msg.put("score", 0); // 얻을 수 있는 🔥 키워드가 없다(모두 이미 가졌거나 🔥 키워드가 없음)
+                }
+                room.submit(rr -> {
+                    Room.Member m = rr.byPlayer(playerId);
+                    if (m != null) sendText(m, msg);
+                });
+            } catch (RuntimeException e) {
+                log.warn("bot win reward failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
     public void requestOrb(Room room, Room.Member eater) {
         long playerId = eater.playerId;
         workers.submit(() -> {

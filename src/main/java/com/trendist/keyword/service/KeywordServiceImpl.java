@@ -176,6 +176,27 @@ public class KeywordServiceImpl implements KeywordService {
                 k.getHolderCount(), r.gained(), r.keyword().myExpiresAt());
     }
 
+    @Override
+    @Transactional
+    public KeywordDtos.OrbResult gainFromBot(long playerId) {
+        Player p = players.findByIdForUpdate(playerId).orElse(null);
+        if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        Instant now = Instant.now(clock);
+        Set<Long> held = new HashSet<>();
+        for (PlayerKeyword pk : playerKeywords.findActiveByPlayer(p.getId(), now, codes.keywordStateId(CodeTables.KW_BANNED))) {
+            held.add(pk.getKeyword().getId());
+        }
+        // 구슬과 달리 꽝·중복이 없다: 이미 가진 키워드는 빼고 고른다
+        List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE))
+                .stream().filter(id -> !held.contains(id)).toList();
+        if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        Keyword k = keywords.findByIdForUpdate(ids.get(ThreadLocalRandom.current().nextInt(ids.size()))).orElseThrow();
+        Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()); // 만료됐지만 아직 안 지운 행
+        KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
+        return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
+                k.getHolderCount(), r.gained(), r.keyword().myExpiresAt());
+    }
+
     // ---------------------------------------------------------------- 목록형 외부 소스(10.2)
 
     @Override

@@ -21,6 +21,8 @@ class RoomTest {
         public void requestLose(Room room, Room.Member loser, Room.Member winner) { loses.add(new long[]{loser.playerId, winner.playerId}); }
         final List<Long> orbEaters = new ArrayList<>();
         public void requestOrb(Room room, Room.Member eater) { orbEaters.add(eater.playerId); }
+        final List<Long> botWinners = new ArrayList<>();
+        public void requestBotWin(Room room, Room.Member winner, Room.Member bot) { botWinners.add(winner.playerId); }
         public void send(Room.Member m, ByteBuffer binary) { snapshots++; sent.add(binary); }
         final List<Long> closed = new ArrayList<>();
         public void close(Room.Member m) { closed.add(m.playerId); }
@@ -276,8 +278,8 @@ class RoomTest {
         r.tick();
         assertThat(bot.botKeywords).hasSize(1);
         assertThat(bot.score).isIn(40.0, 50.0); // 10(EXP) + 남은 키워드 30 또는 40
-        // 이긴 사람 화면에 봇이 잃은 키워드 점수(봇 키워드는 이름이 없다), 봇에게도 무적 카운트다운
-        assertThat(out.texts).anyMatch(t -> "hit".equals(t.get("type")) && "Bot".equals(t.get("target")) && (t.get("score").equals(30) || t.get("score").equals(40)));
+        // 이긴 사람은 보상으로 무작위 🔥 키워드를 받는다(틱 밖에서 처리하도록 요청), 봇에게도 무적 카운트다운
+        assertThat(out.botWinners).containsExactly(human.playerId);
         assertThat(out.texts).anyMatch(t -> "shield".equals(t.get("type")) && t.get("e").equals(bot.entityNo));
         assertThat(out.loses).hasSize(1); // 봇이 진 것은 서버 키워드 잃기 요청이 아니다
     }
