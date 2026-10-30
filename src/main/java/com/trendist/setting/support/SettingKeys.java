@@ -56,8 +56,8 @@ public final class SettingKeys {
      * (관리자가 직접 바꾼 값은 그대로 둔다).
      */
     public static final Map<String, Set<String>> REPLACED_DEFAULTS = Map.of(
-            // 봇 상한: 1등 × 1.5 → 1등 × 0.7 → 접속 중인 사람 평균 × 1.0(4.21)
-            BOT_CAP_RATIO, Set.of("1.5", "0.7"),
+            // 봇 상한: 1등 × 1.5 → 1등 × 0.7 → 접속 중인 사람 평균 × 1.0(4.21). 운영 DB에 들어간 1.1도 1.0으로 맞춘다
+            BOT_CAP_RATIO, Set.of("1.5", "0.7", "1.1"),
             // 세이프존을 더 크게, 무작위 존을 2배로(4.22)
             SAFE_CENTER_RATIO, Set.of("0.06"), SAFE_CENTER_MIN, Set.of("600"), SAFE_ZONE_RATIO, Set.of("0.035"),
             SAFE_ZONE_MIN, Set.of("400"), SAFE_ZONE_DENSITY, Set.of("6"), SAFE_ZONE_MAX, Set.of("40"));
