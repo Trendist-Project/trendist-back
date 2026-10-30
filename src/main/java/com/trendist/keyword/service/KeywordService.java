@@ -49,7 +49,8 @@ public interface KeywordService {
                            long totalPlusCount, long searchCount, Instant externalUntil, Instant activatedAt,
                            Instant bannedAt, Instant createdAt) {}
 
-    record AdminKeywordPage(List<AdminKeywordRow> items, long total, int page, int size) {}
+    /** stateCounts: 상태 필터를 빼고(소스·검색어는 적용) 센 상태별 개수. 필터 칩에 보여 준다. */
+    record AdminKeywordPage(List<AdminKeywordRow> items, long total, int page, int size, java.util.Map<String, Long> stateCounts) {}
 
     /**
      * 관리자 키워드 목록(13.6). state: 활성/비활성/금지(이름, 비우면 전체), source: data_sources.name, q: 검색어,

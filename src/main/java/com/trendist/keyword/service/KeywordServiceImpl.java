@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -286,10 +287,17 @@ public class KeywordServiceImpl implements KeywordService {
         String by = ADMIN_SORTS.contains(sort) ? sort : "trendValue";
         Sort.Direction d = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
         int sz = Math.max(1, Math.min(size, 100));
-        var result = keywords.searchForAdmin(country.getId(), stateId, sourceId, like,
-                PageRequest.of(Math.max(0, page), sz, Sort.by(d, by).and(Sort.by(Sort.Direction.DESC, "id"))));
+        Sort order = Sort.by(d, by).and(Sort.by(Sort.Direction.DESC, "id"));
+        if (stateId == null) {
+            // 상태 전체: 금지 키워드는 트렌드 값이 0이라 점수순으로는 마지막 쪽에 묻힌다. 놓치지 않게 맨 위에 모아 보여 준다(13.6)
+            long bannedId = codes.keywordStateId(CodeTables.KW_BANNED);
+            order = JpaSort.unsafe(Sort.Direction.ASC, "(case when k.keywordState.id = " + bannedId + " then 0 else 1 end)").and(order);
+        }
+        var result = keywords.searchForAdmin(country.getId(), stateId, sourceId, like, PageRequest.of(Math.max(0, page), sz, order));
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (Object[] row : keywords.countByStateForAdmin(country.getId(), sourceId, like)) counts.put((String) row[0], (Long) row[1]);
         return new AdminKeywordPage(result.getContent().stream().map(this::adminRow).toList(), result.getTotalElements(),
-                result.getNumber(), sz);
+                result.getNumber(), sz, counts);
     }
 
     @Override

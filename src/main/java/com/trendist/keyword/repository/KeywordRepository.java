@@ -48,6 +48,15 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
                                                                   @Param("sourceId") Long sourceId, @Param("q") String q,
                                                                   org.springframework.data.domain.Pageable pageable);
 
+    /** 관리자 키워드 목록의 상태별 개수(상태 필터 없이, 소스·검색어만 적용). [상태 이름, 개수] */
+    @Query("""
+            select k.keywordState.name, count(k) from Keyword k
+            where k.country.id = :countryId
+              and (:sourceId is null or k.dataSource.id = :sourceId)
+              and (:q is null or k.normalized like :q)
+            group by k.keywordState.name""")
+    List<Object[]> countByStateForAdmin(@Param("countryId") Long countryId, @Param("sourceId") Long sourceId, @Param("q") String q);
+
     /** 그 나라의 한 상태 키워드 번호(구슬 보상 추첨). */
     @Query("select k.id from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId")
     List<Long> findIdsByCountryAndState(@Param("countryId") Long countryId, @Param("stateId") Long stateId);
