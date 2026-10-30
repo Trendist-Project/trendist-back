@@ -4,6 +4,8 @@ import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
 import com.trendist.country.entity.Country;
 import com.trendist.country.service.CountryService;
+import com.trendist.effect.entity.TrailEffect;
+import com.trendist.effect.repository.TrailEffectRepository;
 import com.trendist.game.event.GameEvents;
 import com.trendist.game.room.Room;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
@@ -43,6 +45,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final SettingService settings;
     private final TitleRepository titles;
     private final ProfileRepository profiles;
+    private final TrailEffectRepository trailEffects;
     private final Clock clock;
 
     @Override
@@ -61,9 +64,11 @@ public class PlayerServiceImpl implements PlayerService {
             String title = p.getTitleId() == null ? null
                     : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
             var look = profiles.findFirstByPlayerIdAndEquippedTrue(p.getId());
+            String trail = p.getTrailEffectId() == null ? null
+                    : trailEffects.findById(p.getTrailEffectId()).filter(TrailEffect::isEnabled).map(TrailEffect::getCode).orElse(null);
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
                     p.getTotalPlusCount() == 0, title, look.map(Profile::getBackgroundColor).orElse(Room.DEFAULT_BACKGROUND),
-                    look.map(Profile::getBorderColor).orElse(null), look.map(Profile::getBorderWidth).orElse(null));
+                    look.map(Profile::getBorderColor).orElse(null), look.map(Profile::getBorderWidth).orElse(null), trail);
         });
     }
 

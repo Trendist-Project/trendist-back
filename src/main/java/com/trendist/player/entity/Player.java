@@ -20,6 +20,7 @@ public class Player extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false) private User user;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "country_id", nullable = false) private Country country;
     @Column(name = "title_id") private Long titleId;
+    @Column(name = "trail_effect_id") private Long trailEffectId; // 이동 효과(4.23). null이면 없음
     @Column(nullable = false, length = 40) private String nickname;
     @Column(name = "nickname_changed_at", columnDefinition = "DATETIME(6)") private Instant nicknameChangedAt;
     @Column(nullable = false) private long exp;
@@ -46,6 +47,8 @@ public class Player extends BaseTimeEntity {
     public void touchPlayed(Instant now) { this.lastPlayedAt = now; }
     /** 활성 칭호(4.10). null이면 숨김. 가진 칭호인지는 서비스가 확인한다. */
     public void changeTitle(Long titleId) { this.titleId = titleId; }
+    /** 이동 효과(4.23). null이면 끔. 얻었는지는 서비스가 확인한다. */
+    public void changeTrailEffect(Long effectId) { this.trailEffectId = effectId; }
 
     /** 닉네임 변경. 변경 간격 검사는 서비스가 하고, 여기서는 변경 시각을 함께 남긴다(4.1). */
     public void changeNickname(String nickname, Instant now) {

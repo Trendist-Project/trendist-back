@@ -55,6 +55,7 @@ class ApiFlowTest {
     @Autowired ScoreHistoryService scoreHistory;
     @Autowired KeywordActivityService activityService;
     @Autowired com.trendist.player.repository.PlayerRepository playerRepo;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private String guest() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -284,6 +285,39 @@ class ApiFlowTest {
             }
         }
         assertThat(renewed).isTrue();
+    }
+
+    @Test
+    void trailEffectsAreFreeToChooseOneAtATime() throws Exception {
+        // 이동 효과(4.23): 지금은 모두 조건 없이 고를 수 있고 하나만 쓴다
+        String t = player("효과시험");
+        MvcResult box = mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeEffectId").doesNotExist()).andReturn();
+        String json = box.getResponse().getContentAsString();
+        java.util.List<String> codes = JsonPath.read(json, "$.effects[*].code");
+        assertThat(codes).contains("afterimage", "sparkle", "flame", "bubble", "rainbow", "footprint", "petal");
+        java.util.List<Boolean> unlocked = JsonPath.read(json, "$.effects[*].unlocked");
+        assertThat(unlocked).containsOnly(true);
+        java.util.List<Integer> ids = JsonPath.read(json, "$.effects[?(@.code == 'flame')].id");
+        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"effectId\":" + ids.getFirst() + "}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeEffectId").value(ids.getFirst()))
+                .andExpect(jsonPath("$.effects[?(@.active == true)].code").value("flame"));
+        // 5초에 한 번
+        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"effectId\":null}")).andExpect(status().isTooManyRequests());
+        // 나중에 조건을 붙이면(레벨) 그 조건을 채우기 전에는 고를 수 없다
+        jdbc.update("update trail_effects set unlock_type = 'LEVEL', unlock_value = 50 where code = 'rainbow'");
+        try {
+            String t2 = player("효과시험2");
+            mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t2))
+                    .andExpect(jsonPath("$.effects[?(@.code == 'rainbow')].unlocked").value(false));
+            java.util.List<Integer> rainbow = JsonPath.read(json, "$.effects[?(@.code == 'rainbow')].id");
+            mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t2).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"effectId\":" + rainbow.getFirst() + "}")).andExpect(status().isForbidden());
+        } finally {
+            jdbc.update("update trail_effects set unlock_type = 'FREE', unlock_value = null where code = 'rainbow'");
+        }
     }
 
     @Test

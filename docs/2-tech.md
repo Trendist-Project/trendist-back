@@ -165,6 +165,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `POST /api/auth/withdraw` | `{ "phrase": "탈퇴 합니다." }`. 탈퇴(4.1): 문구가 다르면 400 `WITHDRAW_PHRASE`, 게스트면 400 `WITHDRAW_GUEST`. 갱신 토큰 폐기, 쿠키 삭제(204) |
 | `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 떼기). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
+| `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 조건 미달 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
 | `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
@@ -313,6 +314,7 @@ record TrendBox(
 | | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 누적 `+` 횟수, 댓글 점수 |
 | | `profiles` | 플레이어별 꾸미기 프로필(성장형·픽셀 그림·업로드 이미지, 바탕·테두리 색과 두께). 한 플레이어에 여러 개, 하나만 장착 |
 | | `titles`, `player_titles` | 칭호 목록과 플레이어별 보유 칭호 |
+| | `trail_effects` | 이동 효과 목록과 얻는 조건(4.23). 쓰는 효과는 `players.trail_effect_id` |
 | | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자가 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
@@ -358,6 +360,7 @@ record TrendBox(
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 22개를 번호 순서대로 |
+| `trail_effects` | 4.23의 7개(모두 FREE). 코드에 있는데 DB에 없는 코드만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리 6개와 놀이 방법 글(각 테이블이 비어 있을 때만) |
 | `users` | 공지·가이드 작성자로 쓰는 운영자 계정(`role` = ADMIN, 로그인 수단 없음) 1개, 없을 때만 |

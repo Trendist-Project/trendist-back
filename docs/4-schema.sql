@@ -39,6 +39,21 @@ CREATE TABLE titles (
   UNIQUE KEY uk_titles_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='칭호';
 
+CREATE TABLE trail_effects (
+  id            BIGINT NOT NULL AUTO_INCREMENT COMMENT '이동 효과 ID',
+  code          VARCHAR(30) NOT NULL COMMENT '그림 코드(프론트엔드가 이 값으로 그린다)',
+  name          VARCHAR(100) NOT NULL COMMENT '이름(한글)',
+  description   VARCHAR(500) NOT NULL COMMENT '설명(한글)',
+  unlock_type   VARCHAR(20) NOT NULL DEFAULT 'FREE' COMMENT '얻는 조건: FREE / LEVEL / TITLE / PURCHASE(결제, 아직 없음)',
+  unlock_value  BIGINT NULL COMMENT 'LEVEL이면 레벨, TITLE이면 칭호 ID',
+  sort_order    BIGINT NOT NULL DEFAULT 0 COMMENT '표시 순서',
+  enabled       BOOLEAN NOT NULL DEFAULT TRUE COMMENT '사용 여부',
+  created_at    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_trail_effects_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='이동 효과(4.23)';
+
 CREATE TABLE levels (
   id           BIGINT NOT NULL AUTO_INCREMENT COMMENT '레벨 ID',
   level        BIGINT NOT NULL COMMENT '레벨(1~100). 1레벨은 필요 EXP 0',
@@ -86,6 +101,7 @@ CREATE TABLE players (
   user_id             BIGINT NOT NULL COMMENT '사용자 ID',
   country_id          BIGINT NOT NULL COMMENT '지역 ID',
   title_id            BIGINT NULL COMMENT '활성 칭호(NULL이면 없음)',
+  trail_effect_id     BIGINT NULL COMMENT '쓰는 이동 효과(NULL이면 없음, 4.23)',
   nickname            VARCHAR(40) NOT NULL COMMENT '닉네임(나라별, 중복 허용). 탈퇴 후에도 유지하고 화면에서만 탈퇴한 사용자로 표시',
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
   exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, + 횟수로만 쌓이고 줄지 않음)',
@@ -103,7 +119,8 @@ CREATE TABLE players (
   KEY idx_players_ranking (country_id, current_score),
   CONSTRAINT fk_players_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_players_country FOREIGN KEY (country_id) REFERENCES countries (id),
-  CONSTRAINT fk_players_title FOREIGN KEY (title_id) REFERENCES titles (id)
+  CONSTRAINT fk_players_title FOREIGN KEY (title_id) REFERENCES titles (id),
+  CONSTRAINT fk_players_trail_effect FOREIGN KEY (trail_effect_id) REFERENCES trail_effects (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어(사용자 × 나라): 닉네임, EXP·레벨, 활성 칭호, 트렌드 수치';
 
 CREATE TABLE profiles (

@@ -57,9 +57,9 @@ public class Room {
     /** 성장 캐릭터의 정해진 바탕색(4.9). 꾸미지 않은 원 */
     public static final String DEFAULT_BACKGROUND = "#3fb68b";
 
-    /** 이름표 아래 칭호와 원의 꾸미기. 입장 때 함께 받는다. */
-    public record Appearance(String title, String background, String borderColor, Integer borderWidth) {
-        public static final Appearance DEFAULT = new Appearance(null, DEFAULT_BACKGROUND, null, null);
+    /** 이름표 아래 칭호, 원의 꾸미기, 이동 효과. 입장 때 함께 받는다. */
+    public record Appearance(String title, String background, String borderColor, Integer borderWidth, String trail) {
+        public static final Appearance DEFAULT = new Appearance(null, DEFAULT_BACKGROUND, null, null, null);
     }
 
     public static final class Member {
@@ -72,6 +72,8 @@ public class Room {
         /** 꾸미기(4.9): 바탕색, 테두리 색·두께(1~8단계). 테두리가 null이면 기본 테두리 */
         public String background = DEFAULT_BACKGROUND, borderColor;
         public Integer borderWidth;
+        /** 이동 효과 코드(4.23). null이면 없음. 그림은 클라이언트가 그린다 */
+        public String trail;
         public int level;
         public double score;
         public double x, y, vx, vy;
@@ -179,7 +181,7 @@ public class Room {
         Member m = new Member(nextEntity++, playerId, session);
         m.lastHeardNanos = nanoClock.getAsLong();
         m.nickname = nickname; m.level = level; m.score = score;
-        m.title = look.title(); m.background = look.background(); m.borderColor = look.borderColor(); m.borderWidth = look.borderWidth();
+        m.title = look.title(); m.background = look.background(); m.borderColor = look.borderColor(); m.borderWidth = look.borderWidth(); m.trail = look.trail();
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         double area = activeArea(members.size() + 1);
         LastSeen seen = lastSeen.remove(playerId);
@@ -317,6 +319,14 @@ public class Room {
         Member m = byPlayer.get(playerId);
         if (m == null) return;
         m.background = background; m.borderColor = borderColor; m.borderWidth = borderWidth;
+        broadcastRoster();
+    }
+
+    /** 이동 효과가 바뀌었다(4.23). 모두에게 명단을 다시 보낸다. */
+    public void applyTrail(long playerId, String trail) {
+        Member m = byPlayer.get(playerId);
+        if (m == null) return;
+        m.trail = trail;
         broadcastRoster();
     }
 
@@ -705,10 +715,11 @@ public class Room {
     private void broadcastRoster() {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Member m : members.values()) {
-            // 칭호·테두리는 없을 수 있어서(null) Map.of 대신 HashMap을 쓴다
+            // 칭호·테두리·효과는 없을 수 있어서(null) Map.of 대신 HashMap을 쓴다
             Map<String, Object> e = new HashMap<>();
             e.put("e", m.entityNo); e.put("nickname", m.nickname); e.put("level", m.level); e.put("bot", m.bot);
             e.put("title", m.title); e.put("bg", m.background); e.put("borderColor", m.borderColor); e.put("borderWidth", m.borderWidth);
+            e.put("trail", m.trail);
             list.add(e);
         }
         Map<String, Object> msg = Map.of("type", "roster", "players", list);

@@ -25,6 +25,8 @@ import com.trendist.setting.entity.Setting;
 import com.trendist.setting.repository.SettingRepository;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
+import com.trendist.effect.entity.TrailEffect;
+import com.trendist.effect.repository.TrailEffectRepository;
 import com.trendist.title.entity.Title;
 import com.trendist.title.repository.TitleRepository;
 import com.trendist.user.entity.User;
@@ -69,6 +71,7 @@ public class DataSeeder implements ApplicationRunner {
     private final SettingRepository settings;
     private final LevelRepository levels;
     private final TitleRepository titles;
+    private final TrailEffectRepository trailEffects;
     private final GuideCategoryRepository guideCategories;
     private final GuideRepository guides;
     private final UserRepository users;
@@ -149,6 +152,11 @@ public class DataSeeder implements ApplicationRunner {
                 titles.save(new Title(t[0], t[1], t[2], t[3], order++));
                 added++;
             }
+        }
+        // 이동 효과(4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 효과만 넣는다(이름·조건·순서는 운영에서 고친다)
+        for (int i = 0; i < TRAIL_EFFECTS.length; i++) {
+            String[] t = TRAIL_EFFECTS[i];
+            if (trailEffects.findByCode(t[0]).isEmpty()) { trailEffects.save(new TrailEffect(t[0], t[1], t[2], i + 1)); added++; }
         }
         codeTables.clear();
         migrateDataSources();
@@ -234,6 +242,17 @@ public class DataSeeder implements ApplicationRunner {
         if (level <= 10) return early[level];
         return Math.round(100 * Math.pow(level / 10.0, 2));
     }
+
+    /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */
+    private static final String[][] TRAIL_EFFECTS = {
+            {"afterimage", "잔상", "지나온 자리에 내 원의 흐릿한 그림자가 남았다 사라져요"},
+            {"sparkle", "별가루", "반짝이는 작은 별이 흩날려요"},
+            {"flame", "불꽃", "뒤로 불티가 튀며 사그라들어요"},
+            {"bubble", "물방울", "동글동글 물방울이 떠오르다 톡 터져요"},
+            {"rainbow", "무지개", "지나간 길을 따라 무지개 띠가 그려져요"},
+            {"footprint", "발자국", "작은 거북이 발자국이 콕콕 찍혀요"},
+            {"petal", "꽃잎", "분홍 꽃잎이 팔랑이며 흩날려요"},
+    };
 
     private static final String[][] TITLES = {
             {"트렌드 워처", "처음으로 키워드를 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":1}"},
