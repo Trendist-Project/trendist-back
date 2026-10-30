@@ -27,7 +27,7 @@ public class Room {
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
                          double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds,
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
-                         int botPlayers, double botCapRatio, double botStepMin, double botStepMax, double expScoreCap) {}
+                         int botPlayers, int botMinPlayers, double botCapRatio, double botStepMin, double botStepMax, double expScoreCap) {}
 
     /**
      * 세이프존 설정(4.22). 가운데 고정 존과 무작위 존의 한 변은 활동 영역 한 변의 비율(최소값 이상)이고,
@@ -776,7 +776,8 @@ public class Room {
     }
 
     /**
-     * 1초마다: 사람이 있으면 사람 + 봇이 botPlayers가 되도록 봇을 하나씩 넣거나 뺀다(사람이 없으면 봇도 없다).
+     * 1초마다: 사람이 있으면 사람 + 봇이 botPlayers가 되도록 봇을 하나씩 넣거나 뺀다. 사람이 많아도 봇은 botMinPlayers 이상 둔다
+     * (사람이 없으면 봇도 없다).
      * 사람들 평균이 내려가 상한을 넘은 봇은 키워드를 하나씩 내려놓고, EXP만으로도 넘으면 빼고 새 봇으로 바꾼다.
      */
     void maintainBots(Tuning tu) {
@@ -787,7 +788,7 @@ public class Room {
             else { members.remove(b.entityNo); broadcastRoster(); }
         }
         int humans = humanCount(), bots = members.size() - humans;
-        int want = humans == 0 ? 0 : Math.max(0, tu.botPlayers() - humans);
+        int want = humans == 0 ? 0 : Math.max(tu.botMinPlayers(), tu.botPlayers() - humans);
         if (bots < want) addBot(tu);
         else if (bots > want) members.values().stream().filter(m -> m.bot).findFirst().ifPresent(b -> {
             members.remove(b.entityNo);

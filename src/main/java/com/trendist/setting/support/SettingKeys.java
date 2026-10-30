@@ -38,6 +38,7 @@ public final class SettingKeys {
     public static final String ORB_SPAWN_SECONDS = "orb_spawn_seconds";
     public static final String ORB_DENSITY = "orb_density";
     public static final String BOT_PLAYERS = "bot_players";
+    public static final String BOT_MIN_PLAYERS = "bot_min_players";
     public static final String BOT_CAP_RATIO = "bot_cap_ratio";
     public static final String BOT_STEP_MIN = "bot_step_min";
     public static final String BOT_STEP_MAX = "bot_step_max";
@@ -100,7 +101,9 @@ public final class SettingKeys {
             new Def(ORB_SPAWN_SECONDS, "3", 0.5, 600, "? 구슬이 생기는 간격(초)"),
             new Def(ORB_SPAWN_PERCENT, "5", 1, 100, "? 구슬이 간격마다 목표 개수의 몇 %씩 생기는지(최소 1개). 5%면 빈 아레나가 약 20번의 간격에 다 찬다"),
             // NPC 봇(4.21): 사람 + 봇이 이 수가 되도록 채운다. 봇은 키워드 없이 방 메모리의 점수만 가진다
-            new Def(BOT_PLAYERS, "10", 0, 200, "방 인원(사람 + 봇)이 이 수보다 적으면 봇으로 채운다(0이면 봇 없음)"),
+            new Def(BOT_PLAYERS, "10", 0, 200, "방 인원(사람 + 봇)이 이 수보다 적으면 봇으로 채운다"),
+            // 사람이 많아도 봇이 하나도 없으면 봇 이기기(보상·칭호)를 할 수 없으므로 최소 인원을 둔다. 봇을 아예 없애려면 두 값 모두 0
+            new Def(BOT_MIN_PLAYERS, "1", 0, 200, "봇 최소 인원: 사람이 있으면 방 인원과 관계없이 봇을 이 수 이상 둔다(0이면 사람이 많을 때 봇 없음)"),
             new Def(BOT_CAP_RATIO, "1.0", 0.1, 10, "봇 유행도 상한: 그 방에 접속 중인 사람 유행도 평균의 이 배수(1이면 평균)"),
             new Def(BOT_STEP_MIN, "20", 0, 100, "봇이 가진 키워드 하나의 점수 최소(사람의 키워드 점수처럼)"),
             new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),

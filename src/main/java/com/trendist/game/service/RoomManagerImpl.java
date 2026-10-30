@@ -93,6 +93,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.ORB_SPAWN_PERCENT),
                 settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT),
                 settings.getInt(SettingKeys.BOT_PLAYERS),
+                settings.getInt(SettingKeys.BOT_MIN_PLAYERS),
                 settings.getDouble(SettingKeys.BOT_CAP_RATIO),
                 settings.getDouble(SettingKeys.BOT_STEP_MIN),
                 settings.getDouble(SettingKeys.BOT_STEP_MAX),

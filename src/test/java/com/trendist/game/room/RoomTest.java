@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
-    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
+    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
 
     /** 충돌 테스트: 무작위 세이프존을 끄고, 가운데 고정 세이프존(한 변 600px) 밖에서 부딪히게 한다(4.22). */
     static final Room.ZoneTuning NO_RANDOM_ZONES = new Room.ZoneTuning(0.06, 600, 0.035, 400, 0, 0, 300);
@@ -95,7 +95,7 @@ class RoomTest {
 
     @Test
     void orbsSpawnUpToMax() {
-        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 5, 0.5, 2.2, 5, 33, 0, 1.5, 20, 50, 100), new Out());
+        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 5, 0.5, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100), new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         for (int i = 0; i < 20 * 10; i++) r.tick(); // 10초
         assertThat(r.orbCount()).isEqualTo(5);
@@ -103,7 +103,7 @@ class RoomTest {
 
     @Test
     void rejoinWithinOneMinuteKeepsLastPositionAndProtection() {
-        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 5, 0, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
+        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 5, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
         Room r = new Room(1, withProtect, new Out());
         Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
         m.x = 321; m.y = -123;
@@ -178,7 +178,7 @@ class RoomTest {
     @Test
     void activeAreaScalesWithWorldSize() {
         // 적은 인원에서도 기준 맵 한 변의 1/4, 1000명이면 한 변 전체(4.2)
-        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100), new Out());
+        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100), new Out());
         assertThat(small.activeArea(1)).isEqualTo(6000);
         assertThat(small.activeArea(1000)).isEqualTo(24000);
         assertThat(new Room(1, T, new Out()).activeArea(1)).isEqualTo(3000);
@@ -187,27 +187,40 @@ class RoomTest {
     @Test
     void orbTargetFollowsArea() {
         // 3,000×3,000px에 20개였던 비율(밀도 2.2)을 넓이에 비례해 유지한다. 상한 orbMax를 넘지 않는다(4.20)
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
         Room r = new Room(1, tu, new Out());
         assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
         assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역(지금 최소)
         assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
-        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 100, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
+        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
         assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
     }
 
     @Test
     void orbsFillInBatches() {
         // 목표 79개면 간격마다 5%(4개)씩 생긴다
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 1.5, 20, 50, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
         Room r = new Room(1, tu, new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         r.tick();
         assertThat(r.orbCount()).isEqualTo(4);
     }
 
-    static Room.Tuning withBots(int botPlayers) {
-        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, botPlayers, 1.5, 20, 50, 100);
+    static Room.Tuning withBots(int botPlayers) { return withBots(botPlayers, 0); }
+
+    static Room.Tuning withBots(int botPlayers, int botMinPlayers) {
+        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, botPlayers, botMinPlayers, 1.5, 20, 50, 100);
+    }
+
+    @Test
+    void botMinimumStaysEvenWhenRoomIsFullOfHumans() {
+        // 사람이 방 인원(3명) 이상이어도 봇은 최소 인원(1명)만큼 남는다. 사람이 없으면 봇도 없다(4.21)
+        Room r = new Room(1, withBots(3, 1), new Out());
+        for (int i = 0; i < 100; i++) r.tick();
+        assertThat(r.members()).isEmpty();
+        for (int p = 1; p <= 4; p++) r.join(p, "s" + p, "사람" + p, 1, 0, List.of());
+        for (int i = 0; i < 20 * 5; i++) r.tick();
+        assertThat(r.members().stream().filter(m -> m.bot).count()).isEqualTo(1);
     }
 
     @Test
@@ -386,7 +399,7 @@ class RoomTest {
     @Test
     void botCapIsAverageOfConnectedHumans() {
         // 봇 상한 = 접속 중인 사람 유행도 평균 × 배수(기본 1). 봇은 평균에 들어가지 않는다(4.21)
-        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, 10, 1.0, 20, 50, 100);
+        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, 10, 0, 1.0, 20, 50, 100);
         Room r = new Room(1, avg, new Out());
         r.join(1, "s1", "작은", 1, 100, List.of());
         r.join(2, "s2", "큰", 1, 500, List.of());
