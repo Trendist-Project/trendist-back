@@ -7,7 +7,7 @@ public final class PlayerDtos {
 
     public record PlayerSummary(long id, String nickname, String countryCode, long level, long exp, long nextLevelExp,
                                 long currentScore, long holdCount, long totalPlusCount, long commentScore, long searchCount,
-                                Instant nicknameChangeableAt) {}
+                                Instant nicknameChangeableAt, long stealCount, long botWinCount, long activeDays) {}
 
     /** 점수 추이의 점 하나(4.15). t는 그 칸의 시작(24시간은 정시, 나머지는 나라 현지 자정), live면 지금 값. */
     public record ScorePoint(Instant t, long score, boolean live) {}

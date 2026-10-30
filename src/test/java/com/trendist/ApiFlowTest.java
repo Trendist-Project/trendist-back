@@ -313,7 +313,9 @@ class ApiFlowTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"구슬칭호키워드\"}")).andExpect(status().isOk());
         var p = playerRepo.findById(pid).orElseThrow();
         assertThat(p.getOrbCount()).isEqualTo(10);
-        assertThat(p.getActiveDays()).isEqualTo(1);
+        assertThat(p.getActiveDays()).isEqualTo(1); // 만든 날과 키워드를 얻은 날이 같으면 하루
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.activeDays").value(1))
+                .andExpect(jsonPath("$.player.stealCount").value(0));
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
