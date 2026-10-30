@@ -97,7 +97,7 @@
 
 트렌드 값과 점수 갱신
 - 트렌드 값 재계산: 한 키워드의 `trend_value`는 4.8의 식으로 `holder_count`, 반영 소스(`data_source_id`)의 가중치, 상태에서 구한다. 값이 바뀌면 (키워드 번호, 변화량)을 두 곳에 알린다. 접속 중인 보유자에게는 방 메모리 이벤트로 바로(9.2), 접속 중이 아닌 보유자에게는 메모리의 "변경됨" 집합으로. 외부 수집, 💤↔🔥 전환, 가중치·설정 변경 때도 같은 방식이다.
-- 활성 전환: `+`로 가진 사람이 3명이 되거나 정기 수집에서 외부 확인이 되면 `UPDATE keywords SET keyword_state_id = /* 활성 */, activated_at = COALESCE(activated_at, 지금) WHERE id = ? AND keyword_state_id = /* 비활성 */`을 하고, 영향 행 수가 1일 때만 그 키워드를 "변경됨"에 넣는다(동시에 `+`해도 한 번만). 접속 중인 보유자의 점수는 바로, 아닌 보유자는 다음 재합산에서 반영된다. 다른 사용자의 `players` 행을 한 트랜잭션에서 한꺼번에 잠그지 않으려는 것이다.
+- 활성 전환: `+`로 가진 사람이 3명이 되거나 구글 실시간 인기 목록에서 외부 확인이 되면 `UPDATE keywords SET keyword_state_id = /* 활성 */, activated_at = COALESCE(activated_at, 지금) WHERE id = ? AND keyword_state_id = /* 비활성 */`을 하고, 영향 행 수가 1일 때만 그 키워드를 "변경됨"에 넣는다(동시에 `+`해도 한 번만). 접속 중인 보유자의 점수는 바로, 아닌 보유자는 다음 재합산에서 반영된다. 다른 사용자의 `players` 행을 한 트랜잭션에서 한꺼번에 잠그지 않으려는 것이다.
 - 점수 재합산(1분): "변경됨" 집합을 비우면서 그 키워드를 가진 접속 중이 아닌 플레이어를 찾아(`idx_player_keywords_keyword`), 500명씩 묶어 한 SQL로 다시 합산한다. 값이 바뀐 사람만 저장한다. 합산 대상은 플레이어의 `players` 행을 UPDATE로 잠그는 구간뿐이고 키워드 행은 읽기만 하므로 `+` 트랜잭션과 교착하지 않는다. LEFT JOIN이라 보관함이 모두 없어진 플레이어도 EXP 점수만 남도록 계산된다.
 
 ```sql
@@ -174,7 +174,6 @@ WHERE p.id IN (/* 500명 */)
 | 5초 | 접속 중인 플레이어의 바뀐 점수를 `players.current_score`에 모아서 저장(9.2) |
 | 1분 | 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
 | 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4) |
-| 매일 04:00(나라 현지) | 외부 수집(외부 확인, 반영 소스 갱신, 💤 → 🔥 전환, 외부 데이터 없음 + 3명 미만 🔥 → 💤 전환 포함) |
 | 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외), 만료된 갱신 토큰 삭제 |
 
 ### 9.8 트렌드 상자 (4.19)
@@ -255,17 +254,14 @@ record TrendBox(
 
 | name(`data_sources.name`) | 소스 | 지역 | 내용 | 갱신 |
 |---|---|---|---|---|
-| naver_datalab | 네이버 데이터랩 검색어트렌드 | KR | 검색어 묶음의 기간별 상대 검색 비율 | 일 |
-| bq_trends_rising | BigQuery Google Trends 공개 데이터셋 | 해외 | 나라별 급상승·인기 검색어 Top 25 | 일 |
 | google | 구글 트렌드 실시간 인기 RSS(`https://trends.google.com/trending/rss?geo=KR`) | KR | 지금 급상승 중인 검색어 상위 10개의 제목(`title`). 대략 검색량·관련 뉴스도 오지만 쓰지 않는다 | 약 10분(5분마다 조회) |
 | admin | 관리자가 직접 넣은 키워드(13.7) | 전체 | 관리자 화면에서 넣은 🔥활성 키워드. 넣은 때부터 7일 유지 | - |
 | internal | 서비스 내부 | 전체 | 외부에서 확인되지 않은 키워드의 반영 소스. 점수는 가진 사람 수만으로 정함(4.8) | - |
 
-- 갱신 주기(2026-10-26 공식 문서 확인): 네이버 데이터랩 검색어트렌드는 구간 단위가 일간(`date`)이 가장 짧고, 하루 호출 한도가 1,000회, 요청마다 주제어 묶음이 최대 5개다. 앵커 1개를 빼면 한 번에 키워드 4개를 재므로 하루 최대 약 4,000개이고, 온디맨드 검색도 같은 한도를 쓴다. BigQuery Google Trends 국제 데이터는 일 단위다(하루 4번 갱신은 미국 데이터뿐이다). 두 소스 모두 하루보다 짧은 주기로는 값이 바뀌지 않는다.
-- 구글 실시간 인기는 공식 API가 아니라 구독용으로 공개된 RSS다. 인증·한도가 없고 `robots.txt`가 막지 않는 경로지만, 형식이 바뀌거나 막힐 수 있다. 그래서 읽지 못해도 다른 소스와 게임은 그대로 돌고, 30분 넘게 읽지 못하면 목록을 모르는 것으로 보고 유지 기간 정리를 멈춘다(10.2). 정식 출시 전에 상업적 이용 가능 여부를 확인한다(16.2).
-- 쓰지 않는 것: Google Ads 키워드 플래너, Google Trends API(알파), 구글 트렌드 웹 화면 스크래핑(내부 API `batchexecute` 포함), Custom Search JSON API, Search Console API, 네이버 검색 API, 위키백과, YouTube, 바이두, 웨이보, Yahoo! JAPAN.
-- 나라별로 쓰는 소스는 위 표의 '지역' 열을 기준으로 코드(설정)에 둔다. `data_sources`에는 나라 열이 없고 소스마다 가중치 하나만 있어서, 같은 소스를 쓰는 GLOBAL·JP·IN은 가중치를 공유한다.
-- 해외 지역은 BigQuery 이용이 확정된 뒤 연다. 나라별로 독립 수집해서 한 소스가 막혀도 나머지는 계속된다.
+- 구글 실시간 인기는 공식 API가 아니라 구독용으로 공개된 RSS다. 인증·한도가 없고 `robots.txt`가 막지 않는 경로지만, 형식이 바뀌거나 막힐 수 있다. 그래서 읽지 못해도 게임은 그대로 돌고, 30분 넘게 읽지 못하면 목록을 모르는 것으로 보고 유지 기간 정리를 멈춘다(10.2). 정식 출시 전에 상업적 이용 가능 여부를 확인한다(16.2).
+- 쓰지 않는 것: Google Ads 키워드 플래너, Google Trends API(알파), 구글 트렌드 웹 화면 스크래핑(내부 API `batchexecute` 포함), Custom Search JSON API, Search Console API, 네이버 데이터랩·검색 API, BigQuery Google Trends 공개 데이터셋, 위키백과, YouTube, 바이두, 웨이보, Yahoo! JAPAN.
+- 나라별로 쓰는 소스는 위 표의 '지역' 열을 기준으로 코드(설정)에 둔다. `data_sources`에는 나라 열이 없고 소스마다 가중치 하나만 있어서, 같은 소스를 여러 나라가 쓰면 가중치를 공유한다.
+- 해외 지역은 외부 소스를 정한 뒤 연다(16.1). 나라별로 독립 수집해서 한 소스가 막혀도 나머지는 계속된다.
 
 ### 10.2 수집 방식
 - 구글 실시간 인기(google, KR)
@@ -274,15 +270,8 @@ record TrendBox(
   - 유지 기간이 끝나면(5분마다 검사) 지금 목록에 아직 있으면 지금부터 다시 7일 유지한다. 목록에 없으면 반영 소스를 `internal`(내부 데이터)로 바꾸고, 가진 사람이 활성 조건(3명) 이상이면 🔥를 유지, 미만이면 💤비활성으로 바꾼다. 트렌드 값과 보유자 점수도 다시 계산한다.
   - 사용자가 검색한 단어가 지금 목록에 있으면 외부 확인으로 보고 같은 방식(반영 소스 `google`, 7일 유지)으로 등록한다.
   - RSS를 30분 넘게 읽지 못하면 지금 목록을 모르는 것이므로 유지 기간 정리를 미룬다(일시 장애로 키워드가 한꺼번에 💤가 되지 않게).
-- 대상: 최근 30일 안에 `+`된 키워드 + 🔥 키워드 + BigQuery 목록의 검색어 + 운영자 시드. 30일 동안 `+`가 없는 💤 키워드와 금지 키워드는 뺀다.
-- 정기 수집은 하루 1회(소스가 일·월 단위라 더 자주 해도 값이 같다). 조회 결과는 24시간 캐시한다. 신규 키워드와 검색된 💤 키워드는 바로 1회 조회하고, 최근 30일 안에 `+`가 있었던 💤 키워드도 매일 다시 조회한다.
-- 소스별 값(0~100)
-  - 네이버: 값이 요청마다 상대적이라 모든 요청에 기준(앵커) 키워드를 함께 넣어 맞춘다. 금지 키워드는 앵커·비교 묶음에 넣지 않는다.
-  - BigQuery: 매일 04:00 전에 한 번 쿼리한다. 순위별 점수는 급상승 1위 100 → 25위 60, 인기 1위 80 → 25위 40. 목록에 없는 날은 값 없음.
-- 소스별 값은 "외부 확인" 판정에만 쓰고 저장하지 않는다. 값이 10 이상이면 외부 확인이다(`settings`의 외부 확인 관심도).
-- 수집한 검색어는 소스 코드로 소스를 정하고, 나라와 정규화 키(`normalized`, 4.18)로 키워드를 찾는다.
-  - 이미 있으면 반영 소스(`keywords.data_source_id`)와 상태를 다시 정하고 `trend_value`를 다시 계산한다(10.3). 반영 소스가 외부였던 키워드가 이번 수집에서 모든 외부 소스에서 값이 없으면 반영 소스를 `internal`로 바꾼다(4.7).
-  - 없으면 키워드를 새로 만든다. 외부 확인이면 🔥활성으로 시작하고 반영 소스는 그 외부 소스다. 정기 수집에서 새 키워드를 만드는 소스는 목록을 주는 BigQuery뿐이다. 네이버는 키워드를 넣어야 값을 주므로 정기 수집에서는 있는 키워드의 값만 확인한다. 사용자가 검색한 새 단어에서 외부 확인이 되어 등록될 때는(4.4) 그 값을 준 소스가 반영 소스가 된다.
+- 소스 값(0~100)은 "외부 확인" 판정에만 쓰고 저장하지 않는다. 값이 10 이상이면 외부 확인이다(`settings`의 외부 확인 관심도). 구글 실시간 인기는 지금 목록에 있으면 100, 없으면 값 없음이다.
+- 수집한 검색어는 소스 코드로 소스를 정하고, 나라와 정규화 키(`normalized`, 4.18)로 키워드를 찾는다. 사용자가 검색한 새 단어에서 외부 확인이 되어 등록될 때는(4.4) 그 값을 준 소스가 반영 소스가 된다.
   - 저장 전에 4.6의 등록 조건과 같은 검사(20자 이하, 허용 문자, 개인정보 패턴, 차단어·민감 키워드, 실존 인물 이름 패턴)를 거치고, 통과하지 못한 검색어는 버린다. 키워드가 되어도 목록으로 보여 주지 않는다(3.3).
 
 ### 10.3 반영 소스와 가중치
@@ -294,12 +283,11 @@ record TrendBox(
 
 | 나라 | 소스 | 가중치(반영값, 0~2) |
 |---|---|---|
-| KR | naver_datalab / google / admin / internal | 2 / 2 / 2 / 1 |
-| GLOBAL·JP·IN | bq_trends_rising / internal | 2 / 1 |
+| KR | google / admin / internal | 1 / 1 / 1 |
+| GLOBAL·JP·IN | internal(외부 소스 미정, 16.1) | 1 |
 
 - 나라마다 외부 소스는 하나이고, 한 키워드는 한 번에 반영 소스를 하나만 가진다(`internal` 아니면 그 외부 소스). 외부 소스를 더 붙이면 외부 확인된 소스 중 가중치가 큰 쪽을 쓴다. 트렌드 값의 식은 4.8에 있다.
-- BigQuery는 Top 25 목록에서 빠진 날이 곧 값 없음이다. 그래서 해외 키워드는 하루만 목록에서 빠져도 반영 소스가 `internal`로 내려가 점수가 낮아진다. 의도한 동작이다.
-- 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외).
+- 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외). 지금은 모든 소스가 1이다(125판).
 - 위 표는 `data_sources`의 초기값이다. `internal`은 모든 나라가 같은 행을 쓴다. 기본 비율(10), 최대 기준값(50), 로그 완만도(30), 기준 인원(1,000), 외부 확인 관심도(10)는 `settings`에 둔다(13.3).
 
 ## 11. 데이터 모델
@@ -363,7 +351,7 @@ record TrendBox(
 |---|---|
 | `countries` | KR(오픈), GLOBAL·JP·IN·CN(닫힘), 시간대·기본 언어·방 상한 |
 | `settings` | 13.3의 기본값과 허용 범위 |
-| `data_sources` | naver_datalab 2, google 2, bq_trends_rising 2, admin 2, internal 1 (10.3) |
+| `data_sources` | google 1, admin 1, internal 1 (10.3). 예전 DB에 남은 naver_datalab·bq_trends_rising 행은 지우고(그 소스를 쓰던 키워드는 internal로, 3명 미만이면 💤), 예전 기본값 2 그대로인 반영값은 1로 바꾼 뒤 트렌드 값과 점수를 다시 계산한다 |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 22개를 번호 순서대로 |
@@ -390,7 +378,7 @@ java {
   - Gradle: 9.8.2. Java 25는 Gradle 9.1.0부터 지원하고, Spring Boot 4.1.2는 Gradle 8.14 이상 또는 9.x를 지원한다.
   - 내장 서버: Tomcat 11.0.x(Servlet 6.1).
   - Spring Boot 4는 Jackson 3(`tools.jackson`), Hibernate 7.x, Spring Security 7.x를 쓴다. 4.1.0 기준 Hibernate 7.4, Spring Security 7.1.0, Flyway 12.4.0이고, 4.1.2가 관리하는 정확한 버전은 BOM을 따른다.
-- 주요 의존성: spring-boot-starter-webmvc(예전 이름 starter-web은 폐기 예정), starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, BigQuery 클라이언트, ONNX Runtime, Testcontainers(MySQL).
+- 주요 의존성: spring-boot-starter-webmvc(예전 이름 starter-web은 폐기 예정), starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, ONNX Runtime, Testcontainers(MySQL).
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
 - 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.

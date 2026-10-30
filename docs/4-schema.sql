@@ -124,8 +124,8 @@ CREATE TABLE profiles (
 
 CREATE TABLE data_sources (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '데이터 소스 ID',
-  name       VARCHAR(50) NOT NULL COMMENT '어느 데이터인지(naver_datalab, bq_trends_rising, google, internal 등). 화면 표시는 코드로 번역',
-  weight     DECIMAL(6,3) NOT NULL COMMENT '반영값(가중치, 0~2). 외부 소스 2, internal 1. 키워드 트렌드 값에 곱함. 0이면 사용 안 함',
+  name       VARCHAR(50) NOT NULL COMMENT '어느 데이터인지(google, admin, internal). 화면 표시는 코드로 번역',
+  weight     DECIMAL(6,3) NOT NULL COMMENT '반영값(가중치, 0~2). 지금은 모든 소스 1. 키워드 트렌드 값에 곱함. 0이면 사용 안 함',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),

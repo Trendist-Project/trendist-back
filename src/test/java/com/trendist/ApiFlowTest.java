@@ -251,7 +251,7 @@ class ApiFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FOUND"))
                 .andExpect(jsonPath("$.keyword.state").value("활성"))
-                .andExpect(jsonPath("$.keyword.trendValue").value(20));
+                .andExpect(jsonPath("$.keyword.trendValue").value(10));
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔깐루\"}"))
                 .andExpect(status().isOk())
@@ -262,10 +262,10 @@ class ApiFlowTest {
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔 깐루\"}"))
                 .andExpect(status().isConflict());
-        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 21(20.75를 반올림) = 22, 정수
+        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 10(반영값 1, 10.37을 반올림) = 11, 정수
         MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
         Object score = JsonPath.read(me.getResponse().getContentAsString(), "$.player.currentScore");
-        assertThat(score).isEqualTo(22);
+        assertThat(score).isEqualTo(11);
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
         // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다

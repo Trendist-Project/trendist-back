@@ -8,15 +8,21 @@ import com.trendist.guide.entity.GuideCategory;
 import com.trendist.guide.repository.GuideCategoryRepository;
 import com.trendist.guide.repository.GuideRepository;
 import com.trendist.keyword.entity.DataSource;
+import com.trendist.keyword.entity.Keyword;
 import com.trendist.keyword.entity.KeywordState;
 import com.trendist.keyword.repository.DataSourceRepository;
+import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.KeywordStateRepository;
+import com.trendist.keyword.support.TrendFormula;
 import com.trendist.player.entity.Level;
 import com.trendist.player.repository.LevelRepository;
+import com.trendist.player.repository.PlayerRepository;
+import com.trendist.player.service.PlayerService;
 import com.trendist.report.entity.ReportType;
 import com.trendist.report.repository.ReportTypeRepository;
 import com.trendist.setting.entity.Setting;
 import com.trendist.setting.repository.SettingRepository;
+import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.title.entity.Title;
 import com.trendist.title.repository.TitleRepository;
@@ -25,6 +31,8 @@ import com.trendist.user.entity.UserState;
 import com.trendist.user.repository.UserRepository;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +53,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DataSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+    /** 125판에서 없앤 데이터 소스. 예전 DB에 남아 있으면 지운다. */
+    private static final List<String> REMOVED_SOURCES = List.of("naver_datalab", "bq_trends_rising");
+    /** 124판까지 외부 소스의 기본 반영값. 이 값 그대로인 행은 1로 바꾼다. */
+    private static final BigDecimal OLD_DEFAULT_WEIGHT = new BigDecimal("2");
 
     private final CountryRepository countries;
     private final UserStateRepository userStates;
@@ -57,6 +69,12 @@ public class DataSeeder implements ApplicationRunner {
     private final GuideCategoryRepository guideCategories;
     private final GuideRepository guides;
     private final UserRepository users;
+    private final KeywordRepository keywords;
+    private final PlayerRepository players;
+    private final PlayerService playerService;
+    private final SettingService settingService;
+    private final TrendFormula formula;
+    private final Clock clock;
     private final CodeTables codeTables;
 
     @Override
@@ -85,15 +103,10 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        for (var e : List.of(
-                new Object[]{DataSource.NAVER_DATALAB, "2"},
-                new Object[]{DataSource.BQ_TRENDS_RISING, "2"},
-                new Object[]{DataSource.GOOGLE, "2"},
-                new Object[]{DataSource.ADMIN, "2"},
-                new Object[]{DataSource.INTERNAL, "1"})) {
-            String name = (String) e[0];
+        // 반영값은 모두 1(10.3)
+        for (String name : List.of(DataSource.GOOGLE, DataSource.ADMIN, DataSource.INTERNAL)) {
             if (dataSources.findByName(name).isEmpty()) {
-                dataSources.save(new DataSource(name, new BigDecimal((String) e[1])));
+                dataSources.save(new DataSource(name, BigDecimal.ONE));
                 added++;
             }
         }
@@ -129,8 +142,50 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         codeTables.clear();
+        migrateDataSources();
         added += seedGuides();
         log.info("seed done, {} rows added", added);
+    }
+
+    /**
+     * 예전 DB 정리(125판): 쓰지 않는 소스(naver_datalab, bq_trends_rising)를 지우고 예전 기본 반영값 2를 1로 바꾼다.
+     * 지운 소스를 반영 소스로 쓰던 키워드는 외부 데이터가 사라진 것과 같이 internal로 내리고 3명 미만이면 💤(4.7).
+     * 바뀐 것이 있으면 모든 키워드의 trend_value와 보유자 점수를 다시 계산한다(13.2).
+     */
+    private void migrateDataSources() {
+        boolean changed = false;
+        DataSource internal = dataSources.findByName(DataSource.INTERNAL).orElseThrow();
+        KeywordState active = keywordStates.findByName(CodeTables.KW_ACTIVE).orElseThrow();
+        KeywordState inactive = keywordStates.findByName(CodeTables.KW_INACTIVE).orElseThrow();
+        int activateHolders = settingService.getInt(SettingKeys.ACTIVATE_HOLDERS);
+        Instant now = Instant.now(clock);
+        for (String name : REMOVED_SOURCES) {
+            DataSource old = dataSources.findByName(name).orElse(null);
+            if (old == null) continue;
+            List<Keyword> moved = keywords.findByDataSourceId(old.getId());
+            for (Keyword k : moved) {
+                k.dropExternal(internal);
+                if (k.getKeywordState().getId().equals(active.getId()) && k.getHolderCount() < activateHolders) k.deactivate(inactive, now);
+            }
+            keywords.flush();
+            dataSources.delete(old);
+            log.info("데이터 소스 {} 삭제, 키워드 {}개를 internal로", name, moved.size());
+            changed = true;
+        }
+        for (DataSource ds : dataSources.findAll()) {
+            if (ds.getWeight().compareTo(OLD_DEFAULT_WEIGHT) == 0) {
+                log.info("데이터 소스 반영값 변경: {} {} → 1", ds.getName(), ds.getWeight());
+                ds.changeWeight(BigDecimal.ONE);
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        for (Keyword k : keywords.findAll()) {
+            k.setTrendValue(formula.trendValue(k.getKeywordState().getId().equals(active.getId()), k.getHolderCount(),
+                    k.getDataSource().getWeight().doubleValue()));
+        }
+        keywords.flush();
+        for (Long pid : players.findCheckTargets()) playerService.recomputeLocked(pid, true);
     }
 
     /** 가이드 카테고리와 글(4.17). 운영에서 고치는 데이터라 각 테이블이 비어 있을 때만 넣는다. */
