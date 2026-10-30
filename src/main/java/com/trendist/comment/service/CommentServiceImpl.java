@@ -9,6 +9,7 @@ import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
 import com.trendist.common.support.RateLimiter;
 import com.trendist.common.support.TextRules;
+import com.trendist.game.event.GameEvents;
 import com.trendist.keyword.entity.Keyword;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.player.entity.Player;
@@ -21,6 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ public class CommentServiceImpl implements CommentService {
     private final PlayerRepository players;
     private final PlayerService playerService;
     private final RateLimiter rateLimiter;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     // ---------------------------------------------------------------- 조회
@@ -76,6 +79,7 @@ public class CommentServiceImpl implements CommentService {
         Comment c = comments.save(new Comment(k, me, body));
         comments.flush();
         players.addCommentScore(me.getId(), 1);
+        events.publishEvent(new GameEvents.TitleCheck(me.getId())); // 댓글 점수 칭호(4.10)
         return item(me, c, null);
     }
 
@@ -98,6 +102,7 @@ public class CommentServiceImpl implements CommentService {
         c.delete(Instant.now(clock));
         comments.flush();
         players.addCommentScore(me.getId(), -1);
+        events.publishEvent(new GameEvents.TitleCheck(me.getId())); // 댓글 점수 칭호(4.10)
     }
 
     // ---------------------------------------------------------------- 투표
@@ -139,6 +144,7 @@ public class CommentServiceImpl implements CommentService {
         long authorId = c.getPlayer().getId();
         comments.addVotes(c.getId(), like, dislike);
         players.addCommentScore(authorId, like - dislike); // 추천 +1, 비추천 −1. 추천 → 비추천은 −2
+        events.publishEvent(new GameEvents.TitleCheck(authorId)); // 댓글 점수 칭호(4.10)
         Comment fresh = comments.findById(commentId).orElseThrow();
         return new CommentDtos.VoteResult(after, fresh.getLikeCount(), fresh.getDislikeCount());
     }

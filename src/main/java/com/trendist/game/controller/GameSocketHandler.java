@@ -113,7 +113,8 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
                 room.submit(r -> {
                     if (!session.isOpen()) return;
-                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime());
+                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime(),
+                            new Room.Appearance(player.title()));
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),

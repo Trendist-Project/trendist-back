@@ -44,6 +44,8 @@ public class Player extends BaseTimeEntity {
     public void decHold() { this.holdCount = Math.max(0, holdCount - 1); }
     public void setHoldCount(long holdCount) { this.holdCount = Math.max(0, holdCount); }
     public void touchPlayed(Instant now) { this.lastPlayedAt = now; }
+    /** 활성 칭호(4.10). null이면 숨김. 가진 칭호인지는 서비스가 확인한다. */
+    public void changeTitle(Long titleId) { this.titleId = titleId; }
 
     /** 닉네임 변경. 변경 간격 검사는 서비스가 하고, 여기서는 변경 시각을 함께 남긴다(4.1). */
     public void changeNickname(String nickname, Instant now) {

@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -235,6 +236,29 @@ class ApiFlowTest {
         assertThat(all.stateCounts().get(CodeTables.KW_BANNED)).isGreaterThanOrEqualTo(1L);
         assertThat(keywordService.adminSearch("KR", "", "", "", "trendValue", "desc", 0, 100).items())
                 .anyMatch(k -> k.id() == added.id());
+    }
+
+    @Test
+    void firstPlusGrantsTitleAndOnlyOwnedTitleCanBeActivated() throws Exception {
+        // 처음 추가하면 "트렌드 워처"를 자동으로 받는다(4.10). 자동 활성화는 하지 않는다
+        String t = player("칭호시험");
+        mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"칭호키워드\"}")).andExpect(status().isOk());
+        MvcResult box = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
+        String json = box.getResponse().getContentAsString();
+        java.util.List<Integer> owned = JsonPath.read(json, "$.titles[?(@.owned == true)].id");
+        java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
+        assertThat(names).containsExactly("트렌드 워처");
+        assertThat((Object) JsonPath.read(json, "$.activeTitleId")).isNull();
+        // 아직 없는 칭호(트렌드 수집가, 100번)는 진행도만 보인다
+        java.util.List<Integer> progress = JsonPath.read(json, "$.titles[?(@.name == '트렌드 수집가')].current");
+        assertThat(progress).containsExactly(1);
+        java.util.List<Integer> notOwned = JsonPath.read(json, "$.titles[?(@.owned == false)].id");
+        mvc.perform(put("/api/me/title").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"titleId\":" + notOwned.getFirst() + "}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/me/title").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"titleId\":" + owned.getFirst() + "}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeTitleId").value(owned.getFirst()));
     }
 
     @Test

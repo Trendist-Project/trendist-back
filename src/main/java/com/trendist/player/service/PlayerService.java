@@ -9,7 +9,8 @@ public interface PlayerService {
 
     /** 방 입장에 필요한 값(트랜잭션 안에서 꺼낸다). */
     /** firstTime: 아직 키워드를 한 번도 추가하지 않은 처음 온 플레이어. 가운데 세이프존에서 시작한다(4.22). */
-    record JoinInfo(long playerId, long countryId, String nickname, int level, double score, boolean firstTime) {}
+    /** title은 이름표 아래 칭호(4.10). */
+    record JoinInfo(long playerId, long countryId, String nickname, int level, double score, boolean firstTime, String title) {}
 
     /** 사용자의 현재 나라 플레이어. 마지막으로 플레이한 나라, 없으면 KR. */
     Optional<Player> findCurrent(long userId);

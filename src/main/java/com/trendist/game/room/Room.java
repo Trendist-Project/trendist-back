@@ -54,11 +54,18 @@ public class Room {
         default void close(Member m) {}
     }
 
+    /** 이름표 아래 칭호. 입장 때 함께 받는다. */
+    public record Appearance(String title) {
+        public static final Appearance DEFAULT = new Appearance(null);
+    }
+
     public static final class Member {
         public final int entityNo;
         public final long playerId;
         public final Object session; // GameSocketHandler가 쓰는 세션
         public String nickname;
+        /** 활성 칭호(4.10). 없으면 null. 이름표 아래 작은 글씨로 보인다 */
+        public String title;
         public int level;
         public double score;
         public double x, y, vx, vy;
@@ -156,11 +163,17 @@ public class Room {
     /** firstTime이면(처음 온 플레이어) 가운데 고정 세이프존 안에서 시작한다(4.22). */
     public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
                        boolean firstTime) {
+        return join(playerId, session, nickname, level, score, keywordIds, firstTime, Appearance.DEFAULT);
+    }
+
+    public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
+                       boolean firstTime, Appearance look) {
         Member old = byPlayer.get(playerId);
         if (old != null) leave(old); // 한 계정은 한 방에 한 연결
         Member m = new Member(nextEntity++, playerId, session);
         m.lastHeardNanos = nanoClock.getAsLong();
         m.nickname = nickname; m.level = level; m.score = score;
+        m.title = look.title();
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         double area = activeArea(members.size() + 1);
         LastSeen seen = lastSeen.remove(playerId);
@@ -282,6 +295,14 @@ public class Room {
         Member m = byPlayer.get(playerId);
         if (m == null) return;
         m.nickname = nickname;
+        broadcastRoster();
+    }
+
+    /** 활성 칭호가 바뀌었다(4.10). 모두에게 명단을 다시 보낸다. */
+    public void applyTitle(long playerId, String title) {
+        Member m = byPlayer.get(playerId);
+        if (m == null) return;
+        m.title = title;
         broadcastRoster();
     }
 
@@ -669,7 +690,13 @@ public class Room {
 
     private void broadcastRoster() {
         List<Map<String, Object>> list = new ArrayList<>();
-        for (Member m : members.values()) list.add(Map.of("e", m.entityNo, "nickname", m.nickname, "level", m.level, "bot", m.bot));
+        for (Member m : members.values()) {
+            // 칭호는 없을 수 있어서(null) Map.of 대신 HashMap을 쓴다
+            Map<String, Object> e = new HashMap<>();
+            e.put("e", m.entityNo); e.put("nickname", m.nickname); e.put("level", m.level); e.put("bot", m.bot);
+            e.put("title", m.title);
+            list.add(e);
+        }
         Map<String, Object> msg = Map.of("type", "roster", "players", list);
         for (Member m : members.values()) outbox.sendText(m, msg);
     }

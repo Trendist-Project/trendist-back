@@ -170,6 +170,23 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @TransactionalEventListener(fallbackExecution = true)
+    public void on(GameEvents.TitleChanged e) {
+        Room r = rooms.get(e.countryId());
+        if (r != null) r.submit(room -> room.applyTitle(e.playerId(), e.title()));
+    }
+
+    /** 새 칭호를 받았다(4.10). 접속 중이면 그 사람에게만 알린다. */
+    @TransactionalEventListener(fallbackExecution = true)
+    public void on(GameEvents.TitleGranted e) {
+        Room r = rooms.get(e.countryId());
+        if (r == null) return;
+        r.submit(room -> {
+            Room.Member m = room.byPlayer(e.playerId());
+            if (m != null) sendText(m, Map.of("type", "titleGranted", "name", e.name(), "description", e.description()));
+        });
+    }
+
+    @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.HoldingChanged e) {
         Room r = rooms.get(e.countryId());
         if (r != null) r.submit(room -> room.applyHolding(e.playerId(), e.keywordId(), e.added()));

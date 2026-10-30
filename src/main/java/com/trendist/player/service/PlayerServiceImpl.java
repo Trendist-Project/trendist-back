@@ -13,6 +13,8 @@ import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.support.NicknameValidator;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
+import com.trendist.title.entity.Title;
+import com.trendist.title.repository.TitleRepository;
 import com.trendist.user.entity.User;
 import com.trendist.user.repository.UserRepository;
 import java.time.Clock;
@@ -36,6 +38,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final CodeTables codes;
     private final ApplicationEventPublisher events;
     private final SettingService settings;
+    private final TitleRepository titles;
     private final Clock clock;
 
     @Override
@@ -50,8 +53,12 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     @Transactional(readOnly = true)
     public Optional<JoinInfo> joinInfo(long userId) {
-        return findCurrent(userId).map(p -> new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(),
-                Math.toIntExact(p.getLevel()), p.getCurrentScore(), p.getTotalPlusCount() == 0));
+        return findCurrent(userId).map(p -> {
+            String title = p.getTitleId() == null ? null
+                    : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
+            return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
+                    p.getTotalPlusCount() == 0, title);
+        });
     }
 
     @Override
@@ -120,6 +127,7 @@ public class PlayerServiceImpl implements PlayerService {
         p.setLevel(levels.levelFor(p.getExp()));
         events.publishEvent(new GameEvents.PlayerScoreChanged(p.getCountry().getId(), p.getId(), score, p.getExp(),
                 p.getLevel(), p.getHoldCount()));
+        events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 추가·레벨·보유 수·점수가 바뀌었을 수 있다(4.10)
         return score;
     }
 
