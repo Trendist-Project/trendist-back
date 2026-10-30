@@ -202,6 +202,36 @@ class ApiFlowTest {
         assertThat(keywordService.stealRandom(loser, winner)).isEmpty(); // 잃을 키워드가 없으면 아무 일도 없다
     }
 
+    @Autowired com.trendist.notice.service.NoticeService noticeService;
+    @Autowired com.trendist.user.repository.UserRepository userRepo;
+
+    @Test
+    void adminWritesEditsAndDeletesNotices() throws Exception {
+        // 공지(4.16): 관리자만 쓴다. 관리자가 아니면 403
+        String t = player("공지시험");
+        mvc.perform(post("/api/admin/notices").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"제목\",\"body\":\"본문\"}")).andExpect(status().isForbidden());
+        long admin = userRepo.findFirstByRoleOrderByIdAsc(com.trendist.user.entity.User.ROLE_ADMIN).orElseThrow().getId();
+        var req = new com.trendist.notice.dto.AdminNoticeDtos.Request("  점검 안내 ", "오늘 밤 **점검**이 있어요", true, true, 3);
+        var created = noticeService.create(admin, req);
+        assertThat(created.title()).isEqualTo("점검 안내");
+        assertThat(created.popupDays()).isEqualTo(3);
+        mvc.perform(get("/api/notices")).andExpect(jsonPath("$[?(@.id == " + created.id() + ")].pinned").value(true));
+        var updated = noticeService.update(created.id(), new com.trendist.notice.dto.AdminNoticeDtos.Request("점검 안내(수정)", "본문", false, false, null));
+        assertThat(updated.popupUntil()).isNull();
+        assertThat(updated.pinned()).isFalse();
+        // 제목 50자 초과, 빈 본문, 팝업 기간 범위 밖은 거절
+        assertThatThrownBy(() -> noticeService.create(admin, new com.trendist.notice.dto.AdminNoticeDtos.Request("가".repeat(51), "본문", false, false, null)))
+                .isInstanceOf(com.trendist.common.exception.ApiException.class);
+        assertThatThrownBy(() -> noticeService.create(admin, new com.trendist.notice.dto.AdminNoticeDtos.Request("제목", " ", false, false, null)))
+                .isInstanceOf(com.trendist.common.exception.ApiException.class);
+        assertThatThrownBy(() -> noticeService.create(admin, new com.trendist.notice.dto.AdminNoticeDtos.Request("제목", "본문", false, true, 91)))
+                .isInstanceOf(com.trendist.common.exception.ApiException.class);
+        noticeService.delete(created.id());
+        mvc.perform(get("/api/notices")).andExpect(jsonPath("$[?(@.id == " + created.id() + ")]").isEmpty());
+        assertThat(noticeService.adminList()).noneMatch(n -> n.id() == created.id());
+    }
+
     @Test
     void adminAddsActiveKeywordForSevenDaysAndNonAdminIsRejected() throws Exception {
         // 관리자가 넣은 키워드는 🔥활성, 반영 소스 admin, 지금부터 7일(13.7). 관리자가 아니면 403
