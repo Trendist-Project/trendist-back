@@ -65,7 +65,8 @@ public class PlayerServiceImpl implements PlayerService {
             String title = p.getTitleId() == null ? null
                     : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
             var look = profiles.findFirstByPlayerIdAndEquippedTrue(p.getId());
-            String trail = p.getTrailEffectId() == null ? null
+            // 이동 효과는 로그인 사용자만 쓴다(4.23). 게스트는 예전에 골라 둔 효과가 있어도 보이지 않는다
+            String trail = p.getTrailEffectId() == null || p.getUser().isGuest() ? null
                     : trailEffects.findById(p.getTrailEffectId()).filter(TrailEffect::isEnabled).map(TrailEffect::getCode).orElse(null);
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
                     p.getTotalPlusCount() == 0, title, look.map(Profile::getBackgroundColor).orElse(Room.DEFAULT_BACKGROUND),

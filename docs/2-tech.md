@@ -165,8 +165,8 @@ WHERE p.id IN (/* 500명 */)
 | `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT" \| "PLAYER", "targetId": 1, "reason": "..." }`(PLAYER는 같은 방의 세션 엔티티 번호). 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `POST /api/auth/withdraw` | `{ "phrase": "탈퇴 합니다." }`. 탈퇴(4.1): 문구가 다르면 400 `WITHDRAW_PHRASE`, 게스트면 400 `WITHDRAW_GUEST`. 갱신 토큰 폐기, 쿠키 삭제(204) |
-| `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 떼기). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
-| `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 조건 미달 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
+| `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 해제). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
+| `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 게스트와 조건 미달은 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
 | `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 

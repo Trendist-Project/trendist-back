@@ -70,6 +70,14 @@ class ApiFlowTest {
         return token;
     }
 
+    /** 구글로 로그인한 것처럼 만든 플레이어(이 게스트 사용자 행에 구글 ID를 붙인다) */
+    private String loggedInPlayer(String nickname) throws Exception {
+        String token = player(nickname);
+        long uid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + token)).andReturn(), "$.userId"));
+        jdbc.update("update users set oauth_type = 'GOOGLE', oauth_id = ? where id = ?", "test-" + uid, uid);
+        return token;
+    }
+
     @Test
     void trendFormulaMatchesDocumentTable() {
         // 4.8: 가진 비율 = 가진 사람 / max(활동 인원, 최소 인원 20), 50%에서 최고점. 정수로 반올림한다
@@ -341,8 +349,17 @@ class ApiFlowTest {
 
     @Test
     void trailEffectsAreFreeToChooseOneAtATime() throws Exception {
-        // 이동 효과(4.23): 지금은 모두 조건 없이 고를 수 있고 하나만 쓴다
-        String t = player("효과시험");
+        // 이동 효과(4.23): 게스트는 모두 잠겨 있고 고를 수 없다
+        String g = player("효과게스트");
+        String gjson = mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + g)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<Boolean> guestUnlocked = JsonPath.read(gjson, "$.effects[*].unlocked");
+        assertThat(guestUnlocked).containsOnly(false);
+        java.util.List<Integer> guestIds = JsonPath.read(gjson, "$.effects[?(@.code == 'flame')].id");
+        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + g).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"effectId\":" + guestIds.getFirst() + "}")).andExpect(status().isForbidden());
+        // 로그인하면 모두 조건 없이 고를 수 있고 하나만 쓴다
+        String t = loggedInPlayer("효과시험");
         MvcResult box = mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.activeEffectId").doesNotExist()).andReturn();
         String json = box.getResponse().getContentAsString();
@@ -361,7 +378,7 @@ class ApiFlowTest {
         // 나중에 조건을 붙이면(레벨) 그 조건을 채우기 전에는 고를 수 없다
         jdbc.update("update trail_effects set unlock_type = 'LEVEL', unlock_value = 50 where code = 'rainbow'");
         try {
-            String t2 = player("효과시험2");
+            String t2 = loggedInPlayer("효과시험2");
             mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t2))
                     .andExpect(jsonPath("$.effects[?(@.code == 'rainbow')].unlocked").value(false));
             java.util.List<Integer> rainbow = JsonPath.read(json, "$.effects[?(@.code == 'rainbow')].id");
