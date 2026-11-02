@@ -388,7 +388,7 @@ CREATE TABLE share_cards (
   data         JSON NOT NULL COMMENT '공유한 순간의 카드 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드, 누적 기록, 꾸미기, 이동 효과). 고치지 않는다',
   created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
   view_count   BIGINT NOT NULL DEFAULT 0 COMMENT '공유 페이지 조회 수(같은 방문자 카드마다 하루 1번, 크롤러 제외)',
-  play_count   BIGINT NOT NULL DEFAULT 0 COMMENT '[나도 겨뤄 보기] 클릭 수(조회와 같은 규칙)',
+  play_count   BIGINT NOT NULL DEFAULT 0 COMMENT '[나도 플레이 하기] 클릭 수(조회와 같은 규칙)',
   updated_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각(조회·클릭 수 저장 때)',
   PRIMARY KEY (id),
   UNIQUE KEY uk_share_cards_code (code),

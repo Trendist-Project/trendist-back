@@ -172,8 +172,8 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 게스트와 조건 미달은 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
 | `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
 | `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 누적 기록, 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
-| `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [나도 겨뤄 보기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
-| `GET /share/{code}/play` | [나도 겨뤄 보기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
+| `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [나도 플레이 하기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
+| `GET /share/{code}/play` | [나도 플레이 하기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
 | `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |

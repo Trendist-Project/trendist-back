@@ -17,7 +17,7 @@ public interface ShareCardService {
     /** 카드 PNG. 없는 코드면 비어 있다 */
     Optional<byte[]> image(String code);
 
-    /** 공유 페이지를 열거나([나도 겨뤄 보기]를 누른) 것을 센다. 같은 방문자 카드마다 하루 1번, 크롤러 제외(4.24) */
+    /** 공유 페이지를 열거나([나도 플레이 하기]를 누른) 것을 센다. 같은 방문자 카드마다 하루 1번, 크롤러 제외(4.24) */
     void count(String code, com.trendist.share.support.ShareViewCounter.Kind kind, String ip, String userAgent);
 
     /** 관리자 공유 통계. sort: views / plays / createdAt(13.8) */
