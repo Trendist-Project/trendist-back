@@ -1,7 +1,7 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 32개, 외래 키 34개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 33개, 외래 키 36개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
 -- 확인 범위: 88판 스키마는 MariaDB 10.11.14에서 두 번 연속 실행해 확인했다. 이후 판은 DB 접속 권한이 없어 실행하지 못했고, 쉼표·괄호·외래 키 참조 대상·생성 순서만 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다.
@@ -379,6 +379,22 @@ CREATE TABLE chat_messages (
   CONSTRAINT fk_chat_messages_country FOREIGN KEY (country_id) REFERENCES countries (id),
   CONSTRAINT fk_chat_messages_player FOREIGN KEY (player_id) REFERENCES players (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='채팅 메시지(보관 기간 뒤 삭제)';
+
+CREATE TABLE share_cards (
+  id           BIGINT NOT NULL AUTO_INCREMENT COMMENT '공유 카드 ID',
+  player_id    BIGINT NOT NULL COMMENT '만든 플레이어 ID(players.id)',
+  code         VARCHAR(16) NOT NULL COMMENT '공개 코드(무작위 영숫자 10자). 공유 주소 /share/{code}',
+  content_hash CHAR(64) NOT NULL COMMENT '카드 값(JSON)의 SHA-256. 같은 플레이어가 같은 값으로 다시 만들면 이 행을 다시 쓴다',
+  data         JSON NOT NULL COMMENT '공유한 순간의 카드 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드, 누적 기록, 꾸미기, 이동 효과). 고치지 않는다',
+  created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  view_count   BIGINT NOT NULL DEFAULT 0 COMMENT '공유 페이지 조회 수(같은 방문자 카드마다 하루 1번, 크롤러 제외)',
+  play_count   BIGINT NOT NULL DEFAULT 0 COMMENT '[나도 겨뤄 보기] 클릭 수(조회와 같은 규칙)',
+  updated_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각(조회·클릭 수 저장 때)',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_share_cards_code (code),
+  UNIQUE KEY uk_share_cards_player_hash (player_id, content_hash),
+  CONSTRAINT fk_share_cards_player FOREIGN KEY (player_id) REFERENCES players (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='자랑하기 카드 공유 주소(4.24, 영구 보관)';
 
 CREATE TABLE report_types (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '신고 대상 유형 ID',

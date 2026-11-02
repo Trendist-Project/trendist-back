@@ -22,6 +22,7 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 | `PROD_SERVER_PORT` | prod | 운영 포트(서버 docker compose가 4001로 넘긴다) |
 | `TRENDIST_JWT_SECRET` | prod | JWT 서명 키(32바이트 이상). 없으면 개발용 기본값 |
 | `PROD_ALLOWED_ORIGINS` | prod | 게임 WebSocket을 허용할 사이트 주소(쉼표로 여러 개). 없으면 `https://trendist.kr,https://www.trendist.kr` |
+| `PROD_SITE_URL` | prod | 자랑하기 카드 공유 주소·링크 미리보기(OG)에 쓰는 사이트 주소. 없으면 `https://trendist.kr` |
 
 - 로컬 DB(처음 한 번): MariaDB에 DB `trendist`를 만들고, 이 PC의 DB 계정을 `src/main/resources/application.env`에 적는다(git 제외 파일, 계정 정보는 저장소에 올리지 않는다). `dev` 프로필이 이 파일을 읽는다.
   ```sql

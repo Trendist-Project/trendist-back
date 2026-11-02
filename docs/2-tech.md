@@ -131,6 +131,7 @@ WHERE p.id IN (/* 500명 */)
 | 외부 온디맨드 조회, 새 키워드 생성 | 사용자·IP 단위 분당 제한 |
 | 트렌드 상자 열기 | 초당 2회 |
 | 토큰 발급·갱신·게스트 시작(`/api/auth/*`) | IP 단위 분당 10회 |
+| 자랑하기 카드 공유 주소 만들기 | 사용자당 분당 10회(429 `SHARE_TOO_FAST`). 값이 같은 카드는 같은 주소를 돌려주므로 행이 늘지 않는다 |
 
 ### 9.6 API (초안)
 
@@ -169,6 +170,11 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 해제). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
 | `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 게스트와 조건 미달은 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
 | `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
+| `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 누적 기록, 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
+| `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [나도 겨뤄 보기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
+| `GET /share/{code}/play` | [나도 겨뤄 보기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
+| `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
+| `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
 - 투표 토글: 없음 → INSERT, 같은 값 → DELETE, 반대 값 → UPDATE. 조건부 쿼리의 영향 행 수가 1일 때만 `comments.like_count`·`dislike_count`를 바꾸고, 같은 때 작성자의 `comment_score`도 같이 바꾼다(추천 +1, 비추천 −1, 취소·변경은 반대로, `GREATEST(값, 0)`으로 0 아래 방지). 첫 투표 경합은 UNIQUE 오류 후 다시 읽어 처리한다.
@@ -178,7 +184,7 @@ WHERE p.id IN (/* 500명 */)
 | 주기 | 잡 |
 |---|---|
 | 5초 | 접속 중인 플레이어의 바뀐 점수를 `players.current_score`에 모아서 저장(9.2) |
-| 1분 | 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 나라별 활동 인원을 다시 세고 지금 식과 달라진 🔥 키워드의 트렌드 값 갱신(4.8), 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
+| 1분 | 자랑하기 카드 조회·클릭 수 저장(메모리에 모은 증가분을 `share_cards.view_count`·`play_count`에 더함, 종료 때도 저장, 4.24). 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 나라별 활동 인원을 다시 세고 지금 식과 달라진 🔥 키워드의 트렌드 값 갱신(4.8), 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
 | 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4) |
 | 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외), 만료된 갱신 토큰 삭제 |
 
@@ -307,7 +313,7 @@ record TrendBox(
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 개발·테스트에서는 시작할 때 JPA가 스키마를 반영하고 시더가 초기 데이터를 넣는다(11.3). 운영은 17절 SQL(`4-schema.sql`)을 기준으로 Flyway를 쓴다.
 
-### 11.2 테이블 (32개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (33개, 컬럼은 `4-schema.sql`)
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
@@ -327,6 +333,7 @@ record TrendBox(
 | | `data_sources` | 데이터 소스별 반영값(가중치) |
 | 소셜 | `comments`, `comment_votes` | 키워드 댓글과 투표 |
 | | `chat_messages` | 채팅(30일 보관) |
+| | `share_cards` | 자랑하기 카드 공유 주소(4.24). 공개 코드와 공유한 순간의 카드 값(JSON, 고치지 않음), 누적 조회·클릭 수, 영구 보관 |
 | | `report_types`, `reports` | 신고 대상 유형과 신고(대상 유형 + ID) |
 | 운영 | `notices`, `user_notices` | 공지와 팝업 열람 기록 |
 | | `guide_categories`, `guides` | 게임 가이드 |
@@ -336,7 +343,7 @@ record TrendBox(
 | | `sanction_types`, `sanctions` | 제재 타입(타입별 제재 일수)과 사용자 제재 기록(사유·기간·해제) |
 
 - `player_keywords.player_id`의 나라와 키워드의 나라가 같은지, `chat_messages.country_id`와 `player_id`의 나라가 같은지, 댓글·투표의 `player_id`가 그 댓글 키워드의 나라인지는 애플리케이션에서 검사한다. `keywords.data_source_id`(반영 소스)는 항상 값이 있고, 외부에서 확인되지 않은 키워드(사용자가 만든 것, 관리자가 넣은 시드 포함)는 `internal`을 가리킨다. `reports.target_id`는 대상이 여러 테이블이라 외래 키가 없다.
-- 계속 쌓이는 테이블은 `keyword_log_dailies`(180일)와 `player_score_dailies`(영구)다. 커지면 월 파티션으로 나누고 기본 키를 각각 `(id, record_date)`로 바꾼다. `player_score_24h`는 플레이어당, `keyword_log_24h`는 키워드당 최대 24칸을 덮어써서 항상 24시간치만 남는다. `player_keywords`는 하루치만 남는다.
+- 계속 쌓이는 테이블은 `keyword_log_dailies`(180일), `player_score_dailies`(영구), `share_cards`(영구, 행당 1KB 안팎)다. 커지면 월 파티션으로 나누고 기본 키를 각각 `(id, record_date)`로 바꾼다. `player_score_24h`는 플레이어당, `keyword_log_24h`는 키워드당 최대 24칸을 덮어써서 항상 24시간치만 남는다. `player_keywords`는 하루치만 남는다.
 
 ### 11.3 스키마 자동 반영과 초기 데이터 (개발·테스트)
 스키마
@@ -392,6 +399,11 @@ java {
 - 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
 - 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 운영은 Flyway 전환 전까지 `ddl-auto=update`다(16.1).
 - 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 운영 환경 변수는 GitHub 시크릿 `ENV_FILE`을 배포 때 서버 `/home/ubuntu/trendist/.env`로 보내고(WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`, 기본 `https://trendist.kr`), 실행 설정(포트 4001, 네트워크)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
-- 카카오톡 공유(4.24, 138판): 프론트 빌드 환경 변수 `VITE_KAKAO_JS_KEY`(카카오 앱의 JavaScript 키, 공개 키)가 있을 때만 [카카오톡 공유]가 보인다. 운영은 프론트 저장소 변수 `KAKAO_JS_KEY`(Settings → Secrets and variables → Actions → Variables)를 GitHub Actions 빌드가 넣고, 로컬은 `trendist-front/.env.local`에 `VITE_KAKAO_JS_KEY=...`로 둔다. 카카오 개발자 콘솔(developers.kakao.com)에서 앱을 만들고 [앱 설정 → 플랫폼 → Web]에 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 등록해야 동작한다. SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
+- 카카오톡 공유(4.24, 138판·139판): 프론트 빌드 환경 변수 `VITE_KAKAO_JS_KEY`(카카오 앱의 JavaScript 키, 공개 키)가 있을 때만 [카카오톡 공유]가 보인다. 운영은 프론트 저장소 변수 `KAKAO_JS_KEY`(Settings → Secrets and variables → Actions → Variables)를 GitHub Actions 빌드가 넣고, 로컬은 git 제외 파일 `trendist-front/.env.local`에 `VITE_KAKAO_JS_KEY=...`로 둔다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
+- 자랑하기 카드 공유 주소(4.24, 139판): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
+- 토스 미니앱(앱인토스, 140판): 프론트 저장소 `toss/` 폴더가 토스용 빌드다. 게임 코드는 상위 `src`를 그대로 쓰고, `toss/.env.*`의 `VITE_PLATFORM=toss`로 토스 모드를 켠다(`src/platform.ts`). `cd toss && npm run build`가 `vite build`(게임만, 관리자 페이지 제외) 뒤 `ait build`로 `toss/trendist.ait`를 만들고, 이 파일을 앱인토스 콘솔에 올린다. 설정은 `toss/apps-in-toss.config.ts`(`appName`은 콘솔 앱 이름과 같아야 함, 당겨서 새로고침·뒤로 가기 제스처·튕김 끔). 앱인토스 CLI가 Node 20 이상을 요구해서 `toss/`에 개발 의존성 `node@22`를 두고 `npm run`이 그것을 쓴다.
+  - 토스 페이지는 토스 쪽 출처에서 열리므로 백엔드를 절대 주소 `VITE_API_BASE`(`toss/.env.production`, 기본 `https://trendist.kr`)로 부른다. 웹 빌드는 이 값이 없어 지금처럼 같은 출처의 `/api`·`/ws`를 쓴다. 로컬 `npm run dev`는 http://localhost:8082 에서 웹과 같이 Vite 프록시로 백엔드(8081)에 붙는다.
+  - 백엔드 코드는 바꾸지 않았다. 운영에서 토스 출처를 받으려면 nginx `/api`·`/share/`에 그 출처의 CORS 헤더(쿠키 없이)를 더하고, WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`에 그 출처를 넣어야 한다.
+  - 토스에서는 게스트로만 플레이한다. 구글 로그인 버튼을 숨기고(구글이 앱 웹뷰 로그인을 막는다), 방문자 ID·갱신 토큰 쿠키(`SameSite=Lax`)는 다른 출처라 오가지 않으므로 실행할 때마다 새 게스트가 된다. 한 번 실행하는 동안의 기록은 그 게스트로 DB에 저장된다. 카카오톡 공유는 키를 넣지 않아 숨는다.
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.

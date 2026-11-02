@@ -34,6 +34,9 @@ trendist:
     client-id: ${TRENDIST_GOOGLE_CLIENT_ID:754902354311-cmqprte41plivrf720bonpsdo6eh2m8i.apps.googleusercontent.com}
   ws:
     allowed-origins: http://localhost:8080,http://127.0.0.1:8080
+  # 자랑하기 카드 공유 주소·OG 태그의 사이트 주소(4.24). 로컬은 프론트 개발 서버 주소
+  share:
+    base-url: http://localhost:8080
   # 구글 트렌드 실시간 인기 RSS를 5분마다 읽어 키워드로 넣는다(10.2). 자동 테스트에서는 끈다.
   google-trends:
     enabled: true

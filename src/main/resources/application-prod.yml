@@ -2,6 +2,8 @@
 server:
   # nginx upstream trendist-back:4001
   port: ${PROD_SERVER_PORT}
+  # nginx가 넣는 X-Forwarded-For로 실제 접속 IP를 읽는다(자랑하기 카드 조회 수의 방문자 구분, 4.24)
+  forward-headers-strategy: native
 
 spring:
   datasource:
@@ -22,5 +24,8 @@ trendist:
   # 게임 WebSocket을 열 수 있는 사이트 주소(쉼표로 여러 개). 기본값은 운영 도메인
   ws:
     allowed-origins: ${PROD_ALLOWED_ORIGINS:https://trendist.kr,https://www.trendist.kr}
+  # 공유 주소·OG 태그에 쓰는 운영 사이트 주소(4.24)
+  share:
+    base-url: ${PROD_SITE_URL:https://trendist.kr}
   dev-trends:
     enabled: false
