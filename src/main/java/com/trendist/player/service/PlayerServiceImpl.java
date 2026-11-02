@@ -88,7 +88,7 @@ public class PlayerServiceImpl implements PlayerService {
             throw ApiException.conflict("PLAYER_EXISTS", "이미 이 나라의 닉네임이 있어요");
         }
         u.setCountry(c);
-        Player p = players.save(new Player(u, c, nickname));
+        Player p = players.save(new Player(u, c, nickname, levels.rowFor(0)));
         activity.add(c.getId(), com.trendist.stats.support.ActivityCounter.Kind.NEW_PLAYER); // 사이트 통계(13.9)
         p.touchPlayed(Instant.now(clock), ZoneId.of(c.getTimezone()));
         return p;
@@ -131,7 +131,7 @@ public class PlayerServiceImpl implements PlayerService {
         long sum = playerKeywords.sumActiveTrendValue(p.getId(), now, codes.keywordStateId(CodeTables.KW_ACTIVE));
         long score = formula.expScore(p.getExp()) + sum;
         p.setCurrentScore(score);
-        p.setLevel(levels.levelFor(p.getExp()));
+        p.setLevel(levels.rowFor(p.getExp()));
         events.publishEvent(new GameEvents.PlayerScoreChanged(p.getCountry().getId(), p.getId(), score, p.getExp(),
                 p.getLevel(), p.getHoldCount()));
         events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 추가·레벨·보유 수·점수가 바뀌었을 수 있다(4.10)

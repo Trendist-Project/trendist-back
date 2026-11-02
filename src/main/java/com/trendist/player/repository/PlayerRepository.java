@@ -72,7 +72,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     long countByCountryIdAndLastSeenAtGreaterThanEqual(Long countryId, java.time.Instant since);
 
     /** 레벨 분포(13.9): [레벨, 인원]. 탈퇴한 사용자는 뺀다. */
-    @Query("select p.level, count(p) from Player p where p.country.id = :countryId and p.user.deletedAt is null group by p.level")
+    @Query("select p.level.level, count(p) from Player p where p.country.id = :countryId and p.user.deletedAt is null group by p.level.level")
     List<Object[]> levelCounts(@Param("countryId") Long countryId);
 
     /** 검색 횟수 +1(4.4). 일괄 UPDATE라 updated_at은 바뀌지 않는다(점수 기록 대상에 끼지 않게). */

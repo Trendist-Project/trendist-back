@@ -91,7 +91,7 @@
 
 ### 9.4 `+` 처리와 점수 재합산
 `+` 처리
-- 한 트랜잭션: `players` 행을 `SELECT ... FOR UPDATE`로 먼저 잠그고, `player_keywords`에 INSERT(또는 만료 행 재사용, 아래)한다(`expires_at` = 지금 + 24시간). 그다음 `keywords` 행의 `holder_count`·`total_plus_count`를 고치고 `trend_value`를 다시 계산한다. 마지막으로 `players.exp` +1(레벨은 메모리에 올려 둔 `levels` 표로 다시 정함), `players.current_score`에 그 키워드의 새 점수(`trend_value`)와 늘어난 EXP 점수(100 미만일 때 1)를 더하고, `total_plus_count` +1, 새 행이면 `hold_count` +1 한다. 잠금 순서(플레이어 → 키워드)는 항상 같게 둔다. 접속 중이면 방 메모리 점수도 같이 고친다.
+- 한 트랜잭션: `players` 행을 `SELECT ... FOR UPDATE`로 먼저 잠그고, `player_keywords`에 INSERT(또는 만료 행 재사용, 아래)한다(`expires_at` = 지금 + 24시간). 그다음 `keywords` 행의 `holder_count`·`total_plus_count`를 고치고 `trend_value`를 다시 계산한다. 마지막으로 `players.exp` +1(레벨은 메모리에 올려 둔 `levels` 표로 다시 정해 `players.level_id`에 그 행을 넣음), `players.current_score`에 그 키워드의 새 점수(`trend_value`)와 늘어난 EXP 점수(100 미만일 때 1)를 더하고, `total_plus_count` +1, 새 행이면 `hold_count` +1 한다. 잠금 순서(플레이어 → 키워드)는 항상 같게 둔다. 접속 중이면 방 메모리 점수도 같이 고친다.
 - 같은 키워드 중복은 `UNIQUE(player_id, keyword_id)`가 막는다. 화면의 `+` 버튼은 비활성화되어 있고, 서버는 만료 전 행이 있으면 요청을 거부한다.
 - 만료 행 재사용: `expires_at`이 지났지만 1분 잡이 아직 지우지 않은 행이 있으면 INSERT하지 않고 그 행을 UPDATE한다(`created_at`과 `expires_at`을 새 `+` 값으로 바꾼다). 행 수가 그대로이므로 `keywords.holder_count`와 `players.hold_count`는 바꾸지 않고, 두 `total_plus_count`만 +1 하며, `current_score`는 그 사람의 목록을 다시 합산해서 구한다. `created_at`을 갱신하므로 이 엔티티는 JPA Auditing의 `updatable = false`를 쓰지 않는다.
 - 1분 주기 잡이 `expires_at`이 지난 행을 삭제하고 `keywords.holder_count`와 `players.hold_count`를 −1(0 아래로 내려가지 않게), `trend_value`를 다시 계산한 뒤 그 플레이어의 점수를 다시 합산한다. 같은 `players` 행을 잠그고 `DELETE ... WHERE id = ? AND expires_at <= 지금`처럼 조건부로 지워서, 방금 재사용된 행을 지우거나 두 번 처리하지 않는다. 조회할 때도 `expires_at`을 검사한다.

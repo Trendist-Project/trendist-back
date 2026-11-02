@@ -25,7 +25,10 @@ public class Player extends BaseTimeEntity {
     @Column(nullable = false, length = 40) private String nickname;
     @Column(name = "nickname_changed_at", columnDefinition = "DATETIME(6)") private Instant nicknameChangedAt;
     @Column(nullable = false) private long exp;
-    @Column(nullable = false) private long level = 1;
+    /** 레벨(levels 참조). 누적 EXP로 레벨표에서 정한 행을 가리킨다(4.9). 숫자는 getLevel()로 읽는다 */
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "level_id", nullable = false, foreignKey = @ForeignKey(name = "fk_players_level"))
+    private Level level;
     @Column(name = "current_score", nullable = false) private long currentScore; // 정수 점수(4.8)
     @Column(name = "hold_count", nullable = false) private long holdCount;
     @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
@@ -48,12 +51,17 @@ public class Player extends BaseTimeEntity {
     /** 키워드를 얻은 날의 수(나라 시간대 기준으로 서로 다른 날, 처음 만든 날 포함) */
     @Column(name = "active_days", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long activeDays;
 
-    public Player(User user, Country country, String nickname) {
-        this.user = user; this.country = country; this.nickname = nickname;
+    public Player(User user, Country country, String nickname, Level level) {
+        this.user = user; this.country = country; this.nickname = nickname; this.level = level;
     }
 
+    /** 레벨 숫자(1~100) */
+    public long getLevel() { return level.getLevel(); }
+    /** 레벨표 행 */
+    public Level getLevelRow() { return level; }
+
     public void addExp(long amount) { this.exp += amount; }
-    public void setLevel(long level) { this.level = level; }
+    public void setLevel(Level level) { this.level = level; }
     public void setCurrentScore(long score) { this.currentScore = score; }
     public void incTotalPlus() { this.totalPlusCount++; }
     public void incHold() { this.holdCount++; }

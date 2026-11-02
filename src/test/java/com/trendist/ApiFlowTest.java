@@ -44,6 +44,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 class ApiFlowTest {
     @Autowired MockMvc mvc;
+    @Autowired com.trendist.player.service.LevelService levelService;
     @Autowired com.trendist.guide.service.AdminGuideService adminGuides;
     @Autowired TrendFormula formula;
     @Autowired KeywordService keywordService;
@@ -396,6 +397,10 @@ class ApiFlowTest {
         long uid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.userId"));
         var page = adminUsers.search("KR", "제재대상", "all", "seen", 0);
         assertThat(page.items()).extracting(com.trendist.user.dto.AdminUserDtos.Row::playerId).contains(pid);
+        level(t, 12); // players.level_id → levels(12레벨)
+        var byLevel = adminUsers.search("KR", null, "all", "level", 0).items();
+        assertThat(byLevel.getFirst().level()).isGreaterThanOrEqualTo(12);
+        assertThat(byLevel).extracting(com.trendist.user.dto.AdminUserDtos.Row::level).isSortedAccordingTo(java.util.Comparator.reverseOrder());
         long kw = plusKeyword(t, "제재시험키워드");
         var d = adminUsers.sanction(uid, new com.trendist.user.dto.AdminUserDtos.SanctionRequest("COMMENT", 1, "욕설"));
         assertThat(d.user().commentBannedUntil()).isNotNull();
@@ -479,7 +484,7 @@ class ApiFlowTest {
 
     private void level(String token, int level) throws Exception {
         long pid = playerIdOf(token);
-        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(100L * level * level / 100); p.setLevel(level); });
+        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(100L * level * level / 100); p.setLevel(levelService.row(level)); });
     }
 
     private org.springframework.test.web.servlet.ResultActions saveProfile(String token, int slot, String json) throws Exception {

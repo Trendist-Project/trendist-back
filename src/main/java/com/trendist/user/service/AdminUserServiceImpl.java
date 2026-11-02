@@ -80,7 +80,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         Sort s = switch (sort == null ? "" : sort) {
             case "created" -> Sort.by(Sort.Order.desc("createdAt"));
             case "score" -> Sort.by(Sort.Order.desc("currentScore"));
-            case "level" -> Sort.by(Sort.Order.desc("level"), Sort.Order.desc("exp"));
+            case "level" -> Sort.by(Sort.Order.desc("level.level"), Sort.Order.desc("exp"));
             case "plus" -> Sort.by(Sort.Order.desc("totalPlusCount"));
             default -> Sort.by(Sort.Order.desc("lastSeenAt").nullsLast(), Sort.Order.desc("id"));
         };
