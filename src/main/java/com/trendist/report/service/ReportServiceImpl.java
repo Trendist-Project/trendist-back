@@ -10,11 +10,13 @@ import com.trendist.player.entity.Player;
 import com.trendist.player.service.PlayerService;
 import com.trendist.report.entity.Report;
 import com.trendist.report.entity.ReportType;
+import com.trendist.user.dto.AdminUserDtos;
 import com.trendist.report.repository.ReportRepository;
 import com.trendist.report.repository.ReportTypeRepository;
 import com.trendist.game.room.Room;
 import com.trendist.game.service.RoomManager;
 import com.trendist.player.repository.PlayerRepository;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,10 @@ public class ReportServiceImpl implements ReportService {
     private final PlayerService playerService;
     private final PlayerRepository players;
     private final RoomManager rooms;
+    private final com.trendist.user.repository.SanctionRepository sanctionRepo;
+    private final com.trendist.user.service.SanctionService sanctionService;
+    private final com.trendist.user.service.AdminUserService adminUsers;
+    private final java.time.Clock clock;
 
     @Override
     @Transactional
@@ -96,21 +102,54 @@ public class ReportServiceImpl implements ReportService {
     private AdminReport adminView(Report r) {
         String type = r.getReportType().getName();
         String target = null, content = null, keyword = null;
+        Long userId = null;
+        boolean deleted = false;
         switch (type) {
             case ReportType.COMMENT -> {
                 var c = comments.findById(r.getTargetId()).orElse(null);
-                if (c != null) { target = c.getPlayer().getNickname(); content = c.getBody(); keyword = c.getKeyword().getText(); }
+                if (c != null) {
+                    target = c.getPlayer().getNickname(); content = c.getBody(); keyword = c.getKeyword().getText();
+                    userId = c.getPlayer().getUser().getId(); deleted = c.getDeletedAt() != null;
+                }
             }
             case ReportType.CHAT -> {
                 var m = chats.findById(r.getTargetId()).orElse(null);
-                if (m != null) { target = m.getPlayer().getNickname(); content = m.getBody(); }
+                if (m != null) { target = m.getPlayer().getNickname(); content = m.getBody(); userId = m.getPlayer().getUser().getId(); }
             }
-            case ReportType.PLAYER -> target = players.findById(r.getTargetId()).map(Player::getNickname).orElse(null);
+            case ReportType.PLAYER -> {
+                var p = players.findById(r.getTargetId()).orElse(null);
+                if (p != null) { target = p.getNickname(); userId = p.getUser().getId(); }
+            }
             default -> { }
         }
+        Instant now = Instant.now(clock);
+        List<String> active = userId == null ? List.of() : sanctionRepo.findByUser(userId).stream().filter(s -> s.isActive(now))
+                .map(s -> s.getSanctionType().getName() + " " + sanctionService.untilText(s.getExpiresAt())).toList();
         return new AdminReport(r.getId(), type, r.getTargetId(), r.getReason(), r.getStatus(), r.getCreatedAt(), r.getUpdatedAt(),
                 r.getPlayer().getNickname(), target, content, keyword,
-                reports.countByReportTypeIdAndTargetId(r.getReportType().getId(), r.getTargetId()));
+                reports.countByReportTypeIdAndTargetId(r.getReportType().getId(), r.getTargetId()), userId, deleted, active);
+    }
+
+    @Override
+    @Transactional
+    public ActResult adminAct(long reportId, ActRequest req) {
+        Report r = reports.findById(reportId).orElseThrow(() -> ApiException.notFound("REPORT_NOT_FOUND", "신고를 찾을 수 없어요"));
+        AdminReport view = adminView(r);
+        if (req.sanction() != null && !req.sanction().isBlank()) {
+            if (view.targetUserId() == null) throw ApiException.badRequest("REPORT_NO_USER", "제재할 사용자가 없는 신고예요");
+            String reason = req.reason() == null || req.reason().isBlank()
+                    ? "신고 #" + r.getId() + "(" + view.type() + ")" + (r.getReason() == null ? "" : ": " + r.getReason())
+                    : req.reason().trim();
+            adminUsers.sanction(view.targetUserId(), new AdminUserDtos.SanctionRequest(req.sanction(), req.days(),
+                    reason.length() > 500 ? reason.substring(0, 500) : reason));
+        }
+        if (req.deleteContent()) {
+            if (!ReportType.COMMENT.equals(view.type())) throw ApiException.badRequest("REPORT_DELETE_TYPE", "지울 수 있는 것은 댓글뿐이에요");
+            comments.findById(r.getTargetId()).filter(c -> c.getDeletedAt() == null).ifPresent(c -> c.delete(Instant.now(clock)));
+        }
+        int changed = adminSetStatus(reportId, Report.RESOLVED, req.sameTarget());
+        comments.flush();
+        return new ActResult(changed, adminView(r));
     }
 
     @Override

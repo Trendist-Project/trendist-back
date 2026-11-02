@@ -32,8 +32,6 @@ public class AuthController {
     static final String VISITOR_COOKIE = "visitor_id";
     static final String REFRESH_COOKIE = "refresh_token";
     static final String REFRESH_PATH = "/";
-    /** 예전에 쓰던 갱신 토큰 쿠키 경로. 개발자 도구 목록에 안 보이고 쿠키 지우기로도 안 지워져서 "/"로 옮겼다. 남은 것은 지운다 */
-    static final String LEGACY_REFRESH_PATH = "/api/auth";
 
     private final AuthService auth;
     private final AppProperties props;
@@ -130,9 +128,6 @@ public class AuthController {
         ResponseCookie c = ResponseCookie.from(REFRESH_COOKIE, value)
                 .httpOnly(true).secure(props.cookie().secure()).sameSite("Lax").path(REFRESH_PATH).maxAge(maxAge).build();
         res.addHeader(HttpHeaders.SET_COOKIE, c.toString());
-        ResponseCookie legacy = ResponseCookie.from(REFRESH_COOKIE, "")
-                .httpOnly(true).secure(props.cookie().secure()).sameSite("Lax").path(LEGACY_REFRESH_PATH).maxAge(Duration.ZERO).build();
-        res.addHeader(HttpHeaders.SET_COOKIE, legacy.toString());
     }
 
     /** 구글 로그인 요청: 구글이 브라우저에 준 ID 토큰, 로그인을 시작할 때 브라우저가 만든 nonce(있으면 토큰과 비교). */

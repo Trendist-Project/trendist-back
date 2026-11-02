@@ -21,6 +21,12 @@ public class AdminReportController {
         return service.adminList(status, page, size);
     }
 
+    /** 신고에서 바로 제재·댓글 삭제를 하고 조치함으로 넘긴다(13.5). */
+    @PostMapping("/{id}/act")
+    public ReportService.ActResult act(@PathVariable long id, @RequestBody ReportService.ActRequest req) {
+        return service.adminAct(id, req);
+    }
+
     @PatchMapping("/{id}")
     public Map<String, Integer> setStatus(@PathVariable long id, @RequestBody StatusRequest req) {
         return Map.of("changed", service.adminSetStatus(id, req.status(), req.sameTarget()));

@@ -45,6 +45,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final ChatService chatService;
     private final RoomManager rooms;
     private final ObjectMapper json;
+    private final com.trendist.user.service.SanctionService sanctionService;
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ws-auth-timeout"));
 
     @Override
@@ -84,6 +85,15 @@ public class GameSocketHandler extends TextWebSocketHandler {
             return;
         }
         if ("chat".equals(type)) { chat(session, member, node.path("text").asString("")); return; }
+        if ("emote".equals(type)) {
+            // 이모트(4.26): 정해진 코드만, 2초에 1번꼴(잠깐 몰려도 3번까지)
+            String code = node.path("code").asString("");
+            if (Room.EMOTES.contains(code) && allowInput(session, "emote")) {
+                Room room = (Room) session.getAttributes().get(ATTR_ROOM);
+                room.submit(r -> r.emote(member, code));
+            }
+            return;
+        }
         if (!allowInput(session, type)) return;
         long receivedNanos = System.nanoTime(); // 방은 이 시점부터 조작을 적용한다(틱 경계로 반올림하지 않는다)
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
@@ -114,7 +124,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 room.submit(r -> {
                     if (!session.isOpen()) return;
                     Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime(),
-                            new Room.Appearance(player.title(), player.background(), player.borderColor(), player.borderWidth(), player.trail()));
+                            new Room.Appearance(player.title(), player.skin(), player.trail()));
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),
@@ -144,6 +154,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
         rooms.submitWork(() -> {
             try {
+                java.time.Instant banned = sanctionService.chatBannedUntil(member.playerId); // 채팅 정지(13.5)
+                if (banned != null) {
+                    rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_BANNED",
+                            "message", "채팅이 정지된 계정이에요(" + sanctionService.untilText(banned) + ")"));
+                    return;
+                }
                 ChatService.Saved saved = chatService.save(room.countryId(), member.playerId, text);
                 room.submit(r -> r.chat(member, saved.id(), text, saved.atMillis()));
             } catch (RuntimeException e) {
@@ -160,9 +176,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
      * 버킷은 잠깐 몰려 도착해도 받아 주고, 평균 빈도만 제한한다.
      */
     private boolean allowInput(WebSocketSession session, String type) {
-        String key = "move".equals(type) || "input".equals(type) || "chat".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
-        double rate = switch (key) { case "move" -> 12; case "input" -> 60; case "chat" -> 1; default -> 10; };
-        double burst = switch (key) { case "move" -> 24; case "input" -> 60; case "chat" -> 1; default -> 10; };
+        String key = "move".equals(type) || "input".equals(type) || "chat".equals(type) || "emote".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다
+        double rate = switch (key) { case "move" -> 12; case "input" -> 60; case "chat" -> 1; case "emote" -> 0.5; default -> 10; };
+        double burst = switch (key) { case "move" -> 24; case "input" -> 60; case "chat" -> 1; case "emote" -> 3; default -> 10; };
         @SuppressWarnings("unchecked")
         Map<String, Bucket> buckets = (Map<String, Bucket>) session.getAttributes().get(ATTR_INPUTS);
         Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(burst, System.nanoTime()));

@@ -18,7 +18,18 @@ public interface ReportService {
      * targetNickname은 신고된 사람, sameTargetCount는 같은 대상에 들어온 신고 수.
      */
     record AdminReport(long id, String type, long targetId, String reason, String status, Instant createdAt, Instant updatedAt,
-                       String reporterNickname, String targetNickname, String content, String keywordText, long sameTargetCount) {}
+                       String reporterNickname, String targetNickname, String content, String keywordText, long sameTargetCount,
+                       Long targetUserId, boolean contentDeleted, List<String> targetSanctions) {}
+
+    /**
+     * 신고에서 바로 조치(13.5). sanction: BAN / CHAT / COMMENT / UPLOAD(없으면 제재 없이), days가 null이면 영구,
+     * deleteContent면 신고된 댓글을 지운다. 끝나면 그 신고(sameTarget이면 같은 대상의 접수 신고도)를 조치함으로 바꾼다.
+     */
+    record ActRequest(String sanction, Integer days, String reason, boolean deleteContent, boolean sameTarget) {}
+
+    record ActResult(int changed, AdminReport report) {}
+
+    ActResult adminAct(long reportId, ActRequest req);
 
     record AdminReportPage(List<AdminReport> items, long total, int page, int size) {}
 

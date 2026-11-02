@@ -1,17 +1,30 @@
 package com.trendist.profile.service;
 
 import com.trendist.profile.dto.ProfileDtos;
+import java.util.Optional;
 
-/** 꾸미기(4.9): 11레벨(설정값)부터 원의 바탕색·테두리 색·테두리 두께를 바꾼다. */
+/**
+ * 꾸미기 프로필(4.9): 1~3번 칸에 모습(색·테두리·이름표·원 안에 그릴 것과 그림)과 효과(이동·테두리)를 저장하고, 한 칸을 장착한다.
+ * 꾸미기는 해금 레벨(기본 11)부터이고, 그림과 효과는 그중에서도 Google로 로그인한 사용자만. 장착한 칸을 저장하면 방에 바로 반영된다.
+ */
 public interface ProfileService {
-    /** 성장 캐릭터의 정해진 바탕색. 꾸미지 않았으면 이 색이다. */
-    String DEFAULT_BACKGROUND = "#3fb68b";
+    ProfileDtos.Box box(long userId);
 
-    ProfileDtos.Mine mine(long userId);
+    /** 한 칸 저장. 레벨·색·그림·효과를 검사하고 5초에 1번(그림은 설정 간격). */
+    ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req);
 
-    /** 색·두께를 저장하고 장착한다(처음이면 프로필을 만든다). 레벨, 색 형식, 바닥과의 대비, 5초 1번을 검사한다. */
-    ProfileDtos.Mine update(long userId, ProfileDtos.UpdateRequest req);
+    /** 장착할 칸을 고른다. 5초에 1번. */
+    ProfileDtos.Box equip(long userId, int slot);
 
-    /** 방 입장 때 쓸 장착 모습. 꾸미지 않았으면 기본 모습. */
+    /** 장착한 칸의 모습(관리자 화면). */
     ProfileDtos.Look lookOf(long playerId);
+
+    /** 픽셀 그림 PNG(32×32). 그림이 없는 칸이면 비어 있다. */
+    Optional<byte[]> artPng(long profileId);
+
+    /** 장착한 칸이 원 안에 그리는 그림(관리자 화면·자랑하기 카드). 없으면 비어 있다. */
+    Optional<ProfileDtos.Art> equippedArt(long playerId);
+
+    /** 관리자 꾸미기 초기화(13.10): 프로필을 모두 지워 기본 모습(1번 칸)으로 되돌린다. */
+    void adminReset(long playerId);
 }

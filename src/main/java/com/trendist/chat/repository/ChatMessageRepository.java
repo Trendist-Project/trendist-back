@@ -8,6 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+    /** 관리자 사용자 관리(13.10): 그 플레이어의 최근 채팅(30일 보관). */
+    java.util.List<ChatMessage> findByPlayerIdOrderByIdDesc(Long playerId, org.springframework.data.domain.Pageable pageable);
+
+    long countByPlayerId(Long playerId);
+
     /** 보관 기간이 지난 메시지. 신고된 메시지는 처리할 때까지 남긴다(4.13). */
     @Modifying
     @Query("delete from ChatMessage m where m.createdAt < :before and m.reportCount = 0")

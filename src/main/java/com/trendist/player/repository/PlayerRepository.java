@@ -30,8 +30,57 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     @Query("select p from Player p join fetch p.country where p.updatedAt >= :since")
     List<Player> findChangedSince(@Param("since") java.time.Instant since);
 
+    /** 접속 중인 플레이어의 마지막 접속 시각(13.9). 일괄 UPDATE라 updated_at은 바뀌지 않는다. */
+    @Modifying
+    @Query("update Player p set p.lastSeenAt = :now where p.id in :ids")
+    int touchSeen(@Param("ids") java.util.Collection<Long> ids, @Param("now") java.time.Instant now);
+
+    long countByCountryId(Long countryId);
+
+    /**
+     * 관리자 사용자 목록(13.10). q: 닉네임 일부(소문자, %포함) 또는 사용자·플레이어 번호(qid), filter: all / guest / google / admin /
+     * banned / withdrawn / online(online에 든 플레이어만).
+     */
+    @Query(value = """
+            select p from Player p join fetch p.user u
+            where p.country.id = :countryId
+              and (:q is null or lower(p.nickname) like :q or u.id = :qid or p.id = :qid)
+              and (:filter = 'all'
+                   or (:filter = 'guest' and u.oauthId is null)
+                   or (:filter = 'google' and u.oauthId is not null)
+                   or (:filter = 'admin' and u.role = 'ADMIN')
+                   or (:filter = 'banned' and u.bannedUntil > :now)
+                   or (:filter = 'withdrawn' and u.deletedAt is not null)
+                   or (:filter = 'online' and p.id in :online))""",
+            countQuery = """
+            select count(p) from Player p join p.user u
+            where p.country.id = :countryId
+              and (:q is null or lower(p.nickname) like :q or u.id = :qid or p.id = :qid)
+              and (:filter = 'all'
+                   or (:filter = 'guest' and u.oauthId is null)
+                   or (:filter = 'google' and u.oauthId is not null)
+                   or (:filter = 'admin' and u.role = 'ADMIN')
+                   or (:filter = 'banned' and u.bannedUntil > :now)
+                   or (:filter = 'withdrawn' and u.deletedAt is not null)
+                   or (:filter = 'online' and p.id in :online))""")
+    org.springframework.data.domain.Page<Player> searchForAdmin(@Param("countryId") Long countryId, @Param("q") String q,
+                                                                @Param("qid") Long qid, @Param("filter") String filter,
+                                                                @Param("now") java.time.Instant now,
+                                                                @Param("online") java.util.Collection<Long> online,
+                                                                org.springframework.data.domain.Pageable pageable);
+
+    long countByCountryIdAndLastSeenAtGreaterThanEqual(Long countryId, java.time.Instant since);
+
+    /** 레벨 분포(13.9): [레벨, 인원]. 탈퇴한 사용자는 뺀다. */
+    @Query("select p.level, count(p) from Player p where p.country.id = :countryId and p.user.deletedAt is null group by p.level")
+    List<Object[]> levelCounts(@Param("countryId") Long countryId);
+
     /** 검색 횟수 +1(4.4). 일괄 UPDATE라 updated_at은 바뀌지 않는다(점수 기록 대상에 끼지 않게). */
     @Modifying
     @Query("update Player p set p.searchCount = p.searchCount + 1 where p.id = :id")
     int incSearchCount(@Param("id") Long id);
+
+    /** 관리자 대시보드(13.11): 최근에 만든 플레이어(사용자와 함께). */
+    @Query("select p from Player p join fetch p.user where p.country.id = :countryId order by p.id desc")
+    List<Player> findRecent(@Param("countryId") Long countryId, org.springframework.data.domain.Pageable pageable);
 }

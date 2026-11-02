@@ -44,6 +44,8 @@ public class CommentServiceImpl implements CommentService {
     private final RateLimiter rateLimiter;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final com.trendist.stats.support.ActivityCounter activity;
+    private final com.trendist.user.service.SanctionService sanctions;
 
     // ---------------------------------------------------------------- 조회
 
@@ -73,11 +75,13 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public CommentDtos.Item write(long userId, long keywordId, String raw) {
         Player me = playerService.requireCurrent(userId);
+        sanctions.requireCanComment(userId); // 댓글 작성 정지(13.5)
         Keyword k = requireKeyword(me, keywordId);
         // 작성은 기획상 로그인 사용자만이지만, 구글 로그인을 만들기 전까지는 게스트도 쓸 수 있게 둔다(4.12). 작성 수 한도는 없다
         String body = validBody(raw);
         Comment c = comments.save(new Comment(k, me, body));
         comments.flush();
+        activity.add(me.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COMMENT); // 사이트 통계(13.9)
         players.addCommentScore(me.getId(), 1);
         events.publishEvent(new GameEvents.TitleCheck(me.getId())); // 댓글 점수 칭호(4.10)
         return item(me, c, null);

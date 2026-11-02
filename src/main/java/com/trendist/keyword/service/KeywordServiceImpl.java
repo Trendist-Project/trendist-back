@@ -60,6 +60,7 @@ public class KeywordServiceImpl implements KeywordService {
     private final TransactionTemplate tx;
     private final CountryService countries;
     private final Clock clock;
+    private final com.trendist.stats.support.ActivityCounter activity;
 
     /** 트렌드 값이 바뀐 키워드. 1분 잡이 보유자 점수를 DB에서 다시 합산한다(9.4). */
     private final Set<Long> dirtyKeywords = ConcurrentHashMap.newKeySet();
@@ -74,6 +75,7 @@ public class KeywordServiceImpl implements KeywordService {
         String normalized = KeywordNormalizer.validate(text);
         // 검색할 때마다 플레이어의 누적 검색 횟수 +1(찾았는지·금지인지와 관계없이). 형식에 맞지 않아 거절된 입력은 세지 않는다
         players.incSearchCount(p.getId());
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.SEARCH); // 사이트 통계(13.9)
         events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 검색 칭호(4.10)
         Country country = p.getCountry();
         Instant now = Instant.now(clock);
@@ -117,6 +119,7 @@ public class KeywordServiceImpl implements KeywordService {
 
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
         if (existing.isPresent() && !existing.get().isExpired(now)) throw ApiException.conflict("ALREADY_PLUSED", "이미 보유중인 키워드예요");
+        activity.add(country.getId(), com.trendist.stats.support.ActivityCounter.Kind.PLUS); // 사이트 통계(13.9)
         return addHolding(p, k, existing, now);
     }
 
@@ -160,6 +163,7 @@ public class KeywordServiceImpl implements KeywordService {
     public KeywordDtos.OrbResult openOrb(long playerId) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.ORB); // 사이트 통계(13.9)
         p.incOrb(); // 꽝이어도 먹은 횟수는 센다(칭호, 4.10)
         events.publishEvent(new GameEvents.TitleCheck(p.getId()));
         // 설정 확률(기본 33%)로만 🔥활성 키워드가 나오고, 나머지는 꽝이다
@@ -425,6 +429,7 @@ public class KeywordServiceImpl implements KeywordService {
         long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0;
         playerKeywords.delete(pk);
         playerKeywords.flush();
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
         p.incLose(); // 칭호(4.10). removeHolding이 재합산하며 칭호를 검사한다
         removeHolding(p, keywordId, now);
         return Optional.of(new LostKeyword(text, score));
@@ -449,6 +454,7 @@ public class KeywordServiceImpl implements KeywordService {
         playerKeywords.delete(pk);
         playerKeywords.flush();
         loser.incLose(); // 칭호(4.10)
+        activity.add(loser.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
         winner.incSteal();
         events.publishEvent(new GameEvents.TitleCheck(winner.getId()));
         removeHolding(loser, keywordId, now);

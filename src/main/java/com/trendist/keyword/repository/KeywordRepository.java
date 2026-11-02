@@ -68,4 +68,14 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Modifying
     @Query("update Keyword k set k.searchCount = k.searchCount + :n where k.id = :id")
     int addSearchCount(@Param("id") Long id, @Param("n") long n);
+
+    /** 관리자 대시보드(13.11): 가진 사람이 많은 키워드(그 상태만), 가진 사람·트렌드 값 순. */
+    @Query("select k from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId order by k.holderCount desc, k.trendValue desc, k.id desc")
+    List<Keyword> topHeld(@Param("countryId") Long countryId, @Param("stateId") Long stateId, org.springframework.data.domain.Pageable pageable);
+
+    long countByCountryIdAndCreatedAtGreaterThanEqual(Long countryId, Instant since);
+
+    /** 관리자 대시보드(13.11): 외부 유지 기간이 (now, until] 안에 끝나는 키워드 수. */
+    @Query("select count(k) from Keyword k where k.country.id = :countryId and k.externalUntil > :now and k.externalUntil <= :until")
+    long countExternalEnding(@Param("countryId") Long countryId, @Param("now") Instant now, @Param("until") Instant until);
 }

@@ -77,7 +77,7 @@ class ShareCardTest {
     void cardKeepsValuesFromShareTime() throws Exception {
         String token = player("그때모습");
         String first = create(token);
-        // 공유한 뒤 점수가 바뀌면 새 주소가 생기고, 예전 주소의 카드는 그때 값 그대로다
+        // 공유한 뒤 점수가 바뀌면 새 주소가 생기고, 먼저 만든 주소의 카드는 그때 값 그대로다
         jdbc.update("update players set current_score = 777 where nickname = '그때모습'");
         String second = create(token);
         assertThat(second).isNotEqualTo(first);

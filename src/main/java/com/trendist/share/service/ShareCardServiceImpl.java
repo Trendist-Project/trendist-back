@@ -1,5 +1,7 @@
 package com.trendist.share.service;
 
+import com.trendist.profile.dto.ProfileDtos;
+import com.trendist.profile.service.ProfileService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.trendist.common.code.CodeTables;
@@ -51,6 +53,8 @@ public class ShareCardServiceImpl implements ShareCardService {
     private final com.trendist.share.support.ShareViewCounter counter;
     private final ObjectMapper json;
     private final Clock clock;
+    private final com.trendist.stats.support.ActivityCounter activity;
+    private final ProfileService profiles;
     private final String baseUrl;
     private final String site;
     private final SecureRandom random = new SecureRandom();
@@ -64,9 +68,12 @@ public class ShareCardServiceImpl implements ShareCardService {
 
     public ShareCardServiceImpl(ShareCardRepository cards, com.trendist.player.repository.PlayerRepository playerRepo, PlayerService players, ScoreHistoryService scoreHistory,
                                 RankingService rankings, KeywordService keywords, RateLimiter limiter,
-                                ShareCardRenderer renderer, com.trendist.share.support.ShareViewCounter counter, ObjectMapper json, Clock clock, AppProperties props) {
+                                ShareCardRenderer renderer, com.trendist.share.support.ShareViewCounter counter, ObjectMapper json, Clock clock, AppProperties props,
+                                com.trendist.stats.support.ActivityCounter activity, ProfileService profiles) {
         this.cards = cards; this.playerRepo = playerRepo; this.players = players; this.scoreHistory = scoreHistory; this.rankings = rankings;
         this.keywords = keywords; this.limiter = limiter; this.renderer = renderer; this.counter = counter; this.json = json; this.clock = clock;
+        this.activity = activity;
+        this.profiles = profiles;
         this.baseUrl = props.share() == null ? new AppProperties.Share(null).baseUrl() : props.share().baseUrl();
         String host = URI.create(baseUrl).getHost();
         int port = URI.create(baseUrl).getPort();
@@ -96,6 +103,7 @@ public class ShareCardServiceImpl implements ShareCardService {
         // 코드가 겹칠 확률은 거의 없지만 겹치면 다시 뽑는다
         String code;
         do code = newCode(); while (cards.findByCode(code).isPresent());
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.SHARE); // 사이트 통계(13.9)
         return cards.save(new ShareCard(p, code, hash, body, Instant.now(clock)));
     }
 
@@ -117,8 +125,10 @@ public class ShareCardServiceImpl implements ShareCardService {
                 new ShareDtos.Record("봇 사냥", String.format("%,d회", s.botWinCount())),
                 new ShareDtos.Record("활동한 날", String.format("%,d일", s.activeDays())));
         long score = mine != null ? mine.score() : s.currentScore(); // 접속 중이면 방의 실시간 값
+        Optional<ProfileDtos.Art> art = profiles.equippedArt(p.getId()); // 픽셀 그림(4.9)
         return new ShareDtos.CardData(info.nickname(), info.level(), info.title(), score, mine == null ? null : mine.rank(),
-                week, hot, records, info.background(), info.borderColor(), info.borderWidth(), info.trail());
+                week, hot, records, info.skin().background(), info.skin().borderColor(), info.skin().borderWidth(), info.trail(),
+                art.map(a -> String.join(",", a.palette())).orElse(null), art.map(ProfileDtos.Art::pixels).orElse(null));
     }
 
     /** 순위·점수 추이는 카드의 한 칸이라 실패해도 그 칸만 비운다(닫힌 나라 등) */

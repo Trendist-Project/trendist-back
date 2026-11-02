@@ -4,8 +4,6 @@ import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
 import com.trendist.country.entity.Country;
 import com.trendist.country.service.CountryService;
-import com.trendist.effect.entity.TrailEffect;
-import com.trendist.effect.repository.TrailEffectRepository;
 import com.trendist.game.event.GameEvents;
 import com.trendist.game.room.Room;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
@@ -14,8 +12,6 @@ import com.trendist.player.dto.PlayerDtos;
 import com.trendist.player.entity.Player;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.support.NicknameValidator;
-import com.trendist.profile.entity.Profile;
-import com.trendist.profile.repository.ProfileRepository;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.title.entity.Title;
@@ -45,9 +41,9 @@ public class PlayerServiceImpl implements PlayerService {
     private final ApplicationEventPublisher events;
     private final SettingService settings;
     private final TitleRepository titles;
-    private final ProfileRepository profiles;
-    private final TrailEffectRepository trailEffects;
+    private final com.trendist.profile.support.ProfileLooks looks;
     private final Clock clock;
+    private final com.trendist.stats.support.ActivityCounter activity;
 
     @Override
     @Transactional(readOnly = true)
@@ -64,13 +60,10 @@ public class PlayerServiceImpl implements PlayerService {
         return findCurrent(userId).map(p -> {
             String title = p.getTitleId() == null ? null
                     : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
-            var look = profiles.findFirstByPlayerIdAndEquippedTrue(p.getId());
-            // 이동 효과는 로그인 사용자만 쓴다(4.23). 게스트는 예전에 골라 둔 효과가 있어도 보이지 않는다
-            String trail = p.getTrailEffectId() == null || p.getUser().isGuest() ? null
-                    : trailEffects.findById(p.getTrailEffectId()).filter(TrailEffect::isEnabled).map(TrailEffect::getCode).orElse(null);
+            // 장착한 꾸미기 프로필(4.9). 효과·그림은 로그인 사용자만 그린다
+            var look = looks.equippedLook(p);
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
-                    p.getTotalPlusCount() == 0, title, look.map(Profile::getBackgroundColor).orElse(Room.DEFAULT_BACKGROUND),
-                    look.map(Profile::getBorderColor).orElse(null), look.map(Profile::getBorderWidth).orElse(null), trail);
+                    p.getTotalPlusCount() == 0, title, look.toSkin(), look.trailEffect());
         });
     }
 
@@ -96,6 +89,7 @@ public class PlayerServiceImpl implements PlayerService {
         }
         u.setCountry(c);
         Player p = players.save(new Player(u, c, nickname));
+        activity.add(c.getId(), com.trendist.stats.support.ActivityCounter.Kind.NEW_PLAYER); // 사이트 통계(13.9)
         p.touchPlayed(Instant.now(clock), ZoneId.of(c.getTimezone()));
         return p;
     }

@@ -47,7 +47,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             try {
                 Room.Tuning t = tuning();
                 Room.ZoneTuning z = zoneTuning();
+                Room.ComboTuning c = comboTuning();
                 rooms.values().forEach(r -> {
+                    if (!c.equals(r.comboTuning())) r.setComboTuning(c);
                     if (!t.equals(r.tuning())) { r.setTuning(t); r.submit(rr -> broadcastTuning(rr)); }
                     if (!z.equals(r.zoneTuning())) r.setZoneTuning(z);
                 });
@@ -60,6 +62,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         return rooms.computeIfAbsent(countryId, id -> {
             Room r = new Room(id, tuning(), this);
             r.setZoneTuning(zoneTuning());
+            r.setComboTuning(comboTuning());
             r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
             ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(
                     run -> { Thread t = new Thread(run, "room-" + id); t.setDaemon(true); return t; }); // 틱은 플랫폼 스레드
@@ -98,6 +101,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.BOT_STEP_MIN),
                 settings.getDouble(SettingKeys.BOT_STEP_MAX),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP));
+    }
+
+    /** 연속 빼앗기 콤보와 궤도 위성 설정(4.25). */
+    private Room.ComboTuning comboTuning() {
+        return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_ORBIT_AT), settings.getDouble(SettingKeys.ORBIT_INTERVAL_SECONDS),
+                settings.getInt(SettingKeys.ORBIT_MAX), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0);
     }
 
     /** 세이프존 설정(4.22). */
@@ -179,7 +188,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.LookChanged e) {
         Room r = rooms.get(e.countryId());
-        if (r != null) r.submit(room -> room.applyLook(e.playerId(), e.background(), e.borderColor(), e.borderWidth()));
+        if (r != null) r.submit(room -> room.applyLook(e.playerId(), e.skin()));
     }
 
     @TransactionalEventListener(fallbackExecution = true)
@@ -217,6 +226,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 if (winnerId == null) {
                     // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
+                        r.fightResult(null, loserId, true); // 잃으면 콤보·위성이 사라진다(4.25)
                         Room.Member m = r.byPlayer(loserId);
                         if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
                     }));
@@ -225,6 +235,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 // 사람끼리면 이긴 사람이 그 키워드를 빼앗는다. 양쪽 모두에게 어떤 키워드인지와 점수를, 이긴 사람에게는
                 // 새로 들어갔는지(ADDED)·남은 시간만 갱신됐는지(RENEWED)도 보여 준다(4.3)
                 keywordService.stealRandom(loserId, winnerId).ifPresent(st -> room.submit(r -> {
+                    r.fightResult(winnerId, loserId, false); // 연속 빼앗기 콤보(4.25)
                     Room.Member m = r.byPlayer(loserId);
                     if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", st.text(), "score", st.score(), "stolen", true));
                     Room.Member w = r.byPlayer(winnerId);
@@ -254,7 +265,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 } else {
                     msg.put("score", 0); // 🔥 키워드가 없다
                 }
+                boolean won = "GAINED".equals(r.status()) || "RENEWED".equals(r.status());
                 room.submit(rr -> {
+                    if (won) rr.fightResult(playerId, null, true); // 봇을 이겨 키워드를 얻은 것도 콤보(설정, 4.25)
                     Room.Member m = rr.byPlayer(playerId);
                     if (m != null) sendText(m, msg);
                 });
@@ -311,6 +324,22 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void submitWork(Runnable r) { workers.submit(r); }
+
+    @Override
+    public void kick(long countryId, long playerId, String message) {
+        Room r = rooms.get(countryId);
+        if (r == null) return;
+        r.submit(room -> {
+            Room.Member m = room.byPlayer(playerId);
+            if (m == null || m.bot) return;
+            sendText(m, Map.of("type", "kicked", "message", message));
+            room.leave(m);
+            if (m.session instanceof WebSocketSession s) {
+                // 클라이언트가 다시 연결하지 않게 따로 표시한 이유로 닫는다
+                try { if (s.isOpen()) s.close(new CloseStatus(4001, "KICKED")); } catch (Exception ignored) { /* 이미 닫힘 */ }
+            }
+        });
+    }
 
     @PreDestroy
     public void shutdown() {

@@ -227,7 +227,17 @@ public class ShareCardRenderer {
         g.setComposite(AlphaComposite.SrcOver);
         g.setColor(body);
         g.fill(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
-        TurtlePainter.paint(g, cx, cy, r, d.level(), heading);
+        if (d.artPixels() != null) {
+            // 픽셀 그림(4.9): 원 안으로 잘라 칸이 또렷하게(보간 없이) 키워 그린다
+            java.awt.Shape clip = g.getClip();
+            g.clip(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(com.trendist.profile.support.PixelArt.image(d.artPalette(), d.artPixels()),
+                    (int) Math.round(cx - r), (int) Math.round(cy - r), (int) Math.round(r * 2), (int) Math.round(r * 2), null);
+            g.setClip(clip);
+        } else {
+            TurtlePainter.paint(g, cx, cy, r, d.level(), heading);
+        }
         g.setColor(color(d.borderColor(), Color.decode("#11372a")));
         g.setStroke(new BasicStroke((float) TurtlePainter.borderWidth(r, d.borderWidth())));
         g.draw(new Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2));

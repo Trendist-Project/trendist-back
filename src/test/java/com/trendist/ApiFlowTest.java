@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,10 @@ class ApiFlowTest {
     @Autowired KeywordActivityService activityService;
     @Autowired com.trendist.player.repository.PlayerRepository playerRepo;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired com.trendist.dashboard.service.DashboardService dashboard;
+    @Autowired com.trendist.user.service.AdminUserService adminUsers;
+    @Autowired com.trendist.user.service.SanctionService sanctionService;
+    @Autowired com.trendist.stats.service.StatsService stats;
 
     private String guest() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -339,7 +344,7 @@ class ApiFlowTest {
 
     @Test
     void newCounterTitlesAreGrantedFromOrbsAndActiveDays() throws Exception {
-        // 133판에서 늘린 칭호: ? 구슬 10개(꽝 포함)면 "행운 탐색자", 키워드를 얻은 첫날이면 활동한 날 1(4.10)
+        // 칭호 23~46: ? 구슬 10개(꽝 포함)면 "행운 탐색자", 키워드를 얻은 첫날이면 활동한 날 1(4.10)
         String t = player("구슬칭호시험");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         for (int i = 0; i < 10; i++) keywordService.openOrb(pid);
@@ -384,68 +389,193 @@ class ApiFlowTest {
     }
 
     @Test
-    void trailEffectsAreFreeToChooseOneAtATime() throws Exception {
-        // 이동 효과(4.23): 게스트는 모두 잠겨 있고 고를 수 없다
-        String g = player("효과게스트");
-        String gjson = mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + g)).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        java.util.List<Boolean> guestUnlocked = JsonPath.read(gjson, "$.effects[*].unlocked");
-        assertThat(guestUnlocked).containsOnly(false);
-        java.util.List<Integer> guestIds = JsonPath.read(gjson, "$.effects[?(@.code == 'flame')].id");
-        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + g).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"effectId\":" + guestIds.getFirst() + "}")).andExpect(status().isForbidden());
-        // 로그인하면 모두 조건 없이 고를 수 있고 하나만 쓴다
-        String t = loggedInPlayer("효과시험");
-        MvcResult box = mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.activeEffectId").doesNotExist()).andReturn();
-        String json = box.getResponse().getContentAsString();
-        java.util.List<String> codes = JsonPath.read(json, "$.effects[*].code");
-        assertThat(codes).contains("afterimage", "sparkle", "flame", "bubble", "rainbow", "footprint", "petal");
-        java.util.List<Boolean> unlocked = JsonPath.read(json, "$.effects[*].unlocked");
-        assertThat(unlocked).containsOnly(true);
-        java.util.List<Integer> ids = JsonPath.read(json, "$.effects[?(@.code == 'flame')].id");
-        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"effectId\":" + ids.getFirst() + "}")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.activeEffectId").value(ids.getFirst()))
-                .andExpect(jsonPath("$.effects[?(@.active == true)].code").value("flame"));
-        // 5초에 한 번
-        mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"effectId\":null}")).andExpect(status().isTooManyRequests());
-        // 나중에 조건을 붙이면(레벨) 그 조건을 채우기 전에는 고를 수 없다
-        jdbc.update("update trail_effects set unlock_type = 'LEVEL', unlock_value = 50 where code = 'rainbow'");
+    void adminSanctionsBlockCommentAndAccount() throws Exception {
+        // 관리자 사용자 관리(13.10): 찾기, 상세, 댓글 작성 정지 → 댓글 403, 풀면 다시 됨, 계정 금지 → 세션 거절
+        String t = player("제재대상");
+        long pid = playerIdOf(t);
+        long uid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.userId"));
+        var page = adminUsers.search("KR", "제재대상", "all", "seen", 0);
+        assertThat(page.items()).extracting(com.trendist.user.dto.AdminUserDtos.Row::playerId).contains(pid);
+        long kw = plusKeyword(t, "제재시험키워드");
+        var d = adminUsers.sanction(uid, new com.trendist.user.dto.AdminUserDtos.SanctionRequest("COMMENT", 1, "욕설"));
+        assertThat(d.user().commentBannedUntil()).isNotNull();
+        mvc.perform(post("/api/keywords/" + kw + "/comments").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"안녕\"}")).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("COMMENT_BANNED"));
+        d = adminUsers.release(d.sanctions().get(0).id());
+        assertThat(d.user().commentBannedUntil()).isNull();
+        mvc.perform(post("/api/keywords/" + kw + "/comments").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"안녕\"}")).andExpect(status().isCreated());
+        assertThatThrownBy(() -> adminUsers.sanction(uid, new com.trendist.user.dto.AdminUserDtos.SanctionRequest("BAN", null, " ")))
+                .isInstanceOf(com.trendist.common.exception.ApiException.class);
+        d = adminUsers.sanction(uid, new com.trendist.user.dto.AdminUserDtos.SanctionRequest("BAN", null, "도배"));
+        assertThat(d.user().bannedUntil()).isNotNull();
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isUnauthorized());
+        d = adminUsers.rename(uid, "새이름");
+        assertThat(d.user().nickname()).isEqualTo("새이름");
+    }
+
+    @Test
+    void statsCountActivityAndCloseHour() throws Exception {
+        // 관리자 통계(13.9): 추가·검색은 이번 시간 값(집계 중)에 바로 보이고, 시간을 닫으면 시간별 행으로 남는다
+        String t = player("통계시험");
+        long before = stats.hourly("KR", 24).getLast().plus();
+        plusKeyword(t, "통계시험키워드");
+        mvc.perform(get("/api/keywords/search").param("q", "통계시험키워드").header("Authorization", "Bearer " + t)).andExpect(status().isOk());
+        var live = stats.hourly("KR", 24).getLast();
+        assertThat(live.live()).isTrue();
+        assertThat(live.plus()).isEqualTo(before + 1);
+        assertThat(live.search()).isGreaterThanOrEqualTo(1);
+        assertThat(stats.hourly("KR", 24)).hasSize(24);
+        assertThat(stats.daily("KR", 7)).hasSize(7);
+        var s = stats.summary("KR");
+        assertThat(s.today().plus()).isGreaterThanOrEqualTo(1);
+        assertThat(s.totals().users()).isGreaterThanOrEqualTo(1);
+        assertThat(s.levels()).isNotEmpty();
+        stats.flushCurrentHour();
+        assertThat(stats.hourly("KR", 24).getLast().plus()).isZero(); // 메모리 값은 저장하며 비운다
+    }
+
+    @Test
+    void adminDashboardSummarizesTodosAndLists() throws Exception {
+        // 관리자 대시보드(13.11): 처리할 일, 새 플레이어, 리더보드, 24시간 그래프 칸을 한 번에 준다. 관리자만
+        String t = player("대시보드시험");
+        mvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
+        var d = dashboard.dashboard("KR");
+        assertThat(d.hourly()).hasSize(24);
+        assertThat(d.todos()).extracting(com.trendist.dashboard.dto.DashboardDtos.Todo::key).contains("reports", "reported", "sanctioned", "ending");
+        assertThat(d.newPlayers()).extracting(com.trendist.dashboard.dto.DashboardDtos.NewPlayer::nickname).contains("대시보드시험");
+        assertThat(d.leaderboard().size()).isLessThanOrEqualTo(5);
+        assertThat(d.share().cards()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void reportActSanctionsTargetAndResolves() throws Exception {
+        // 신고에서 바로 조치(13.5): 댓글 신고 → 댓글 작성 정지 1일 + 댓글 지우기 → 조치함. 채팅 신고 → 채팅 정지
+        String a = player("조치대상"), b = player("조치신고자");
+        long kid = plusKeyword(a, "조치 키워드");
+        long cid = ((Number) JsonPath.read(mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", "Bearer " + a)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"나쁜 댓글\"}")).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        report(b, "COMMENT", cid, 201);
+        long pid = playerIdOf(a);
+        long chatId = chatService.save(playerRepo.findById(pid).orElseThrow().getCountry().getId(), pid, "나쁜 채팅").id();
+        report(b, "CHAT", chatId, 201);
+        var list = reportService.adminList("RECEIVED", 0, 100).items();
+        var commentReport = list.stream().filter(x -> x.type().equals("댓글") && x.targetId() == cid).findFirst().orElseThrow();
+        assertThat(commentReport.targetUserId()).isNotNull();
+        var res = reportService.adminAct(commentReport.id(),
+                new com.trendist.report.service.ReportService.ActRequest("COMMENT", 1, "", true, true));
+        assertThat(res.report().status()).isEqualTo("RESOLVED");
+        assertThat(res.report().contentDeleted()).isTrue();
+        assertThat(res.report().targetSanctions()).anyMatch(x -> x.startsWith("댓글 작성 정지"));
+        mvc.perform(post("/api/keywords/" + kid + "/comments").header("Authorization", "Bearer " + a).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"또\"}")).andExpect(status().isForbidden());
+        var chatReport = list.stream().filter(x -> x.type().equals("채팅") && x.targetId() == chatId).findFirst().orElseThrow();
+        reportService.adminAct(chatReport.id(), new com.trendist.report.service.ReportService.ActRequest("CHAT", 3, "도배", false, false));
+        assertThat(sanctionService.chatBannedUntil(pid)).isNotNull();
+        assertThatThrownBy(() -> reportService.adminAct(chatReport.id(),
+                new com.trendist.report.service.ReportService.ActRequest(null, null, null, true, false)))
+                .isInstanceOf(com.trendist.common.exception.ApiException.class); // 채팅은 지울 수 없다
+    }
+
+    private void level(String token, int level) throws Exception {
+        long pid = playerIdOf(token);
+        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(100L * level * level / 100); p.setLevel(level); });
+    }
+
+    private org.springframework.test.web.servlet.ResultActions saveProfile(String token, int slot, String json) throws Exception {
+        return mvc.perform(put("/api/me/profiles/" + slot).header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content(json));
+    }
+
+    @Test
+    void profilesUnlockAtLevelElevenAndSlotOneIsEquippedByDefault() throws Exception {
+        // 꾸미기 프로필(4.9): 1~3번 칸, 아무것도 저장하지 않았으면 1번 칸(기본 모습)을 장착. 꾸미기는 11레벨부터
+        String t = player("프로필시험");
+        mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.unlocked").value(false)).andExpect(jsonPath("$.equippedSlot").value(1))
+                .andExpect(jsonPath("$.slots.length()").value(3)).andExpect(jsonPath("$.slots[0].equipped").value(true))
+                .andExpect(jsonPath("$.slots[0].saved").value(false)).andExpect(jsonPath("$.colors.length()").value(24));
+        String good = "{\"background\":\"#FF6B6B\",\"borderColor\":\"#ffffff\",\"borderWidth\":4,\"nameColor\":\"#ffd166\",\"nameStyle\":\"ribbon\"}";
+        saveProfile(t, 1, good).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CUSTOMIZE_LOCKED"));
+        level(t, 11);
+        saveProfile(t, 1, "{\"background\":\"#222b38\"}").andExpect(status().isBadRequest()); // 바닥색과 거의 같다
+        saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"borderWidth\":9}").andExpect(status().isBadRequest());
+        saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"nameStyle\":\"sparkle\"}").andExpect(status().isBadRequest());
+        saveProfile(t, 4, good).andExpect(status().isBadRequest());
+        saveProfile(t, 2, good).andExpect(status().isOk())
+                .andExpect(jsonPath("$.slots[1].saved").value(true))
+                .andExpect(jsonPath("$.slots[1].look.background").value("#ff6b6b"))
+                .andExpect(jsonPath("$.slots[1].look.nameStyle").value("RIBBON"))
+                .andExpect(jsonPath("$.equippedSlot").value(1)); // 2번 칸을 저장해도 장착은 그대로
+        saveProfile(t, 1, good).andExpect(status().isTooManyRequests()); // 5초에 한 번
+        String other = player("장착시험");
+        level(other, 11);
+        mvc.perform(put("/api/me/profiles/equipped").header("Authorization", "Bearer " + other).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"slot\":3}")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.equippedSlot").value(3)).andExpect(jsonPath("$.slots[2].equipped").value(true))
+                .andExpect(jsonPath("$.slots[0].equipped").value(false));
+    }
+
+    @Test
+    void effectsNeedLevelElevenAndGoogleLogin() throws Exception {
+        // 이동·테두리 효과는 꾸미기의 하나: 11레벨부터, Google 로그인 사용자만(4.9, 4.23)
+        String member = loggedInPlayer("효과회원");
+        mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
+                .andExpect(jsonPath("$.trails[0].unlocked").value(false)).andExpect(jsonPath("$.trails[0].lockReason").value("11레벨부터 쓸 수 있어요"));
+        level(member, 11);
+        String guest = player("효과게스트");
+        level(guest, 11);
+        mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + guest))
+                .andExpect(jsonPath("$.borders[0].unlocked").value(false));
+        String body = mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
+                .andExpect(jsonPath("$.trails.length()").value(12)).andExpect(jsonPath("$.borders.length()").value(5))
+                .andExpect(jsonPath("$.borders[0].unlocked").value(true)).andReturn().getResponse().getContentAsString();
+        int trail = JsonPath.read(body, "$.trails[0].id"), border = JsonPath.read(body, "$.borders[4].id");
+        saveProfile(guest, 1, "{\"background\":\"#ff6b6b\",\"trailEffectId\":" + trail + "}")
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("EFFECT_LOCKED"));
+        saveProfile(member, 1, "{\"background\":\"#ff6b6b\",\"trailEffectId\":" + border + "}").andExpect(status().isNotFound()); // 종류가 다르다
+        saveProfile(member, 1, "{\"background\":\"#ff6b6b\",\"trailEffectId\":" + trail + ",\"borderEffectId\":" + border + "}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slots[0].trailEffectId").value(trail))
+                .andExpect(jsonPath("$.slots[0].look.borderEffect").value("rainbow"))
+                .andExpect(jsonPath("$.slots[0].look.trailEffect").value("afterimage"));
+        // 효과마다 조건을 더 붙일 수 있다(LEVEL)
+        String typeTrail = "(select id from effect_types where code = 'TRAIL')";
+        jdbc.update("update effects set unlock_type = 'LEVEL', unlock_value = 50 where code = 'sparkle' and effect_type_id = " + typeTrail);
         try {
-            String t2 = loggedInPlayer("효과시험2");
-            mvc.perform(get("/api/me/effects").header("Authorization", "Bearer " + t2))
-                    .andExpect(jsonPath("$.effects[?(@.code == 'rainbow')].unlocked").value(false));
-            java.util.List<Integer> rainbow = JsonPath.read(json, "$.effects[?(@.code == 'rainbow')].id");
-            mvc.perform(put("/api/me/effect").header("Authorization", "Bearer " + t2).contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"effectId\":" + rainbow.getFirst() + "}")).andExpect(status().isForbidden());
+            mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
+                    .andExpect(jsonPath("$.trails[?(@.code == 'sparkle')].lockReason").value("50레벨부터 쓸 수 있어요"));
         } finally {
-            jdbc.update("update trail_effects set unlock_type = 'FREE', unlock_value = null where code = 'rainbow'");
+            jdbc.update("update effects set unlock_type = 'FREE', unlock_value = null where code = 'sparkle' and effect_type_id = " + typeTrail);
         }
     }
 
     @Test
-    void customizeUnlocksAtLevelElevenWithContrastCheck() throws Exception {
-        // 꾸미기는 11레벨부터(4.9). 바닥과 비슷한 색은 거절, 테두리 두께는 1~8단계
-        String t = player("꾸미기시험");
-        mvc.perform(get("/api/me/profile").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.unlocked").value(false)).andExpect(jsonPath("$.presets.length()").value(24));
-        String good = "{\"background\":\"#FF6B6B\",\"borderColor\":\"#ffffff\",\"borderWidth\":4}";
-        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
-                .andExpect(status().isForbidden());
-        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
-        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(121); p.setLevel(11); });
-        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"background\":\"#222b38\"}")).andExpect(status().isBadRequest()); // 바닥색과 거의 같다
-        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"background\":\"#ff6b6b\",\"borderWidth\":9}")).andExpect(status().isBadRequest());
-        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
+    void pixelArtIsSavedInProfileAndServedAsPng() throws Exception {
+        // 픽셀 그림(4.9): 11레벨 + Google 로그인만, 프로필 칸에 저장하고 PNG로 받는다. 변경 간격(기본 10분)
+        String guest = player("그림게스트");
+        String t = loggedInPlayer("그림작가");
+        level(guest, 11);
+        level(t, 11);
+        String pixels = "0".repeat(10) + ".".repeat(1024 - 20) + "1".repeat(10);
+        String art = "\"art\":{\"palette\":[\"#FF0000\",\"#00ff00\",\"#0000ff\"],\"pixels\":\"" + pixels + "\"}";
+        saveProfile(guest, 1, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\"," + art + "}")
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ART_LOGIN"));
+        saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ART_NONE"));
+        saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\",\"art\":{\"palette\":[\"#ff0000\"],\"pixels\":\"" + ".".repeat(1024) + "\"}}")
+                .andExpect(status().isBadRequest());
+        MvcResult saved = saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\"," + art + "}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.look.background").value("#ff6b6b")).andExpect(jsonPath("$.look.borderWidth").value(4));
-        // 5초에 한 번
-        mvc.perform(put("/api/me/profile").header("Authorization", "Bearer " + t).contentType(MediaType.APPLICATION_JSON).content(good))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(jsonPath("$.slots[0].inner").value("PIXEL"))
+                .andExpect(jsonPath("$.slots[0].art.palette.length()").value(2)) // 쓰지 않은 파란색은 빠진다
+                .andExpect(jsonPath("$.artChangeableAt").isNotEmpty()).andReturn();
+        String url = body(saved, "$.slots[0].look.art");
+        assertThat(url).startsWith("/api/art/");
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(content().contentType(MediaType.IMAGE_PNG)); // 로그인 없이
+        String other = "\"art\":{\"palette\":[\"#ffffff\"],\"pixels\":\"" + "0".repeat(1024) + "\"}";
+        saveProfile(t, 2, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\"," + other + "}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ART_TOO_SOON")); // 간격은 칸이 달라도 같이 센다
     }
 
     @Test

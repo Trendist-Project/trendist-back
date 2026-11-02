@@ -29,6 +29,9 @@ public interface RoomManager {
 
     void sendText(Room.Member m, Map<String, Object> message);
 
+    /** 관리자 강제 퇴장(13.10): 접속 중이면 이유를 보내고 방에서 뺀 뒤 연결을 닫는다. */
+    void kick(long countryId, long playerId, String message);
+
     /** DB·외부 호출처럼 틱 스레드에서 하면 안 되는 일을 작업 스레드에서 돌린다. */
     void submitWork(Runnable r);
 }

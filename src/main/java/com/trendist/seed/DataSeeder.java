@@ -8,38 +8,30 @@ import com.trendist.guide.entity.GuideCategory;
 import com.trendist.guide.repository.GuideCategoryRepository;
 import com.trendist.guide.repository.GuideRepository;
 import com.trendist.keyword.entity.DataSource;
-import com.trendist.keyword.entity.Keyword;
 import com.trendist.keyword.entity.KeywordState;
 import com.trendist.keyword.repository.DataSourceRepository;
-import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.KeywordStateRepository;
-import com.trendist.keyword.support.ActivePopulation;
-import com.trendist.keyword.support.TrendFormula;
 import com.trendist.player.entity.Level;
 import com.trendist.player.repository.LevelRepository;
-import com.trendist.player.repository.PlayerRepository;
-import com.trendist.player.service.PlayerService;
 import com.trendist.report.entity.ReportType;
 import com.trendist.report.repository.ReportTypeRepository;
 import com.trendist.setting.entity.Setting;
 import com.trendist.setting.repository.SettingRepository;
-import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
-import com.trendist.effect.entity.TrailEffect;
-import com.trendist.effect.repository.TrailEffectRepository;
+import com.trendist.effect.entity.Effect;
+import com.trendist.effect.entity.EffectType;
+import com.trendist.effect.repository.EffectRepository;
+import com.trendist.effect.repository.EffectTypeRepository;
 import com.trendist.title.entity.Title;
 import com.trendist.title.repository.TitleRepository;
 import com.trendist.user.entity.User;
+import com.trendist.user.entity.SanctionType;
+import com.trendist.user.repository.SanctionTypeRepository;
 import com.trendist.user.entity.UserState;
 import com.trendist.user.repository.UserRepository;
 import com.trendist.user.repository.UserStateRepository;
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,32 +50,21 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DataSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
-    /** 125판에서 없앤 데이터 소스. 예전 DB에 남아 있으면 지운다. */
-    private static final List<String> REMOVED_SOURCES = List.of("naver_datalab", "bq_trends_rising");
-    /** 쓰지 않게 된 설정. 예전 DB에 남아 있으면 지운다(128판: 기준 인원은 활동 인원으로 바뀜, 4.8). */
-    private static final List<String> REMOVED_SETTINGS = List.of("trend_base_population");
-    /** 124판까지 외부 소스의 기본 반영값. 이 값 그대로인 행은 1로 바꾼다. */
-    private static final BigDecimal OLD_DEFAULT_WEIGHT = new BigDecimal("2");
 
     private final CountryRepository countries;
     private final UserStateRepository userStates;
     private final KeywordStateRepository keywordStates;
     private final ReportTypeRepository reportTypes;
+    private final SanctionTypeRepository sanctionTypes;
     private final DataSourceRepository dataSources;
     private final SettingRepository settings;
     private final LevelRepository levels;
     private final TitleRepository titles;
-    private final TrailEffectRepository trailEffects;
+    private final EffectRepository effects;
+    private final EffectTypeRepository effectTypes;
     private final GuideCategoryRepository guideCategories;
     private final GuideRepository guides;
     private final UserRepository users;
-    private final KeywordRepository keywords;
-    private final PlayerRepository players;
-    private final PlayerService playerService;
-    private final SettingService settingService;
-    private final TrendFormula formula;
-    private final ActivePopulation population;
-    private final Clock clock;
     private final CodeTables codeTables;
 
     @Override
@@ -99,6 +80,9 @@ public class DataSeeder implements ApplicationRunner {
         }
         for (String n : ReportType.ALL) {
             if (reportTypes.findByName(n).isEmpty()) { reportTypes.save(new ReportType(n)); added++; }
+        }
+        for (String n : SanctionType.ALL) {
+            if (sanctionTypes.findByName(n).isEmpty()) { sanctionTypes.save(new SanctionType(n)); added++; }
         }
         record C(String code, String name, String locale, String tz, boolean enabled, int order) {}
         for (C c : List.of(
@@ -119,9 +103,6 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        for (String name : REMOVED_SETTINGS) {
-            settings.findByName(name).ifPresent(s -> { settings.delete(s); log.info("설정 삭제: {}", name); });
-        }
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
             if (settings.findByName(d.name()).isEmpty()) {
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
@@ -130,11 +111,6 @@ public class DataSeeder implements ApplicationRunner {
             } else {
                 Setting s = settings.findByName(d.name()).get();
                 boolean changed = false;
-                if (SettingKeys.REPLACED_DEFAULTS.getOrDefault(d.name(), Set.of()).contains(s.getValue())) {
-                    log.info("설정 기본값 변경 반영: {} {} → {}", d.name(), s.getValue(), d.value());
-                    s.changeValue(d.value());
-                    changed = true;
-                }
                 // 설명과 값 형식은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
                 if (!d.description().equals(s.getDescription())) { s.changeDescription(d.description()); changed = true; }
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
@@ -149,80 +125,30 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         added += seedTitles();
-        // 이동 효과(4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 효과만 넣는다(이름·조건·순서는 운영에서 고친다)
-        for (int i = 0; i < TRAIL_EFFECTS.length; i++) {
-            String[] t = TRAIL_EFFECTS[i];
-            if (trailEffects.findByCode(t[0]).isEmpty()) { trailEffects.save(new TrailEffect(t[0], t[1], t[2], i + 1)); added++; }
+        // 효과 종류와 효과(4.9, 4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 것만 넣는다(이름·조건·순서는 운영에서 고친다)
+        for (String[] t : EFFECT_TYPES) {
+            if (effectTypes.findByCode(t[0]).isEmpty()) { effectTypes.save(new EffectType(t[0], t[1])); added++; }
+        }
+        for (var entry : java.util.Map.of(EffectType.TRAIL, TRAIL_EFFECTS, EffectType.BORDER, BORDER_EFFECTS).entrySet()) {
+            EffectType type = effectTypes.findByCode(entry.getKey()).orElseThrow();
+            String[][] list = entry.getValue();
+            for (int i = 0; i < list.length; i++) {
+                if (effects.findByTypeAndCode(entry.getKey(), list[i][0]).isEmpty()) {
+                    effects.save(new Effect(type, list[i][0], list[i][1], i + 1));
+                    added++;
+                }
+            }
         }
         codeTables.clear();
-        migrateDataSources();
         added += seedGuides();
         log.info("seed done, {} rows added", added);
     }
 
     /**
-     * 예전 DB 정리(125판): 쓰지 않는 소스(naver_datalab, bq_trends_rising)를 지우고 예전 기본 반영값 2를 1로 바꾼다.
-     * 지운 소스를 반영 소스로 쓰던 키워드는 외부 데이터가 사라진 것과 같이 internal로 내리고 3명 미만이면 💤(4.7).
-     * 바뀐 것이 있으면 모든 키워드의 trend_value와 보유자 점수를 다시 계산한다(13.2).
-     */
-    private void migrateDataSources() {
-        boolean changed = false;
-        DataSource internal = dataSources.findByName(DataSource.INTERNAL).orElseThrow();
-        KeywordState active = keywordStates.findByName(CodeTables.KW_ACTIVE).orElseThrow();
-        KeywordState inactive = keywordStates.findByName(CodeTables.KW_INACTIVE).orElseThrow();
-        int activateHolders = settingService.getInt(SettingKeys.ACTIVATE_HOLDERS);
-        Instant now = Instant.now(clock);
-        for (String name : REMOVED_SOURCES) {
-            DataSource old = dataSources.findByName(name).orElse(null);
-            if (old == null) continue;
-            List<Keyword> moved = keywords.findByDataSourceId(old.getId());
-            for (Keyword k : moved) {
-                k.dropExternal(internal);
-                if (k.getKeywordState().getId().equals(active.getId()) && k.getHolderCount() < activateHolders) k.deactivate(inactive, now);
-            }
-            keywords.flush();
-            dataSources.delete(old);
-            log.info("데이터 소스 {} 삭제, 키워드 {}개를 internal로", name, moved.size());
-            changed = true;
-        }
-        for (DataSource ds : dataSources.findAll()) {
-            if (ds.getWeight().compareTo(OLD_DEFAULT_WEIGHT) == 0) {
-                log.info("데이터 소스 반영값 변경: {} {} → 1", ds.getName(), ds.getWeight());
-                ds.changeWeight(BigDecimal.ONE);
-                changed = true;
-            }
-        }
-        if (!changed) return;
-        for (Keyword k : keywords.findAll()) {
-            k.setTrendValue(formula.trendValue(k.getKeywordState().getId().equals(active.getId()), k.getHolderCount(),
-                    k.getDataSource().getWeight().doubleValue(), population.get(k.getCountry().getId())));
-        }
-        keywords.flush();
-        for (Long pid : players.findCheckTargets()) playerService.recomputeLocked(pid, true);
-    }
-
-    /**
      * 가이드 카테고리와 글(4.17). 운영에서 고치는 데이터라 각 테이블이 비어 있을 때만 넣는다.
-     * 예외: 처음 넣은 1판 글을 아무도 고치지 않았으면(133판에서 가이드를 다시 씀) 카테고리를 새 이름·순서로 바꾸고
-     * 예전 글은 지운 표시를 한 뒤 새 글을 넣는다. 한 번 바꾸면 카테고리 이름이 달라져 다시 바꾸지 않는다.
      */
     private int seedGuides() {
         int added = 0;
-        if (guideV1Untouched()) {
-            Instant now = Instant.now(clock);
-            guides.findAll().forEach(g -> g.delete(now));
-            int order = 1;
-            for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
-                int o = order++;
-                guideCategories.findAll().stream().filter(gc -> gc.getCode().equals(c.code())).findFirst()
-                        .ifPresentOrElse(gc -> gc.change(c.name(), c.displayType(), o),
-                                () -> guideCategories.save(new GuideCategory(c.code(), c.name(), c.displayType(), o)));
-            }
-            guideCategories.flush();
-            added += insertGuideArticles();
-            log.info("가이드를 133판 글로 바꿈");
-            return added;
-        }
         if (guideCategories.count() == 0) {
             int order = 1;
             for (GuideSeed.Category c : GuideSeed.CATEGORIES) {
@@ -231,38 +157,7 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         if (guides.count() == 0) added += insertGuideArticles();
-        return added + reviseGuides();
-    }
-
-    /**
-     * 시드 뒤에 고친 글(GuideSeed.REVISIONS). 관리자가 고친 글(본문이 예전 시드와 다름)과 지운 글은 건드리지 않는다.
-     * 새 글은 지운 글을 포함해 같은 제목·본문이 없을 때만 넣는다(관리자가 지우거나 제목을 바꿔도 되살아나지 않게).
-     */
-    private int reviseGuides() {
-        int changed = 0;
-        for (GuideSeed.Revision r : GuideSeed.REVISIONS) {
-            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(r.code()).orElse(null);
-            if (category == null) continue;
-            List<Guide> list = guides.findByGuideCategoryIdAndDeletedAtIsNullOrderBySortOrderAscIdAsc(category.getId());
-            String body = GuideSeed.article(r.code(), r.title()).body();
-            Guide same = list.stream().filter(g -> g.getTitle().equals(r.title())).findFirst().orElse(null);
-            if (r.oldBody() != null) {
-                if (same != null && same.getBody().equals(r.oldBody())) { same.changeBody(body); changed++; }
-                continue;
-            }
-            if (same != null) continue;
-            // 관리자가 지웠거나(소프트 삭제) 제목만 바꾼 글은 다시 넣지 않는다: 지운 글까지 보고 같은 제목이나 같은 본문이 있으면 건너뛴다
-            if (guides.findByGuideCategoryId(category.getId()).stream()
-                    .anyMatch(g -> g.getTitle().equals(r.title()) || g.getBody().equals(body))) continue;
-            // 기준 글과 같은 순서 값이면 id가 커서 바로 뒤에 온다. 기준이 없으면 맨 앞
-            long order = r.after() == null ? list.stream().mapToLong(Guide::getSortOrder).min().orElse(1) - 1
-                    : list.stream().filter(g -> g.getTitle().equals(r.after())).mapToLong(Guide::getSortOrder).findFirst()
-                    .orElse(list.stream().mapToLong(Guide::getSortOrder).max().orElse(0));
-            guides.save(new Guide(category, operator(), r.title(), body, Math.toIntExact(order)));
-            changed++;
-        }
-        if (changed > 0) log.info("가이드 글 {}개 고침·추가", changed);
-        return changed;
+        return added;
     }
 
     private int insertGuideArticles() {
@@ -280,19 +175,6 @@ public class DataSeeder implements ApplicationRunner {
         return added;
     }
 
-    /** 1판 기본 가이드(카테고리 코드가 1판 그대로, "아이콘과 칭호" 이름 그대로)이고 글을 하나도 고치거나 지우지 않았는지. */
-    private boolean guideV1Untouched() {
-        List<GuideCategory> cats = guideCategories.findAll();
-        if (cats.isEmpty()) return false;
-        if (!cats.stream().map(GuideCategory::getCode).collect(java.util.stream.Collectors.toSet()).equals(new HashSet<>(GuideSeed.V1_CODES))) return false;
-        if (cats.stream().noneMatch(c -> c.getCode().equals("icons-and-titles") && c.getName().equals("아이콘과 칭호"))) return false;
-        List<Guide> all = guides.findAll();
-        if (all.isEmpty()) return false;
-        // 고친 적이 없으면 수정 시각이 만든 시각과 같다(같은 저장에서 찍혀 조금 다를 수 있어 1초까지 같게 본다)
-        return all.stream().allMatch(g -> g.getDeletedAt() == null
-                && Duration.between(g.getCreatedAt(), g.getUpdatedAt()).abs().compareTo(Duration.ofSeconds(1)) <= 0);
-    }
-
     /** 공지·가이드 작성자로 쓰는 운영자 계정. 없으면 만든다. */
     private User operator() {
         return users.findFirstByRoleOrderByIdAsc(User.ROLE_ADMIN)
@@ -307,22 +189,14 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * 칭호(4.10). 칭호 ID는 번역 키라서 넣는 순서를 고정한다: 처음 22개(TITLES) 다음에 133판에서 늘린 것(MORE_TITLES).
-     * 처음 22개는 테이블이 비어 있을 때만 넣고(관리자가 지운 것이 되살아나지 않게), 늘린 칭호는 같은 이름이 없을 때 넣는다.
-     * 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10. 처음 넣은 순서(1~22) 그대로인 행만 새 순서로 바꾼다.
+     * 칭호(4.10). 운영에서 고치는 데이터라 테이블이 비어 있을 때만 넣는다(관리자가 지운 것이 되살아나지 않게).
+     * 칭호 ID는 번역 키라서 넣는 순서를 고정한다: TITLES(1~22) 다음에 MORE_TITLES(23~46). 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10.
      */
     private int seedTitles() {
+        if (titles.count() > 0) return 0;
         int added = 0;
-        if (titles.count() == 0) {
-            for (String[] t : TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
-        }
-        for (String[] t : MORE_TITLES) {
-            if (titles.findByName(t[0]).isEmpty()) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
-        }
-        for (int i = 0; i < TITLES.length; i++) {
-            int original = i + 1;
-            titles.findByName(TITLES[i][0]).filter(t -> t.getSortOrder() == original)
-                    .ifPresent(t -> t.changeSortOrder(titleOrder(t.getName())));
+        for (String[][] list : List.of(TITLES, MORE_TITLES)) {
+            for (String[] t : list) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
         return added;
     }
@@ -332,7 +206,7 @@ public class DataSeeder implements ApplicationRunner {
         return (i < 0 ? TITLE_ORDER.size() : i) * 10 + 10;
     }
 
-    /** 133판에서 늘린 칭호. ID가 처음 22개 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
+    /** 칭호 23~46. ID가 TITLES 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
     private static final String[][] MORE_TITLES = {
             {"트렌드 탐험가", "키워드를 30번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":30}"},
             {"일취월장", "20레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":20}"},
@@ -376,14 +250,32 @@ public class DataSeeder implements ApplicationRunner {
             "새내기", "단골", "터줏대감", "산증인");
 
     /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */
+    /** 효과 종류(4.9, 4.23) */
+    private static final String[][] EFFECT_TYPES = {{EffectType.TRAIL, "이동 효과"}, {EffectType.BORDER, "테두리 효과"}};
+
+    /** 이동 효과(4.23). 그림은 프론트엔드 game/trails.ts가 코드값으로 그린다 */
     private static final String[][] TRAIL_EFFECTS = {
-            {"afterimage", "잔상", "지나온 자리에 내 원의 흐릿한 그림자가 남았다 사라져요"},
-            {"sparkle", "별가루", "반짝이는 작은 별이 흩날려요"},
-            {"flame", "불꽃", "뒤로 불티가 튀며 사그라들어요"},
-            {"bubble", "물방울", "동글동글 물방울이 떠오르다 톡 터져요"},
-            {"rainbow", "무지개", "지나간 길을 따라 무지개 띠가 그려져요"},
-            {"footprint", "발자국", "작은 거북이 발자국이 콕콕 찍혀요"},
-            {"petal", "꽃잎", "분홍 꽃잎이 팔랑이며 흩날려요"},
+            {"afterimage", "잔상"},
+            {"sparkle", "별가루"},
+            {"flame", "불꽃"},
+            {"bubble", "물방울"},
+            {"rainbow", "무지개"},
+            {"footprint", "발자국"},
+            {"petal", "꽃잎"},
+            {"heart", "하트"},
+            {"note", "음표"},
+            {"bolt", "번개"},
+            {"smoke", "연기"},
+            {"snow", "눈송이"},
+    };
+
+    /** 테두리 효과(4.9). 그림은 프론트엔드 game/skin.ts가 코드값으로 그린다 */
+    private static final String[][] BORDER_EFFECTS = {
+            {"glow", "은은한 빛"},
+            {"dash", "도는 점선"},
+            {"gradient", "그라데이션"},
+            {"pulse", "맥박"},
+            {"rainbow", "무지개"},
     };
 
     private static final String[][] TITLES = {

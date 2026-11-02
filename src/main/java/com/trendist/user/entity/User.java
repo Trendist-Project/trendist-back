@@ -89,5 +89,13 @@ public class User extends BaseTimeEntity {
     public boolean isWithdrawn() { return deletedAt != null; }
 
     public boolean isBanned(Instant now) { return bannedUntil != null && bannedUntil.isAfter(now); }
+    public boolean isUploadBanned(Instant now) { return uploadBannedUntil != null && uploadBannedUntil.isAfter(now); }
+
+    /** 제재 상태를 빠르게 보려고 users에도 둔다(13.5). 제재를 걸거나 풀 때 sanctions와 같은 트랜잭션에서 고친다. null이면 제재 없음. */
+    public void changeBannedUntil(Instant until) { this.bannedUntil = until; }
+    public void changeUploadBannedUntil(Instant until) { this.uploadBannedUntil = until; }
+
+    /** 관리자 권한(13). 구글 로그인 계정에만 준다(서비스가 확인한다). */
+    public void changeRole(String role) { this.role = role; }
     public void setCountry(Country country) { this.country = country; }
 }

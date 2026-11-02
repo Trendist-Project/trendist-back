@@ -57,10 +57,30 @@ public class Room {
     /** 성장 캐릭터의 정해진 바탕색(4.9). 꾸미지 않은 원 */
     public static final String DEFAULT_BACKGROUND = "#3fb68b";
 
-    /** 이름표 아래 칭호, 원의 꾸미기, 이동 효과. 입장 때 함께 받는다. */
-    public record Appearance(String title, String background, String borderColor, Integer borderWidth, String trail) {
-        public static final Appearance DEFAULT = new Appearance(null, DEFAULT_BACKGROUND, null, null, null);
+    /** 이름표 아래 칭호, 원의 꾸미기(art는 픽셀 그림 이미지 주소, 없으면 성장 캐릭터), 이동 효과. 입장 때 함께 받는다. */
+    public record Appearance(String title, Skin skin, String trail) {
+        public static final Appearance DEFAULT = new Appearance(null, Skin.DEFAULT, null);
     }
+
+    /**
+     * 원의 꾸미기(4.9): 바탕색, 테두리 색·두께(1~8단계), 픽셀 그림 주소, 테두리 효과 코드, 이름표 글자색·모양.
+     * null이면 기본값이다. 그림은 클라이언트가 그린다.
+     */
+    public record Skin(String background, String borderColor, Integer borderWidth, String art,
+                       String borderEffect, String nameColor, String nameStyle) {
+        public static final Skin DEFAULT = new Skin(DEFAULT_BACKGROUND, null, null, null, null, null, null);
+    }
+
+    /**
+     * 연속 빼앗기 콤보와 궤도 위성(4.25). orbitAt번 연속으로 이기면 위성이 생기기 시작해 interval초마다 하나씩 max개까지 늘고,
+     * 한 번이라도 싸움에서 키워드를 잃으면 콤보와 위성이 모두 사라진다. countBots면 봇을 이긴 것도 센다.
+     */
+    public record ComboTuning(int orbitAt, double interval, int max, boolean countBots) {
+        public static final ComboTuning DEFAULT = new ComboTuning(5, 6, 8, true);
+    }
+
+    /** 이모트(4.26): 원 위에 잠깐 뜨는 이모지. 코드만 주고받는다 */
+    public static final List<String> EMOTES = List.of("wave", "laugh", "cool", "cry", "angry", "thumbs", "heart", "fire");
 
     public static final class Member {
         public final int entityNo;
@@ -69,9 +89,11 @@ public class Room {
         public String nickname;
         /** 활성 칭호(4.10). 없으면 null. 이름표 아래 작은 글씨로 보인다 */
         public String title;
-        /** 꾸미기(4.9): 바탕색, 테두리 색·두께(1~8단계). 테두리가 null이면 기본 테두리 */
-        public String background = DEFAULT_BACKGROUND, borderColor;
-        public Integer borderWidth;
+        /** 꾸미기(4.9) */
+        public Skin skin = Skin.DEFAULT;
+        /** 연속 빼앗기 콤보, 지금 위성 수, 다음 위성이 생기는 방 시계(4.25) */
+        public int combo, orbits;
+        double orbitNextAt;
         /** 이동 효과 코드(4.23). null이면 없음. 그림은 클라이언트가 그린다 */
         public String trail;
         public int level;
@@ -121,12 +143,13 @@ public class Room {
     private int nextOrb = 1;
     private double nextOrbAt;
     private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
+    private volatile ComboTuning comboTuning = ComboTuning.DEFAULT;
     private final List<SafeZone> zones = new ArrayList<>();
     private int nextZone = 1;
     private double centerSize, sentCenterSize = -1;
 
     /** 나간 플레이어의 마지막 위치와 보호 종료 시각. keepUntil이 지나면 버린다. */
-    private record LastSeen(double x, double y, double protectUntil, double keepUntil) {}
+    private record LastSeen(double x, double y, double protectUntil, double keepUntil, int combo, int orbits) {}
     private volatile Tuning tuning;
     private int nextEntity = 1;
     private long tick;
@@ -152,6 +175,8 @@ public class Room {
     public int size() { return size; }
     public void setTuning(Tuning t) { this.tuning = t; }
     public void setZoneTuning(ZoneTuning z) { this.zoneTuning = z; }
+    public void setComboTuning(ComboTuning c) { this.comboTuning = c; }
+    public ComboTuning comboTuning() { return comboTuning; }
     public ZoneTuning zoneTuning() { return zoneTuning; }
     public Tuning tuning() { return tuning; }
     public void submit(Consumer<Room> task) { tasks.add(task); }
@@ -181,7 +206,7 @@ public class Room {
         Member m = new Member(nextEntity++, playerId, session);
         m.lastHeardNanos = nanoClock.getAsLong();
         m.nickname = nickname; m.level = level; m.score = score;
-        m.title = look.title(); m.background = look.background(); m.borderColor = look.borderColor(); m.borderWidth = look.borderWidth(); m.trail = look.trail();
+        m.title = look.title(); m.skin = look.skin() == null ? Skin.DEFAULT : look.skin(); m.trail = look.trail();
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         double area = activeArea(members.size() + 1);
         LastSeen seen = lastSeen.remove(playerId);
@@ -190,6 +215,7 @@ public class Room {
             double half = area / 2;
             m.x = clamp(seen.x(), -half, half); m.y = clamp(seen.y(), -half, half);
             m.protectUntil = seen.protectUntil();
+            m.combo = seen.combo(); m.orbits = seen.orbits(); m.orbitNextAt = clockSeconds + comboTuning.interval(); // 콤보·위성도 이어 간다(4.25)
         } else {
             double[] spawn = firstTime ? centerSpawn(area) : findSpawn(area);
             m.x = spawn[0]; m.y = spawn[1];
@@ -220,10 +246,62 @@ public class Room {
         for (Member m : members.values()) outbox.sendText(m, msg);
     }
 
+    /** 이모트(4.26): 방 전체에 보내 그 원 위에 잠깐 띄운다. 코드는 받는 쪽에서 이미 검사했다. */
+    public void emote(Member from, String code) {
+        if (members.get(from.entityNo) != from) return;
+        Map<String, Object> msg = Map.of("type", "emote", "e", from.entityNo, "code", code);
+        for (Member m : members.values()) outbox.sendText(m, msg);
+    }
+
+    /**
+     * 싸움 결과(4.3, 4.25): 이긴 사람(winnerId, 봇이면 null)의 콤보를 +1 하고, 키워드를 잃은 사람(loserId, 봇이면 null)의 콤보와 위성을
+     * 모두 없앤다. vsBot이면 상대가 봇이다(설정에 따라 콤보에 넣지 않는다). 키워드가 실제로 오간 뒤에만 부른다.
+     */
+    public void fightResult(Long winnerId, Long loserId, boolean vsBot) {
+        ComboTuning ct = comboTuning;
+        Member w = winnerId == null ? null : byPlayer.get(winnerId);
+        Member l = loserId == null ? null : byPlayer.get(loserId);
+        if (l != null && !l.bot && (l.combo > 0 || l.orbits > 0)) {
+            boolean broken = l.orbits > 0;
+            l.combo = 0; l.orbits = 0;
+            Map<String, Object> msg = comboMessage(l, broken ? "broken" : "reset");
+            msg.put("by", w != null ? w.nickname : "Bot");
+            if (w != null) msg.put("byE", w.entityNo);
+            broadcast(msg);
+        }
+        if (w != null && !w.bot && (!vsBot || ct.countBots())) {
+            w.combo++;
+            if (w.combo == ct.orbitAt()) {
+                w.orbitNextAt = clockSeconds; // 바로 첫 위성이 생긴다
+                broadcast(comboMessage(w, "start"));
+            } else {
+                broadcast(comboMessage(w, "up"));
+            }
+        }
+    }
+
+    /** 위성 늘리기: 콤보가 기준 이상인 사람은 정해진 간격마다 하나씩, 최대 개수까지(4.25). */
+    private void growOrbits() {
+        ComboTuning ct = comboTuning;
+        for (Member m : members.values()) {
+            if (m.bot || m.combo < ct.orbitAt() || m.orbits >= ct.max() || clockSeconds < m.orbitNextAt) continue;
+            m.orbits++;
+            m.orbitNextAt = clockSeconds + ct.interval();
+            broadcast(comboMessage(m, "orbit"));
+        }
+    }
+
+    private Map<String, Object> comboMessage(Member m, String event) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "combo"); msg.put("e", m.entityNo); msg.put("nickname", m.nickname);
+        msg.put("combo", m.combo); msg.put("orbits", m.orbits); msg.put("event", event); msg.put("orbitAt", comboTuning.orbitAt());
+        return msg;
+    }
+
     public void leave(Member m) {
         if (members.remove(m.entityNo) == null) return;
         byPlayer.remove(m.playerId);
-        lastSeen.put(m.playerId, new LastSeen(m.x, m.y, m.protectUntil, clockSeconds + REJOIN_KEEP_SECONDS));
+        lastSeen.put(m.playerId, new LastSeen(m.x, m.y, m.protectUntil, clockSeconds + REJOIN_KEEP_SECONDS, m.combo, m.orbits));
         for (Long k : m.keywords) {
             Set<Member> set = holders.get(k);
             if (set != null) { set.remove(m); if (set.isEmpty()) holders.remove(k); }
@@ -315,10 +393,10 @@ public class Room {
     }
 
     /** 꾸미기가 바뀌었다(4.9). 모두에게 명단을 다시 보낸다. */
-    public void applyLook(long playerId, String background, String borderColor, Integer borderWidth) {
+    public void applyLook(long playerId, Skin skin) {
         Member m = byPlayer.get(playerId);
         if (m == null) return;
-        m.background = background; m.borderColor = borderColor; m.borderWidth = borderWidth;
+        m.skin = skin;
         broadcastRoster();
     }
 
@@ -351,6 +429,7 @@ public class Room {
         if (tick % 20 == 0) { dropSilent(); maintainBots(tu); }
         thinkBots(tu, half);
         for (Member m : members.values()) move(m, dt, tu, half);
+        growOrbits();
         updateZones(half);
         for (Member m : members.values()) m.safe = inSafeZone(m.x, m.y);
         collide(tu);
@@ -718,8 +797,11 @@ public class Room {
             // 칭호·테두리·효과는 없을 수 있어서(null) Map.of 대신 HashMap을 쓴다
             Map<String, Object> e = new HashMap<>();
             e.put("e", m.entityNo); e.put("nickname", m.nickname); e.put("level", m.level); e.put("bot", m.bot);
-            e.put("title", m.title); e.put("bg", m.background); e.put("borderColor", m.borderColor); e.put("borderWidth", m.borderWidth);
-            e.put("trail", m.trail);
+            Skin k = m.skin;
+            e.put("title", m.title); e.put("bg", k.background()); e.put("borderColor", k.borderColor()); e.put("borderWidth", k.borderWidth());
+            e.put("trail", m.trail); e.put("art", k.art()); e.put("borderEffect", k.borderEffect());
+            e.put("nameColor", k.nameColor()); e.put("nameStyle", k.nameStyle());
+            e.put("combo", m.combo); e.put("orbits", m.orbits);
             list.add(e);
         }
         Map<String, Object> msg = Map.of("type", "roster", "players", list);

@@ -26,7 +26,7 @@ public final class GameEvents {
     public record TitleChanged(long countryId, long playerId, String title) {}
 
     /** 꾸미기가 바뀌었다(4.9). 접속 중이면 방의 원 모습을 바꾼다. */
-    public record LookChanged(long countryId, long playerId, String background, String borderColor, Integer borderWidth) {}
+    public record LookChanged(long countryId, long playerId, com.trendist.game.room.Room.Skin skin) {}
 
     /** 이동 효과가 바뀌었다(4.23, code가 null이면 끔). 접속 중이면 방의 원 뒤 효과를 바꾼다. */
     public record TrailChanged(long countryId, long playerId, String code) {}

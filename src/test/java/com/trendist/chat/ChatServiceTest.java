@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class ChatServiceTest {
     // 검사만 쓰므로 저장소는 비워 둔다
-    private final ChatServiceImpl chat = new ChatServiceImpl(null, null, null, Clock.systemUTC());
+    private final ChatServiceImpl chat = new ChatServiceImpl(null, null, null, Clock.systemUTC(), new com.trendist.stats.support.ActivityCounter());
 
     @Test
     void cleansAndLimits() {

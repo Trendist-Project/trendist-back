@@ -14,7 +14,14 @@ public final class ShareDtos {
      */
     public record CardData(String nickname, long level, String title, long score, Integer rank, List<Long> scores,
                            List<String> keywords, List<Record> records, String background, String borderColor,
-                           Integer borderWidth, String trail) {}
+                           Integer borderWidth, String trail, String artPalette, String artPixels) {
+        /** 픽셀 그림이 없는 카드 */
+        public CardData(String nickname, long level, String title, long score, Integer rank, List<Long> scores,
+                        List<String> keywords, List<Record> records, String background, String borderColor,
+                        Integer borderWidth, String trail) {
+            this(nickname, level, title, score, rank, scores, keywords, records, background, borderColor, borderWidth, trail, null, null);
+        }
+    }
 
     /**
      * 만든 공유 주소. url은 공유 페이지, imageUrl은 카드 이미지(모두 사이트 주소 기준 절대 주소).

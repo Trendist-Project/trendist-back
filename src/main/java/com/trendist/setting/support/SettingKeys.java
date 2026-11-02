@@ -1,8 +1,6 @@
 package com.trendist.setting.support;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /** settings 테이블의 이름과 기본값(13.3). 시더가 없는 행만 넣는다(11.3). */
 public final class SettingKeys {
@@ -53,19 +51,11 @@ public final class SettingKeys {
     public static final String SAFE_ZONE_MAX = "safe_zone_max";
     public static final String SAFE_ZONE_SECONDS = "safe_zone_seconds";
     public static final String CUSTOMIZE_UNLOCK_LEVEL = "customize_unlock_level";
-
-    /**
-     * 기본값을 바꾼 설정과 예전 기본값들. 시더는 기존 행을 덮어쓰지 않지만, 아직 예전 기본값 그대로인 행만 새 기본값으로 바꾼다
-     * (관리자가 직접 바꾼 값은 그대로 둔다).
-     */
-    public static final Map<String, Set<String>> REPLACED_DEFAULTS = Map.of(
-            // 트렌드 값을 고정 인원(1,000명)이 아니라 활동 인원 대비 비율로 계산하면서 기본 점수와 완만도의 단위가 바뀜(4.8)
-            TREND_BASE_RATIO, Set.of("10"), TREND_LOG_SOFTNESS, Set.of("30"),
-            // 봇 상한: 1등 × 1.5 → 1등 × 0.7 → 접속 중인 사람 평균 × 1.0(4.21). 운영 DB에 들어간 1.1도 1.0으로 맞춘다
-            BOT_CAP_RATIO, Set.of("1.5", "0.7", "1.1"),
-            // 세이프존을 더 크게, 무작위 존을 2배로(4.22)
-            SAFE_CENTER_RATIO, Set.of("0.06"), SAFE_CENTER_MIN, Set.of("600"), SAFE_ZONE_RATIO, Set.of("0.035"),
-            SAFE_ZONE_MIN, Set.of("400"), SAFE_ZONE_DENSITY, Set.of("6"), SAFE_ZONE_MAX, Set.of("40"));
+    public static final String ART_CHANGE_MINUTES = "art_change_minutes";
+    public static final String COMBO_ORBIT_AT = "combo_orbit_at";
+    public static final String ORBIT_INTERVAL_SECONDS = "orbit_interval_seconds";
+    public static final String ORBIT_MAX = "orbit_max";
+    public static final String COMBO_BOT_COUNTS = "combo_bot_counts";
 
     public static final List<Def> DEFAULTS = List.of(
             // 트렌드 값(4.8): 가진 비율 s = 가진 사람 / max(활동 인원, 최소 인원). s가 최고점 비율이면 최대 기준값
@@ -95,7 +85,6 @@ public final class SettingKeys {
             new Def(JOIN_PROTECT_SECONDS, "10", 0, 600, "입장 직후 보호(초)"),
             new Def(NICKNAME_CHANGE_MINUTES, "60", 0, 10080, "닉네임 변경 간격(분, 나라별)"),
             // ? 구슬 목표 개수 = 지금 활동 영역 넓이(100만 px² 단위) × 밀도. 맵이 넓어지면 같은 비율로 늘어난다(4.20).
-            // 기본 밀도 4.4는 활동 영역 3,000×3,000px에 20개였던 예전 비율의 2배다
             new Def(ORB_DENSITY, "4.4", 0, 50, "? 구슬 밀도: 1,000×1,000px 넓이마다 떠 있는 개수(0이면 끔)"),
             new Def(ORB_MAX, "3000", 0, 5000, "방에 동시에 떠 있는 ? 구슬 수 상한(0이면 끔). 밀도로 정한 목표가 이보다 크면 이 값까지만"),
             new Def(ORB_SPAWN_SECONDS, "3", 0.5, 600, "? 구슬이 생기는 간격(초)"),
@@ -116,6 +105,11 @@ public final class SettingKeys {
             new Def(SAFE_ZONE_DENSITY, "12", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
             new Def(SAFE_ZONE_MAX, "80", 0, 300, "무작위 세이프존 동시 개수 상한"),
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
-            new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꿀 수 있다"),
+            new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꾸고 픽셀 그림을 그릴 수 있다"),
+            new Def(ART_CHANGE_MINUTES, "10", 0, 1440, "픽셀 그림 변경 간격(분): 그림을 저장한 뒤 이만큼 지나야 다시 바꿀 수 있다"),
+            new Def(COMBO_ORBIT_AT, "5", 1, 50, "궤도 위성: 키워드를 이만큼 연속으로 빼앗으면 위성이 생기기 시작한다(한 번이라도 잃으면 사라짐)"),
+            new Def(ORBIT_INTERVAL_SECONDS, "6", 1, 300, "궤도 위성이 하나씩 늘어나는 간격(초)"),
+            new Def(ORBIT_MAX, "8", 1, 20, "궤도 위성 최대 개수"),
+            new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

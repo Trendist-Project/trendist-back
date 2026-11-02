@@ -20,6 +20,7 @@ public class ChatServiceImpl implements ChatService {
     private final CountryRepository countries;
     private final PlayerRepository players;
     private final Clock clock;
+    private final com.trendist.stats.support.ActivityCounter activity;
 
     @Override
     public String validate(String raw) {
@@ -33,6 +34,7 @@ public class ChatServiceImpl implements ChatService {
     public Saved save(long countryId, long playerId, String text) {
         Instant now = Instant.now(clock);
         ChatMessage m = messages.save(new ChatMessage(countries.getReferenceById(countryId), players.getReferenceById(playerId), text, now));
+        activity.add(countryId, com.trendist.stats.support.ActivityCounter.Kind.CHAT); // 사이트 통계(13.9)
         return new Saved(m.getId(), now.toEpochMilli());
     }
 }

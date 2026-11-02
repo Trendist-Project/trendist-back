@@ -28,6 +28,12 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     long countByKeywordId(Long keywordId);
 
+    /** 관리자 사용자 관리(13.10): 그 플레이어의 최근 댓글(지운 것 포함). */
+    @Query("select c from Comment c join fetch c.keyword where c.player.id = :playerId order by c.id desc")
+    List<Comment> findRecentByPlayer(@Param("playerId") Long playerId, org.springframework.data.domain.Pageable pageable);
+
+    long countByPlayerId(Long playerId);
+
     /** 추천·비추천 수를 바꾼다. 0 아래로 내려가지 않는다(9.6). updated_at은 건드리지 않는다. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
