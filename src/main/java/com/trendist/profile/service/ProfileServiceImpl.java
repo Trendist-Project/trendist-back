@@ -69,7 +69,7 @@ public class ProfileServiceImpl implements ProfileService {
         int unlock = settings.getInt(SettingKeys.CUSTOMIZE_UNLOCK_LEVEL);
         Instant now = Instant.now(clock);
         List<Profile> mine = profiles.findByPlayerIdOrderBySlotAsc(p.getId());
-        int equippedSlot = looks.equipped(p.getId()).map(Profile::getSlot).orElse(1);
+        int equippedSlot = looks.equipped(p.getId()).map(x -> Math.toIntExact(x.getSlot())).orElse(1);
         List<ProfileDtos.Slot> slots = new ArrayList<>();
         for (int s = 1; s <= Profile.SLOTS; s++) {
             int n = s;
@@ -135,7 +135,7 @@ public class ProfileServiceImpl implements ProfileService {
 
         boolean first = mine.isEmpty();
         if (pr == null) pr = profiles.save(new Profile(p.getId(), slot, bg));
-        pr.changeLook(bg, border, width, name, style, inner);
+        pr.changeLook(bg, border, width == null ? null : width.longValue(), name, style, inner);
         if (artChanged) pr.changeArt(art.palette(), art.pixels(), now);
         pr.changeEffects(trail, borderEffect);
         if (Boolean.TRUE.equals(req.equip())) {

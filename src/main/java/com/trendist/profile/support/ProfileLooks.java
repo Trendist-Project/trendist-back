@@ -35,7 +35,8 @@ public class ProfileLooks {
     /** 한 칸의 모습. 그림 주소는 원 안에 그림을 고른 칸만, 효과 코드는 로그인 사용자만. */
     public ProfileDtos.Look look(Player p, Profile pr) {
         boolean guest = p.getUser().isGuest();
-        return new ProfileDtos.Look(pr.getBackgroundColor(), pr.getBorderColor(), pr.getBorderWidth(),
+        return new ProfileDtos.Look(pr.getBackgroundColor(), pr.getBorderColor(),
+                pr.getBorderWidth() == null ? null : Math.toIntExact(pr.getBorderWidth()), // 두께는 1~8단계
                 pr.showsArt() && !guest ? pr.artUrl() : null, effects.code(p, pr.getBorderEffectId()),
                 pr.getNameColor(), pr.getNameStyle(), effects.code(p, pr.getTrailEffectId()));
     }

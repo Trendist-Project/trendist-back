@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ProfileRepository extends JpaRepository<Profile, Long> {
     Optional<Profile> findFirstByPlayerIdAndEquippedTrue(long playerId);
 
-    Optional<Profile> findByPlayerIdAndSlot(long playerId, int slot);
+    Optional<Profile> findByPlayerIdAndSlot(long playerId, long slot);
 
     List<Profile> findByPlayerIdOrderBySlotAsc(long playerId);
 }

@@ -26,11 +26,11 @@ public class Profile extends BaseTimeEntity {
     public static final int SLOTS = 3;
 
     @Column(name = "player_id", nullable = false) private long playerId;
-    @Column(nullable = false, columnDefinition = "TINYINT") private int slot;
+    @Column(nullable = false) private long slot;
     @Column(nullable = false) private boolean equipped;
     @Column(name = "background_color", nullable = false, length = 7) private String backgroundColor;
     @Column(name = "border_color", length = 7) private String borderColor;
-    @Column(name = "border_width", columnDefinition = "TINYINT UNSIGNED") private Integer borderWidth;
+    @Column(name = "border_width") private Long borderWidth;
     @Column(name = "name_color", length = 7) private String nameColor;
     @Column(name = "name_style", length = 20) private String nameStyle;
     @Column(name = "profile_type", nullable = false, length = 20) private String profileType = GROWTH;
@@ -40,14 +40,14 @@ public class Profile extends BaseTimeEntity {
     @Column(name = "trail_effect_id") private Long trailEffectId;
     @Column(name = "border_effect_id") private Long borderEffectId;
 
-    public Profile(long playerId, int slot, String backgroundColor) {
+    public Profile(long playerId, long slot, String backgroundColor) {
         this.playerId = playerId;
         this.slot = slot;
         this.backgroundColor = backgroundColor;
     }
 
     /** 모습을 바꾼다. 검사는 서비스가 한다. */
-    public void changeLook(String backgroundColor, String borderColor, Integer borderWidth, String nameColor, String nameStyle, String profileType) {
+    public void changeLook(String backgroundColor, String borderColor, Long borderWidth, String nameColor, String nameStyle, String profileType) {
         this.backgroundColor = backgroundColor;
         this.borderColor = borderColor;
         this.borderWidth = borderWidth;
