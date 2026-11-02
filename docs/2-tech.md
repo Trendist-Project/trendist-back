@@ -25,18 +25,18 @@
   - 조작은 바뀐 시각에 정확히 적용한다. 클라이언트는 조작이 바뀌는 순간까지 예측을 먼저 진행한 뒤 바꾸고(프레임 경계로 반올림하지 않음), 서버는 조작이 도착한 시각을 기록해 틱 구간을 그 시점에서 나눠 움직인다(틱 경계로 반올림하지 않음). 그래서 방향키를 짧게 눌렀다 떼거나 두 개를 함께 눌러도 서버와 예측이 같은 곳에 멈추고, 멈춘 뒤 원이 혼자 미끄러지지 않는다.
   - 이동 목표와 방향 입력은 서버로 보내는 순간(클릭은 초당 10회로 묶은 시점, 방향키는 바뀐 즉시, 한 프레임 16ms 안의 변화만 합침)에 예측에도 반영한다. 클릭 물결 효과만 클릭 즉시 보여 준다.
   - 서버 위치는 왕복 시간만큼 늦은 과거 값이라 매번 당기지 않는다. 움직이는 중에는 최대 속도 × (0.25초 + 왕복 시간) 넘게, 멈춰 있으면 3px 넘게 어긋날 때만 맞춘다(지연이 들쭉날쭉해 생기는 1~2px 차이로 멈춘 원이 다시 미끄러지지 않게). 왕복 시간은 2초마다 `ping`/`pong`으로 잰다.
-  - 맞출 때는 예측 위치만 서버 위치로 옮기고, 화면 위치(카메라)는 순간 이동 없이 약 0.12초에 걸쳐 따라간다. 다만 둘 다 멈춰 있을 때 생긴 작은 차이(12px 이하)는 화면에 바로 보여 주지 않고, 다음에 움직이기 시작할 때 섞어서 따라간다(멈춘 원이 혼자 한 번 움직여 보이지 않게). 서버 쪽 원이 움직이는 중(튕김 등)이거나 12px보다 크게 어긋나면 멈춰 있어도 바로 따라간다. 300px 넘게 어긋나면(입장·순간 이동) 바로 맞춘다.
+  - 맞출 때는 예측 위치만 서버 위치로 옮기고, 화면 위치(카메라)는 순간 이동 없이 약 0.12초에 걸쳐 따라간다. 다만 둘 다 멈춰 있을 때 생긴 작은 차이(12px 이하)는 화면에 바로 보여 주지 않고, 다음에 움직이기 시작할 때 섞어서 따라간다(멈춘 원이 혼자 한 번 움직여 보이지 않게). 서버 쪽 원이 움직이는 중(튕김 등)이거나 12px보다 크게 어긋나면 멈춰 있어도 바로 따라간다. 1,500px 넘게 어긋나면(입장·순간 이동) 바로 맞춘다(아래 모바일 끊김 방지).
 - 모바일 끊김 방지
   - 다른 원은 서버 시각(스냅샷의 틱 번호 × 50ms)으로 140ms 늦게, 앞뒤 스냅샷 사이를 보간해 그린다. 도착 간격이 들쭉날쭉해도 멈췄다 튀지 않는다. 서버 시각과 브라우저 시각의 차이는 가장 빨리 도착한 스냅샷 기준으로 잡는다.
-  - 내 원의 예측은 서버 틱처럼 50ms씩 나눠 진행하고, 프레임이 늦게 와도 그 시간을 버리지 않는다(최대 1초). 예전에는 0.1초를 넘는 시간을 버려 서버보다 뒤처지고 보정으로 화면이 튀었다.
+  - 내 원의 예측은 서버 틱처럼 50ms씩 나눠 진행하고, 프레임이 늦게 와도 그 시간을 버리지 않는다(최대 1초). 시간을 버리면 서버보다 뒤처져 보정으로 화면이 튄다.
   - 1,500px 넘게 어긋날 때만 바로 맞추고, 그보다 작으면 화면을 부드럽게 따라가게 한다(튕김·지연으로 수백 px 어긋날 때 순간 이동하지 않게).
-  - 캔버스 크기는 정수로 맞추고 DPR은 2까지만 쓴다(DPR이 소수인 휴대폰에서 매 프레임 캔버스를 새로 만들던 문제). 원 그림자는 `shadowBlur` 대신 반투명 원, ? 구슬은 한 번 그린 그림을 찍는다. 그리다 오류가 나도 다음 프레임은 계속 돈다.
+  - 캔버스 크기는 정수로 맞추고 DPR은 2까지만 쓴다(DPR이 소수인 휴대폰에서 매 프레임 캔버스를 새로 만들지 않게). 원 그림자는 `shadowBlur` 대신 반투명 원, ? 구슬은 한 번 그린 그림을 찍는다. 그리다 오류가 나도 다음 프레임은 계속 돈다.
 - 바닥 격자는 작은 타일을 한 번 그려 반복한다. 화면 밖 아이콘은 그리지 않고 이미지는 한 번 받아 캐시한다.
 - 서버 데이터는 TanStack Query, 전역 UI 상태는 Zustand(후보, 버전 고정).
 - 다국어: react-i18next로 언어별 JSON. 빠진 번역은 영어(영어 지원 전에는 한국어)로 대체, 빌드 때 누락 키 검사. DB의 이름(칭호, 키워드·사용자 상태, 나라)은 한글 하나만 두고 다른 언어는 키로 찾는다(칭호·키워드 상태는 ID, 예: `titles.7.name`, 나라는 `countries.code`). ID는 초기 데이터를 넣는 순서로 정해지므로 순서를 바꾸거나 지우지 않는다(안 쓰는 칭호는 `enabled`를 끈다). 서버 오류는 코드와 파라미터로만 받는다.
 - 날짜·숫자는 `Intl` API, 폰트는 Noto Sans(KR·JP·SC·Devanagari)를 필요한 것만 불러온다.
 - 키워드 활동 그래프(4.12): SVG로 직접 그리거나 가벼운 차트 라이브러리(후보 uPlot·Recharts, 버전 고정)를 쓴다. 응답은 TanStack Query로 1분 캐시한다.
-- 성공 알림(토스트, 140판): 저장·수정·삭제·복사·신고처럼 요청이 잘 끝나면 화면 위 가운데에 초록 알림을 약 2.4초 띄운다(창 위에 겹쳐 보임, 최대 3개, 같은 문구는 하나만). 어느 화면에서든 `successToast('저장했어요')`를 부르고, 알림 영역(`<Toaster />`)은 게임·관리자 페이지에 하나씩 둔다. 오류는 지금처럼 그 입력 칸·창 안에 보여 준다(무엇을 고쳐야 하는지 그 자리에서 보이게). 아레나의 게임 알림(키워드 잃기·빼앗기 등)은 따로다.
+- 성공 알림(토스트): 저장·수정·삭제·복사·신고처럼 요청이 잘 끝나면 화면 위 가운데에 초록 알림을 약 2.4초 띄운다(창 위에 겹쳐 보임, 최대 3개, 같은 문구는 하나만). 어느 화면에서든 `successToast('저장했어요')`를 부르고, 알림 영역(`<Toaster />`)은 게임·관리자 페이지에 하나씩 둔다. 오류는 그 입력 칸·창 안에 보여 준다(무엇을 고쳐야 하는지 그 자리에서 보이게). 아레나의 게임 알림(키워드 잃기·빼앗기 등)은 따로다.
 - 접근성: 키보드 포커스, 화면 낭독기 라벨(예: "거북이 아이콘 5단계"), 그래프 요약 문장.
 
 ## 9. 백엔드
@@ -61,6 +61,8 @@
 - 느린 클라이언트는 송신 버퍼 상한을 넘으면 오래된 스냅샷을 버린다. DB·외부 호출은 틱 스레드 밖에서 가상 스레드로 처리한다.
 - 방 관리자와 입장 라우팅은 인터페이스로 분리해 두고, 나중에 지역당 여러 방·여러 서버로 늘린다.
 - 설정값 전달: 이동 계산은 항상 서버가 `settings`(1분 캐시)의 값으로 한다. 클라이언트가 예측에 쓰는 값(최대 속도, 반지름·줌 곡선 값)은 입장할 때 서버가 보내 주고, 관리자가 바꿔서 설정이 갱신되면 방 안 모든 클라이언트에 다시 보낸다. 그러지 않으면 내 아이콘 예측이 서버 위치와 어긋난다.
+- 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
+- 연속 빼앗기 콤보(4.25): 작업 스레드가 빼앗기·잃기를 끝내면 방 큐에 결과를 넣고, 틱 스레드가 이긴 사람의 콤보 +1, 잃은 사람의 콤보·위성 0을 하고 `combo{e, nickname, combo, orbits, event, orbitAt, by, byE}`를 방 전체에 보낸다. 위성은 틱마다 간격을 확인해 늘린다. 설정은 1초마다 다시 읽는다(`Room.ComboTuning`).
 - 채팅(4.13)도 게임 WebSocket으로 받는다(`chat{text}`). 검사는 받는 스레드에서, 저장은 작업 스레드에서 하고, 저장이 끝나면 방에 넣어 틱 스레드가 방 전체에 `chat{id, e, nickname, text, at}`을 보낸다. 방은 최근 50개를 메모리에 두고 들어오는 사람에게 `chatHistory`로 보낸다. 보낸 사람은 세션 엔티티 번호(`e`)로만 가리킨다.
 
 점수 실시간 반영
@@ -123,12 +125,14 @@ WHERE p.id IN (/* 500명 */)
 | 대상 | 한도 |
 |---|---|
 | API 전반 | 초당 5회 수준(정상 플레이에서 걸리지 않게) |
-| 이동 명령 | 클릭 이동 초당 10회, 방향키는 바뀔 때마다(16ms에 한 번까지, 클라이언트 기준). 서버는 종류별 토큰 버킷으로 센다: 클릭 초당 12개(최대 24개까지 모임), 방향키 초당 60개(최대 60개), 그 밖의 종류 초당 10개. 고정 1초 창으로 세면 네트워크·프록시가 메시지를 몰아서 전달할 때 한도를 넘겨 그 1초가 끝날 때까지 모든 명령이 버려지고, 화면만 움직였다가 되돌아오는 문제가 있었다. `ping`은 세지 않는다 |
+| 이동 명령 | 클릭 이동 초당 10회, 방향키는 바뀔 때마다(16ms에 한 번까지, 클라이언트 기준). 서버는 종류별 토큰 버킷으로 센다: 클릭 초당 12개(최대 24개까지 모임), 방향키 초당 60개(최대 60개), 그 밖의 종류 초당 10개. 고정 1초 창은 네트워크·프록시가 메시지를 몰아서 전달할 때 한도를 넘겨 그 1초 동안 모든 명령을 버리고, 화면만 움직였다가 되돌아오게 해서 쓰지 않는다. `ping`은 세지 않는다 |
+| 이모트 | 게임 WebSocket 연결마다 토큰 버킷: 초당 0.5개(최대 3개 모임). 넘으면 조용히 버린다(4.26) |
 | 채팅 | 1초에 1회(게임 WebSocket 연결마다 토큰 버킷, 넘으면 `chatError` `CHAT_TOO_FAST`) + IP 단위 |
 | 정보 팝업 조회 | 계정당 초당 2회, 결과 5초 캐시 |
 | 댓글 투표 | 사용자당 분당 20회, 같은 댓글 분당 5회(`vote:comment:{user}:{comment}`) |
 | 색·칭호 변경 | 5초에 1회 |
-| 이미지 변경 | 1시간에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지) |
+| 꾸미기 프로필 저장·장착 | 5초에 1회 |
+| 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 10분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
 | 외부 온디맨드 조회, 새 키워드 생성 | 사용자·IP 단위 분당 제한 |
 | 트렌드 상자 열기 | 초당 2회 |
 | 토큰 발급·갱신·게스트 시작(`/api/auth/*`) | IP 단위 분당 10회 |
@@ -160,7 +164,8 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
 | `POST /api/admin/keywords` | `{ "text": "...", "country": "KR" }`. 🔥활성 키워드 추가(반영 소스 admin, 7일, 13.7) |
 | `POST /api/admin/keywords/{id}/ban`, `/unban` | 금지·해제(13.1). 금지하면 트렌드 값 0, 보유자 점수에서 바로 빠짐 |
-| `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5) |
+| `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5). 목록 한 줄에 `targetUserId`(신고된 사람), `contentDeleted`, `targetSanctions`(지금 걸린 제재) |
+| `POST /api/admin/reports/{id}/act` | 신고에서 바로 조치(13.5) `{ "sanction": "CHAT" \| "COMMENT" \| "UPLOAD" \| "BAN" \| null, "days": 1, "reason": "", "deleteContent": true, "sameTarget": true }`. 제재를 걸고(사유를 비우면 신고 번호·사유로), 댓글이면 지우고, 그 신고(와 같은 대상의 접수 신고)를 조치함으로. 응답 `{ changed, report }`. 대상 사용자가 없으면 400 `REPORT_NO_USER`, 댓글이 아닌데 지우기면 400 `REPORT_DELETE_TYPE` |
 | `GET /api/admin/settings`, `PATCH /api/admin/settings/{name}` | 설정 목록과 값 변경 `{ "value": "12" }`. 숫자·정수·허용 범위 검사, 저장하면 캐시를 비워 바로 반영(13.3) |
 | `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
@@ -169,8 +174,16 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `POST /api/auth/withdraw` | `{ "phrase": "탈퇴 합니다." }`. 탈퇴(4.1): 문구가 다르면 400 `WITHDRAW_PHRASE`, 게스트면 400 `WITHDRAW_GUEST`. 갱신 토큰 폐기, 쿠키 삭제(204) |
 | `GET /api/me/titles`, `PUT /api/me/title` | 칭호함(전체 칭호, 보유·획득일·진행도·활성)과 활성 칭호 바꾸기 `{ "titleId": 3 }`(null이면 해제). 안 가진 칭호는 400 `TITLE_NOT_OWNED`, 5초 1번 429 `TITLE_TOO_FAST`(4.10) |
-| `GET /api/me/effects`, `PUT /api/me/effect` | 이동 효과 목록(코드·이름·설명·조건·해금 여부·잠금 안내·사용 중)과 고르기 `{ "effectId": 3 }`(null이면 끄기). 게스트와 조건 미달은 403 `EFFECT_LOCKED`, 없는 효과 404 `EFFECT_NOT_FOUND`, 5초 1번 429 `EFFECT_TOO_FAST`(4.23). 바뀌면 방 명단(`roster`)의 `trail`로 모두에게 알린다 |
-| `GET /api/me/profile`, `PUT /api/me/profile` | 내 꾸미기(모습·해금 여부·해금 레벨·기본값·프리셋 24색)와 저장 `{ "background": "#ff6b6b", "borderColor": null, "borderWidth": 4 }`. 해금 전 403 `CUSTOMIZE_LOCKED`, 형식 400 `COLOR_FORMAT`, 대비 400 `COLOR_CONTRAST`, 두께 400 `BORDER_WIDTH`, 5초 1번 429 `LOOK_TOO_FAST`(4.9) |
+| `GET /api/me/profiles` | 내 꾸미기 프로필(4.9): 1~3번 칸(`saved`·`equipped`·`inner`(GROWTH/PIXEL)·모습(효과 코드 포함)·그림·효과 번호·저장 시각), `equippedSlot`, `unlocked`·`unlockLevel`, 기본 모습, 프리셋 24색, 이름표 모양, `canDraw`·`drawLockReason`·`artChangeableAt`, 고를 수 있는 이동 효과 `trails`·테두리 효과 `borders`(번호·코드·이름·`unlocked`·`lockReason`) |
+| `PUT /api/me/profiles/{slot}` | 한 칸 저장 `{ "background", "borderColor", "borderWidth", "nameColor", "nameStyle", "inner": "GROWTH" \| "PIXEL", "art": { "palette": [...], "pixels": "1024글자" } \| null(그대로), "trailEffectId", "borderEffectId", "equip": false }`. equip이면 저장 후 장착. 칸 번호 400 `PROFILE_SLOT`, 11레벨 전 403 `CUSTOMIZE_LOCKED`, 색 400 `COLOR_FORMAT`·`COLOR_CONTRAST`·`NAME_CONTRAST`, 두께 400 `BORDER_WIDTH`, 이름표 모양 400 `NAME_STYLE`, 그림 400 `ART_FORMAT`·`ART_COLORS`·`ART_EMPTY`·`ART_NONE`, 게스트 그림 403 `ART_LOGIN`, 그림 저장 정지 403 `ART_BANNED`, 그림 간격 409 `ART_TOO_SOON`, 효과 404 `EFFECT_NOT_FOUND`·403 `EFFECT_LOCKED`, 5초 1번 429 `LOOK_TOO_FAST`. 장착한 칸이면 방에 바로 반영 |
+| `PUT /api/me/profiles/equipped` | 장착할 칸 `{ "slot": 2 }`. 빈 칸은 기본 모습으로 만들어 장착. 11레벨 전 403, 5초 1번 429 |
+| `GET /api/art/{profileId}.png?v=` | 픽셀 그림 PNG(32×32, 로그인 없음). 서버가 저장한 값으로 그려 메모리에 캐시하고 `Cache-Control: public, max-age=31536000, immutable`. 그림 프로필이 아니면 404 |
+| `GET /api/admin/stats/summary`, `/hourly?hours=`, `/daily?days=` | 관리자 통계(13.9). summary: 지금 접속, 오늘·어제 값, 사용자 구성(전체·게스트·Google·관리자·탈퇴·금지·플레이어·7일·30일 활동), 키워드 상태별 수, 처리 대기 신고, 레벨 분포. hourly(최대 744시간)·daily(최대 366일): 오래된 순, 기록 없는 칸은 0, 마지막 칸은 집계 중(`live`) |
+| `GET /api/admin/dashboard?country=` | 관리자 대시보드(13.11): 지금 접속, 오늘·어제 값, 사용자 구성, 최근 24시간 시간별 값, 처리할 일 목록(`key`, `label`, `count`, `level` danger·warn·ok, `detail`, 누르면 열 `tab`·`filter`), 최근 7일 신고 많이 받은 5명, 키워드 상태별 수·오늘 새 키워드·가진 사람 많은 🔥 5개, 구글 실시간 인기 마지막 수집 시각, 리더보드 5명, 새 플레이어 5명, 최근 공지 5개, 자랑하기 카드 수 |
+| `GET /api/admin/users?q=&filter=&sort=&page=` | 관리자 사용자 목록(13.10, 30명씩). q는 닉네임 일부 또는 사용자·플레이어 번호, filter는 all·online·google·guest·admin·banned·withdrawn, sort는 seen·created·score·level·plus |
+| `GET /api/admin/users/{userId}` | 사용자 상세(13.10): 계정·플레이어 값, 누적 수치, 꾸미기, 보관함, 최근 댓글·채팅 10개, 받은 신고 20개, 제재 이력 |
+| `POST /api/admin/users/{userId}/sanctions`, `POST /api/admin/users/sanctions/{id}/release` | 제재 걸기 `{ "type": "BAN" \| "UPLOAD" \| "COMMENT" \| "CHAT", "days": 7, "reason": "…" }`(days가 null이면 영구, 1~3650일, 사유 1~500자, 관리자 계정 금지는 400 `SANCTION_ADMIN`)와 풀기(이미 끝났으면 409 `SANCTION_NOT_ACTIVE`) |
+| `PATCH /api/admin/users/{userId}/nickname`, `POST /{userId}/look/reset`, `PATCH /{userId}/role`, `POST /{userId}/kick` | 닉네임 바꾸기(닉네임 규칙 그대로, 변경 간격은 세지 않음), 꾸미기 초기화, 관리자 권한 `{ "admin": true }`(Google 계정만, 내 권한 빼기 400 `ROLE_SELF`), 강제 퇴장(접속 중이 아니면 409 `NOT_ONLINE`) |
 | `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 누적 기록, 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
 | `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [나도 플레이 하기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
 | `GET /share/{code}/play` | [나도 플레이 하기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
@@ -185,8 +198,9 @@ WHERE p.id IN (/* 500명 */)
 | 주기 | 잡 |
 |---|---|
 | 5초 | 접속 중인 플레이어의 바뀐 점수를 `players.current_score`에 모아서 저장(9.2) |
+| 10초 | 관리자 통계(13.9): 나라별 방 접속 인원 표본(이번 시간·오늘의 최고·평균·활동 인원을 메모리에). 1분마다 접속 중인 플레이어의 `players.last_seen_at`을 고친다 |
 | 1분 | 자랑하기 카드 조회·클릭 수 저장(메모리에 모은 증가분을 `share_cards.view_count`·`play_count`에 더함, 종료 때도 저장, 4.24). 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 나라별 활동 인원을 다시 세고 지금 식과 달라진 🔥 키워드의 트렌드 값 갱신(4.8), 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
-| 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4) |
+| 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4), 사이트 통계(13.9: 지난 한 시간의 `site_hourly_stats` 행을 쓰고 그날의 `site_daily_stats`를 시간별 행에서 다시 만들기. 서버를 끌 때도 이번 시간 값을 저장) |
 | 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외), 만료된 갱신 토큰 삭제 |
 
 ### 9.8 트렌드 상자 (4.19)
@@ -300,7 +314,7 @@ record TrendBox(
 | GLOBAL·JP·IN | internal(외부 소스 미정, 16.1) | 1 |
 
 - 나라마다 외부 소스는 하나이고, 한 키워드는 한 번에 반영 소스를 하나만 가진다(`internal` 아니면 그 외부 소스). 외부 소스를 더 붙이면 외부 확인된 소스 중 가중치가 큰 쪽을 쓴다. 트렌드 값의 식은 4.8에 있다.
-- 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외). 지금은 모든 소스가 1이다(125판).
+- 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외). 지금은 모든 소스가 1이다.
 - 위 표는 `data_sources`의 초기값이다. `internal`은 모든 나라가 같은 행을 쓴다. 기본 비율(3), 최대 기준값(50), 최고점 비율(0.5), 최소 인원(20), 로그 완만도(0.3), 외부 확인 관심도(10)는 `settings`에 둔다(13.3).
 
 ## 11. 데이터 모델
@@ -314,16 +328,16 @@ record TrendBox(
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 개발·테스트에서는 시작할 때 JPA가 스키마를 반영하고 시더가 초기 데이터를 넣는다(11.3). 운영은 17절 SQL(`4-schema.sql`)을 기준으로 Flyway를 쓴다.
 
-### 11.2 테이블 (33개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (37개, 컬럼은 `4-schema.sql`)
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
 | 사용자 | `user_states` | 사용자 상태(정상 / 탈퇴) |
 | | `users` | 계정(게스트 포함). 방문자 ID, OAuth 종류·ID, 상태, 권한, UI 언어, 계정 금지·업로드 정지 만료 시각, 탈퇴 시각 |
-| | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 누적 `+` 횟수, 댓글 점수 |
-| | `profiles` | 플레이어별 꾸미기 프로필(성장형·픽셀 그림·업로드 이미지, 바탕·테두리 색과 두께). 한 플레이어에 여러 개, 하나만 장착 |
+| | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 마지막 접속 시각, 누적 `+` 횟수, 댓글 점수 |
+| | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
 | | `titles`, `player_titles` | 칭호 목록과 플레이어별 보유 칭호 |
-| | `trail_effects` | 이동 효과 목록과 얻는 조건(4.23). 쓰는 효과는 `players.trail_effect_id` |
+| | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
 | | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자가 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
@@ -341,14 +355,15 @@ record TrendBox(
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
 | | `settings`, `setting_histories` | 밸런스 설정과 변경 이력 |
 | | `blocked_terms`, `blocked_nicknames` | 차단어, 금지 닉네임 |
-| | `sanction_types`, `sanctions` | 제재 타입(타입별 제재 일수)과 사용자 제재 기록(사유·기간·해제) |
+| | `sanction_types`, `sanctions` | 제재 타입과 사용자 제재 기록(사유·기간·해제) |
+| | `site_hourly_stats`, `site_daily_stats` | 관리자 통계(13.9). 나라 × 한 시간 / 나라 × 현지 날짜: 최고·평균 동시 접속, 활동 인원, 새 플레이어, 추가·검색·구슬·충돌로 잃기·채팅·댓글·자랑하기 카드 수 |
 
 - `player_keywords.player_id`의 나라와 키워드의 나라가 같은지, `chat_messages.country_id`와 `player_id`의 나라가 같은지, 댓글·투표의 `player_id`가 그 댓글 키워드의 나라인지는 애플리케이션에서 검사한다. `keywords.data_source_id`(반영 소스)는 항상 값이 있고, 외부에서 확인되지 않은 키워드(사용자가 만든 것, 관리자가 넣은 시드 포함)는 `internal`을 가리킨다. `reports.target_id`는 대상이 여러 테이블이라 외래 키가 없다.
-- 계속 쌓이는 테이블은 `keyword_log_dailies`(180일), `player_score_dailies`(영구), `share_cards`(영구, 행당 1KB 안팎)다. 커지면 월 파티션으로 나누고 기본 키를 각각 `(id, record_date)`로 바꾼다. `player_score_24h`는 플레이어당, `keyword_log_24h`는 키워드당 최대 24칸을 덮어써서 항상 24시간치만 남는다. `player_keywords`는 하루치만 남는다.
+- 계속 쌓이는 테이블은 `keyword_log_dailies`(180일), `player_score_dailies`(영구), `share_cards`(영구, 행당 1KB 안팎), `site_hourly_stats`(나라당 하루 24행, 영구), `site_daily_stats`(나라당 하루 1행, 영구)다. 커지면 월 파티션으로 나누고 기본 키를 각각 `(id, record_date)`로 바꾼다. `player_score_24h`는 플레이어당, `keyword_log_24h`는 키워드당 최대 24칸을 덮어써서 항상 24시간치만 남는다. `player_keywords`는 하루치만 남는다.
 
 ### 11.3 스키마 자동 반영과 초기 데이터 (개발·테스트)
 스키마
-- 애플리케이션이 시작할 때마다 JPA(Hibernate)가 엔티티를 보고 DB 스키마를 맞춘다(`spring.jpa.hibernate.ddl-auto=update`). 엔티티에 테이블·컬럼·인덱스를 추가하면 다음 실행에 반영된다. 이 환경에서는 Flyway를 끈다. `update`는 컬럼을 지우지 않으므로, 엔티티에서 뺀 컬럼은 시작할 때 `DroppedColumns`가 있으면 지운다(시더보다 먼저, 트랜잭션 밖에서. 136판: `players.last_active_day`).
+- 애플리케이션이 시작할 때마다 JPA(Hibernate)가 엔티티를 보고 DB 스키마를 맞춘다(`spring.jpa.hibernate.ddl-auto=update`). 엔티티에 테이블·컬럼·인덱스를 추가하면 다음 실행에 반영된다. 이 환경에서는 Flyway를 끈다. `update`는 컬럼·테이블을 지우거나 이름을 바꾸지 않으므로, 그런 변경을 하면 아래 빠른 초기화로 DB를 다시 만든다(옛 데이터를 옮기는 코드는 두지 않는다).
 - `update`는 새 테이블·컬럼·인덱스를 추가하지만 컬럼 이름 변경, 타입 변경, 컬럼·테이블 삭제는 하지 않는다. 그런 변경을 했거나 스키마가 꼬였을 때는 아래 빠른 초기화를 쓴다.
 - 엔티티가 만드는 스키마가 17절(`4-schema.sql`)과 같아지도록 `columnDefinition`, `@Table(indexes, uniqueConstraints)`, `@Comment`로 맞춘다. JPA로 표현하기 어려운 것(`utf8mb4_bin` 콜레이션, `DEFAULT CURRENT_TIMESTAMP(6)`, `guides`의 ngram FULLTEXT 인덱스)은 `columnDefinition`이나 시작 시 보조 SQL로 처리한다(없을 때만 만든다).
 
@@ -366,13 +381,13 @@ record TrendBox(
 |---|---|
 | `countries` | KR(오픈), GLOBAL·JP·IN·CN(닫힘), 시간대·기본 언어·방 상한 |
 | `settings` | 13.3의 기본값과 허용 범위 |
-| `data_sources` | google 1, admin 1, internal 1 (10.3). 예전 DB에 남은 naver_datalab·bq_trends_rising 행은 지우고(그 소스를 쓰던 키워드는 internal로, 3명 미만이면 💤), 예전 기본값 2 그대로인 반영값은 1로 바꾼 뒤 트렌드 값과 점수를 다시 계산한다 |
+| `data_sources` | google 1, admin 1, internal 1 (10.3) |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
-| `titles` | 4.10의 46개를 번호 순서대로(1~22는 테이블이 비어 있을 때만, 23~46은 같은 이름이 없을 때). 표시 순서는 종류별로 다시 매기되, 처음 순서(1~22) 그대로인 행만 바꾼다 |
-| `trail_effects` | 4.23의 7개(모두 FREE). 코드에 있는데 DB에 없는 코드만 넣는다 |
+| `titles` | 4.10의 46개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`) |
+| `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 12개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
-| `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 그 뒤 고친 글은 `GuideSeed.REVISIONS`로 반영한다: 본문이 예전 시드 그대로인 글만 새 본문으로 바꾸고(관리자가 고친 글은 그대로), 없는 새 글은 기준 글 바로 뒤에 넣는다 |
+| `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 시드 글을 고쳐도 이미 들어간 DB는 바꾸지 않는다(관리자 화면에서 고친다) |
 | `users` | 공지·가이드 작성자로 쓰는 운영자 계정(`role` = ADMIN, 로그인 수단 없음) 1개, 없을 때만 |
 | `blocked_nicknames`, `blocked_terms` | 기본 금지어 소수(비어 있어도 동작) |
 
@@ -394,17 +409,13 @@ java {
   - Gradle: 9.8.2. Java 25는 Gradle 9.1.0부터 지원하고, Spring Boot 4.1.2는 Gradle 8.14 이상 또는 9.x를 지원한다.
   - 내장 서버: Tomcat 11.0.x(Servlet 6.1).
   - Spring Boot 4는 Jackson 3(`tools.jackson`), Hibernate 7.x, Spring Security 7.x를 쓴다. 4.1.0 기준 Hibernate 7.4, Spring Security 7.1.0, Flyway 12.4.0이고, 4.1.2가 관리하는 정확한 버전은 BOM을 따른다.
-- 주요 의존성: spring-boot-starter-webmvc(예전 이름 starter-web은 폐기 예정), starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, ONNX Runtime, Testcontainers(MySQL).
+- 주요 의존성: spring-boot-starter-webmvc, starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, ONNX Runtime, Testcontainers(MySQL).
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
 - 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
 - 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 운영은 Flyway 전환 전까지 `ddl-auto=update`다(16.1).
 - 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 운영 환경 변수는 GitHub 시크릿 `ENV_FILE`을 배포 때 서버 `/home/ubuntu/trendist/.env`로 보내고(WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`, 기본 `https://trendist.kr`), 실행 설정(포트 4001, 네트워크)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
-- 카카오톡 공유(4.24, 138판·139판): 카카오 앱의 JavaScript 키(공개 키, 브라우저에 그대로 실린다)는 `trendist-front/src/kakaoShare.ts`에 기본값으로 넣어 두었다(140판). 다른 키를 쓰려면 빌드 환경 변수 `VITE_KAKAO_JS_KEY`로 덮어쓴다(로컬은 git 제외 파일 `.env.local`). GitHub 저장소 변수는 쓰지 않는다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
-- 자랑하기 카드 공유 주소(4.24, 139판): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
-- 토스 미니앱(앱인토스, 140판): 프론트 저장소 `toss/` 폴더가 토스용 빌드다. 게임 코드는 상위 `src`를 그대로 쓰고, `toss/.env.*`의 `VITE_PLATFORM=toss`로 토스 모드를 켠다(`src/platform.ts`). `cd toss && npm run build`가 `vite build`(게임만, 관리자 페이지 제외) 뒤 `ait build`로 `toss/trendist.ait`를 만들고, 이 파일을 앱인토스 콘솔에 올린다. 설정은 `toss/apps-in-toss.config.ts`(`appName`은 콘솔 앱 이름과 같아야 함, 당겨서 새로고침·뒤로 가기 제스처·튕김 끔). 앱인토스 CLI가 Node 20 이상을 요구해서 `toss/`에 개발 의존성 `node@22`를 두고 `npm run`이 그것을 쓴다.
-  - 토스 페이지는 토스 쪽 출처에서 열리므로 백엔드를 절대 주소 `VITE_API_BASE`(`toss/.env.production`, 기본 `https://trendist.kr`)로 부른다. 웹 빌드는 이 값이 없어 지금처럼 같은 출처의 `/api`·`/ws`를 쓴다. 로컬 `npm run dev`는 http://localhost:8082 에서 웹과 같이 Vite 프록시로 백엔드(8081)에 붙는다.
-  - 백엔드 코드는 바꾸지 않았다. 운영에서 토스 출처를 받으려면 nginx `/api`·`/share/`에 그 출처의 CORS 헤더(쿠키 없이)를 더하고, WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`에 그 출처를 넣어야 한다.
-  - 토스에서는 게스트로만 플레이한다. 구글 로그인 버튼을 숨기고(구글이 앱 웹뷰 로그인을 막는다), 방문자 ID·갱신 토큰 쿠키(`SameSite=Lax`)는 다른 출처라 오가지 않으므로 실행할 때마다 새 게스트가 된다. 한 번 실행하는 동안의 기록은 그 게스트로 DB에 저장된다. 카카오톡 공유는 키를 넣지 않아 숨는다.
+- 카카오톡 공유(4.24): 카카오 앱의 JavaScript 키(공개 키, 브라우저에 그대로 실린다)는 `trendist-front/src/kakaoShare.ts`에 기본값으로 둔다. 다른 키를 쓰려면 빌드 환경 변수 `VITE_KAKAO_JS_KEY`로 덮어쓴다(로컬은 git 제외 파일 `.env.local`). GitHub 저장소 변수는 쓰지 않는다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
+- 자랑하기 카드 공유 주소(4.24): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.

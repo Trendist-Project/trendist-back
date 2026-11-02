@@ -1,7 +1,7 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 33개, 외래 키 36개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 37개, 외래 키 38개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
 -- 확인 범위: 88판 스키마는 MariaDB 10.11.14에서 두 번 연속 실행해 확인했다. 이후 판은 DB 접속 권한이 없어 실행하지 못했고, 쉼표·괄호·외래 키 참조 대상·생성 순서만 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다.
@@ -39,20 +39,31 @@ CREATE TABLE titles (
   UNIQUE KEY uk_titles_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='칭호';
 
-CREATE TABLE trail_effects (
-  id            BIGINT NOT NULL AUTO_INCREMENT COMMENT '이동 효과 ID',
-  code          VARCHAR(30) NOT NULL COMMENT '그림 코드(프론트엔드가 이 값으로 그린다)',
-  name          VARCHAR(100) NOT NULL COMMENT '이름(한글)',
-  description   VARCHAR(500) NOT NULL COMMENT '설명(한글)',
-  unlock_type   VARCHAR(20) NOT NULL DEFAULT 'FREE' COMMENT '얻는 조건: FREE / LEVEL / TITLE / PURCHASE(결제, 아직 없음)',
-  unlock_value  BIGINT NULL COMMENT 'LEVEL이면 레벨, TITLE이면 칭호 ID',
-  sort_order    BIGINT NOT NULL DEFAULT 0 COMMENT '표시 순서',
-  enabled       BOOLEAN NOT NULL DEFAULT TRUE COMMENT '사용 여부',
-  created_at    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
-  updated_at    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+CREATE TABLE effect_types (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '효과 종류 ID',
+  code       VARCHAR(20) NOT NULL COMMENT '종류 코드: TRAIL(이동 효과, 4.23) / BORDER(테두리 효과, 4.9). 애플리케이션이 이 값으로 구분한다',
+  name       VARCHAR(50) NOT NULL COMMENT '이름(한글)',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_trail_effects_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='이동 효과(4.23)';
+  UNIQUE KEY uk_effect_types_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='효과 종류';
+
+CREATE TABLE effects (
+  id             BIGINT NOT NULL AUTO_INCREMENT COMMENT '효과 ID',
+  effect_type_id BIGINT NOT NULL COMMENT '효과 종류 ID',
+  code           VARCHAR(30) NOT NULL COMMENT '그림 코드(프론트엔드가 이 값으로 그린다). 종류마다 유일',
+  name           VARCHAR(100) NOT NULL COMMENT '이름(한글)',
+  unlock_type    VARCHAR(20) NOT NULL DEFAULT 'FREE' COMMENT '얻는 조건(꾸미기 해금·로그인 위에 더 붙임): FREE / LEVEL / TITLE / PURCHASE(결제, 아직 없음)',
+  unlock_value   BIGINT NULL COMMENT 'LEVEL이면 레벨, TITLE이면 칭호 ID',
+  sort_order     BIGINT NOT NULL DEFAULT 0 COMMENT '표시 순서',
+  enabled        BOOLEAN NOT NULL DEFAULT TRUE COMMENT '사용 여부',
+  created_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_effects (effect_type_id, code),
+  CONSTRAINT fk_effects_type FOREIGN KEY (effect_type_id) REFERENCES effect_types (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='원을 꾸미는 효과(이동 효과 4.23, 테두리 효과 4.9)';
 
 CREATE TABLE levels (
   id           BIGINT NOT NULL AUTO_INCREMENT COMMENT '레벨 ID',
@@ -101,7 +112,6 @@ CREATE TABLE players (
   user_id             BIGINT NOT NULL COMMENT '사용자 ID',
   country_id          BIGINT NOT NULL COMMENT '지역 ID',
   title_id            BIGINT NULL COMMENT '활성 칭호(NULL이면 없음)',
-  trail_effect_id     BIGINT NULL COMMENT '쓰는 이동 효과(NULL이면 없음, 4.23)',
   nickname            VARCHAR(40) NOT NULL COMMENT '닉네임(나라별, 중복 허용). 탈퇴 후에도 유지하고 화면에서만 탈퇴한 사용자로 표시',
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
   exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, + 횟수로만 쌓이고 줄지 않음)',
@@ -117,6 +127,7 @@ CREATE TABLE players (
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
   active_days         BIGINT NOT NULL DEFAULT 0 COMMENT '플레이한 날의 수(만든 날·키워드를 얻은 날, 나라 시간대 기준, 칭호용)',
   last_played_at      DATETIME(6) NULL COMMENT '마지막 플레이 시각(만들기·키워드 얻기). active_days를 하루에 한 번만 세는 기준',
+  last_seen_at        DATETIME(6) NULL COMMENT '마지막으로 방에 접속해 있던 시각(1분 단위). 관리자 통계의 7일·30일 활동 인원과 사용자 관리(13.9, 13.10)',
   created_at          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '처음 들어간 시각',
   updated_at          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
@@ -124,25 +135,34 @@ CREATE TABLE players (
   KEY idx_players_ranking (country_id, current_score),
   CONSTRAINT fk_players_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_players_country FOREIGN KEY (country_id) REFERENCES countries (id),
-  CONSTRAINT fk_players_title FOREIGN KEY (title_id) REFERENCES titles (id),
-  CONSTRAINT fk_players_trail_effect FOREIGN KEY (trail_effect_id) REFERENCES trail_effects (id)
+  CONSTRAINT fk_players_title FOREIGN KEY (title_id) REFERENCES titles (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어(사용자 × 나라): 닉네임, EXP·레벨, 활성 칭호, 트렌드 수치';
 
 CREATE TABLE profiles (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '프로필 ID',
-  player_id        BIGINT NOT NULL COMMENT '플레이어 ID(players.id). 꾸미기는 나라별, 한 플레이어에 여러 개',
-  equipped         TINYINT(1) NOT NULL DEFAULT 0 COMMENT '장착 여부(플레이어당 하나, 애플리케이션이 보장)',
+  player_id        BIGINT NOT NULL COMMENT '플레이어 ID(players.id). 꾸미기는 나라별',
+  slot             TINYINT NOT NULL COMMENT '프로필 칸(1~3)',
+  equipped         TINYINT(1) NOT NULL DEFAULT 0 COMMENT '장착 여부(플레이어당 하나, 애플리케이션이 보장). 저장한 칸이 없으면 1번 칸을 장착한 것으로 본다',
   background_color VARCHAR(7) NOT NULL COMMENT '바탕색(#RRGGBB)',
   border_color     VARCHAR(7) NULL COMMENT '테두리 색(#RRGGBB). NULL이면 기본 테두리',
-  border_width     TINYINT UNSIGNED NULL COMMENT '테두리 두께(px). NULL이면 기본 두께',
-  profile_type     VARCHAR(20) NOT NULL DEFAULT 'GROWTH' COMMENT '프로필 종류(GROWTH=성장형 캐릭터, PIXEL=직접 그린 픽셀 그림, IMAGE=업로드 이미지). PIXEL·IMAGE 파일은 profiles/{id}로 찾고 복사·공유 대상이 아님',
-  image_changed_at DATETIME(6) NULL COMMENT '픽셀 그림·업로드 이미지를 바꾼 시각(1시간 1회 제한과 파일 주소 버전 표시용). 플레이어의 모든 프로필 중 가장 최근 값으로 판단',
+  border_width     TINYINT UNSIGNED NULL COMMENT '테두리 두께(1~8단계). NULL이면 기본 두께',
+  name_color       VARCHAR(7) NULL COMMENT '이름표 글자색(#RRGGBB). NULL이면 흰색',
+  name_style       VARCHAR(20) NULL COMMENT '이름표 모양(RIBBON, GLOW). NULL이면 기본',
+  profile_type     VARCHAR(20) NOT NULL DEFAULT 'GROWTH' COMMENT '원 안에 그릴 것(GROWTH=성장 캐릭터, PIXEL=이 칸의 픽셀 그림)',
+  pixel_palette    VARCHAR(300) NULL COMMENT '픽셀 그림에 쓴 색(#rrggbb를 쉼표로, 최대 32개)',
+  pixel_data       VARCHAR(1024) NULL COMMENT '픽셀 그림 32×32 칸, 칸마다 한 글자(팔레트 번호 0-9a-v, 점은 투명 = 바탕색). /api/art/{id}.png로 그려 준다',
+  image_changed_at DATETIME(6) NULL COMMENT '그림을 바꾼 시각(변경 간격은 플레이어의 모든 칸을 합쳐 확인, 이미지 주소의 버전 ?v=)',
+  trail_effect_id  BIGINT NULL COMMENT '이동 효과(effects, NULL이면 없음, 4.23)',
+  border_effect_id BIGINT NULL COMMENT '테두리 효과(effects, NULL이면 없음, 4.9)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
-  updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '저장 시각',
   PRIMARY KEY (id),
+  UNIQUE KEY uk_profiles (player_id, slot),
   KEY idx_profiles_player (player_id, equipped),
-  CONSTRAINT fk_profiles_player FOREIGN KEY (player_id) REFERENCES players (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어 꾸미기 프로필(1 player : N profiles)';
+  CONSTRAINT fk_profiles_player FOREIGN KEY (player_id) REFERENCES players (id),
+  CONSTRAINT fk_profiles_trail_effect FOREIGN KEY (trail_effect_id) REFERENCES effects (id),
+  CONSTRAINT fk_profiles_border_effect FOREIGN KEY (border_effect_id) REFERENCES effects (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='꾸미기 프로필(4.9): 플레이어 × 1~3번 칸';
 
 CREATE TABLE data_sources (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '데이터 소스 ID',
@@ -423,20 +443,19 @@ CREATE TABLE reports (
 
 CREATE TABLE sanction_types (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '제재 타입 ID',
-  name       VARCHAR(100) NOT NULL COMMENT '제재 이름(한글: 계정 금지/이미지 업로드 정지/댓글 작성 정지). 애플리케이션이 이 이름으로 타입을 구분한다',
-  day        BIGINT NULL COMMENT '제재 일수(NULL이면 영구)',
+  name       VARCHAR(100) NOT NULL COMMENT '제재 이름(한글: 계정 금지/이미지 업로드 정지/댓글 작성 정지/채팅 정지). 애플리케이션이 이 이름으로 타입을 구분한다',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
   UNIQUE KEY uk_sanction_types_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='제재 타입(타입별 제재 일수)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='제재 타입(기간은 걸 때 관리자가 고른다)';
 
 CREATE TABLE sanctions (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '제재 ID',
   user_id          BIGINT NOT NULL COMMENT '제재받은 사용자 ID',
   sanction_type_id BIGINT NOT NULL COMMENT '제재 타입 ID',
   reason           VARCHAR(500) NOT NULL COMMENT '제재 사유',
-  expires_at       DATETIME(6) NOT NULL COMMENT '제재 만료 예정 시각(걸 때 시각 + 타입의 day, 영구는 9999-12-31 23:59:59)',
+  expires_at       DATETIME(6) NOT NULL COMMENT '제재 만료 예정 시각(걸 때 시각 + 고른 기간, 영구는 9999-12-31 23:59:59)',
   released_at      DATETIME(6) NULL COMMENT '관리자가 만료 전에 실제로 푼 시각(NULL이면 풀지 않음)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '제재 시작 시각',
   updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
@@ -445,6 +464,47 @@ CREATE TABLE sanctions (
   CONSTRAINT fk_sanctions_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_sanctions_type FOREIGN KEY (sanction_type_id) REFERENCES sanction_types (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='사용자 제재 기록(사유·기간·해제)';
+
+CREATE TABLE site_hourly_stats (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '시간별 통계 ID',
+  country_id      BIGINT NOT NULL COMMENT '나라 ID',
+  recorded_at     DATETIME(6) NOT NULL COMMENT '그 시간의 시작(UTC 정시)',
+  peak_online     BIGINT NOT NULL COMMENT '최고 동시 접속(10초마다 센 방 인원, 봇 제외)',
+  avg_online      DECIMAL(10,2) NOT NULL COMMENT '평균 동시 접속',
+  active_players  BIGINT NOT NULL COMMENT '그 시간에 한 번이라도 방에 있던 플레이어 수',
+  new_players     BIGINT NOT NULL COMMENT '새 플레이어(그 나라 닉네임을 처음 정함)',
+  plus_count      BIGINT NOT NULL COMMENT '키워드 추가(+) 수',
+  search_count    BIGINT NOT NULL COMMENT '검색 수',
+  orb_count       BIGINT NOT NULL COMMENT '? 구슬을 먹은 수',
+  collision_count BIGINT NOT NULL COMMENT '충돌로 키워드를 잃은 수(빼앗김 포함)',
+  chat_count      BIGINT NOT NULL COMMENT '채팅 수',
+  comment_count   BIGINT NOT NULL COMMENT '댓글 수',
+  share_count     BIGINT NOT NULL COMMENT '자랑하기 카드를 새로 만든 수',
+  created_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_site_hourly_stats (country_id, recorded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 통계 시간별(13.9)';
+
+CREATE TABLE site_daily_stats (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '하루별 통계 ID',
+  country_id      BIGINT NOT NULL COMMENT '나라 ID',
+  record_date     DATE NOT NULL COMMENT '나라 현지 날짜',
+  peak_online     BIGINT NOT NULL COMMENT '그날 최고 동시 접속',
+  active_players  BIGINT NOT NULL COMMENT '그날 한 번이라도 방에 있던 플레이어 수(DAU)',
+  new_players     BIGINT NOT NULL COMMENT '새 플레이어',
+  plus_count      BIGINT NOT NULL COMMENT '키워드 추가(+) 수',
+  search_count    BIGINT NOT NULL COMMENT '검색 수',
+  orb_count       BIGINT NOT NULL COMMENT '? 구슬을 먹은 수',
+  collision_count BIGINT NOT NULL COMMENT '충돌로 키워드를 잃은 수',
+  chat_count      BIGINT NOT NULL COMMENT '채팅 수',
+  comment_count   BIGINT NOT NULL COMMENT '댓글 수',
+  share_count     BIGINT NOT NULL COMMENT '자랑하기 카드를 새로 만든 수',
+  created_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_site_daily_stats (country_id, record_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 통계 하루별(13.9). 매시간 그날의 시간별 행에서 다시 만든다';
 
 CREATE TABLE refresh_tokens (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '갱신 토큰 ID',
