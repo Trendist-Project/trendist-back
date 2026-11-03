@@ -1033,10 +1033,11 @@ public class Room {
         return lost;
     }
 
-    /** 봇이 ? 구슬을 먹으면 사람과 같은 확률로 당첨되어 "추가"하고, 나머지는 꽝이다. */
+    /** 봇이 ? 구슬을 먹으면 사람과 같은 확률로 "추가"하고, 나머지는 가진 키워드 점수 하나를 잃는다(없으면 꽝). */
     private void botOrb(Member b) {
         Tuning tu = tuning;
         if (ThreadLocalRandom.current().nextDouble(100) < tu.orbActivePercent()) botPlus(b, tu);
+        else if (!b.botKeywords.isEmpty()) botLose(b, tu);
     }
 
     /** 봇도 가끔 스스로 키워드를 추가하고, 오래된 키워드는 사라진다(사람의 24시간 삭제처럼 줄었다 늘었다 한다). */

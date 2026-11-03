@@ -176,9 +176,9 @@ public class KeywordServiceImpl implements KeywordService {
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.ORB); // 사이트 통계(13.9)
         p.incOrb(); // 꽝이어도 먹은 횟수는 센다(칭호, 4.10)
         events.publishEvent(new GameEvents.TitleCheck(p.getId()));
-        // 설정 확률(기본 33%)로만 🔥활성 키워드가 나오고, 나머지는 꽝이다
+        // 설정 확률(기본 50%)로 🔥활성 키워드를 얻고, 나머지는 내 키워드 하나를 잃는다(없으면 꽝)
         if (ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
-            return new KeywordDtos.OrbResult("MISS", null, null, null, 0, null, null);
+            return loseFromOrb(p);
         }
         List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
         if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
@@ -193,6 +193,23 @@ public class KeywordServiceImpl implements KeywordService {
         KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
         return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
                 k.getHolderCount(), r.gained(), r.keyword().myExpiresAt());
+    }
+
+    /** 구슬에서 잃기(4.20): 가진 키워드(🔥·💤 가리지 않고, 금지 제외) 중 하나를 무작위로 지운다. 잃을 것이 없으면 꽝. 충돌 기록(잃은 횟수·통계)은 올리지 않는다 */
+    private KeywordDtos.OrbResult loseFromOrb(Player p) {
+        Instant now = Instant.now(clock);
+        List<PlayerKeyword> candidates = playerKeywords.findLosableByPlayer(p.getId(), now, codes.keywordStateId(CodeTables.KW_BANNED));
+        if (candidates.isEmpty()) return new KeywordDtos.OrbResult("MISS", null, null, null, 0, null, null);
+        PlayerKeyword pk = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+        Long keywordId = pk.getKeyword().getId();
+        String text = pk.getKeyword().getText();
+        String state = pk.getKeyword().getKeywordState().getName();
+        long score = isState(pk.getKeyword(), CodeTables.KW_ACTIVE) ? pk.getKeyword().getTrendValue() : 0; // 💤는 점수에 더해 주지 않았다
+        playerKeywords.delete(pk);
+        playerKeywords.flush();
+        removeHolding(p, keywordId, now);
+        Keyword k = keywords.findById(keywordId).orElseThrow();
+        return new KeywordDtos.OrbResult("LOST", text, state, k.getTrendValue(), k.getHolderCount(), score, null);
     }
 
     @Override
