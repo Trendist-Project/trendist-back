@@ -175,14 +175,14 @@ class ApiFlowTest {
         long playerId = ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
         keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("구슬테스트"));
-        // 33%만 🔥 키워드, 나머지는 꽝. 이미 가진 키워드가 나오면 아무것도 바뀌지 않는다
+        // 33%만 🔥 키워드, 나머지는 꽝. 이미 가진 키워드가 나오면 만료시간만 갱신한다(점수·EXP 그대로)
         int hold = 0, miss = 0;
         for (int i = 0; i < 300; i++) {
             var r = keywordService.openOrb(playerId);
             switch (r.status()) {
                 case "GAINED" -> { hold++; assertThat(r.text()).isNotBlank(); }
                 case "MISS" -> miss++;
-                default -> { assertThat(r.status()).isEqualTo("DUPLICATE"); assertThat(r.gained()).isZero(); }
+                default -> { assertThat(r.status()).isEqualTo("RENEWED"); assertThat(r.gained()).isZero(); assertThat(r.expiresAt()).isNotNull(); }
             }
         }
         assertThat(hold).isPositive();

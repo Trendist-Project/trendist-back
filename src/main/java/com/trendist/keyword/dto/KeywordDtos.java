@@ -17,7 +17,7 @@ public final class KeywordDtos {
     public record MyKeyword(long keywordId, String text, String state, long trendValue,
                             Instant plusedAt, Instant expiresAt) {}
 
-    /** 구슬을 먹은 결과(4.20). status: GAINED(새로 추가) / DUPLICATE(이미 보유) / MISS(꽝) / NONE(🔥 키워드 없음). */
+    /** 구슬을 먹은 결과(4.20). status: GAINED(새로 추가) / RENEWED(이미 보유, 만료시간만 갱신) / MISS(꽝) / NONE(🔥 키워드 없음). */
     public record OrbResult(String status, String text, String state, Long trendValue, long holderCount,
                             Long gained, Instant expiresAt) {}
 

@@ -156,6 +156,14 @@ public class KeywordServiceImpl implements KeywordService {
         return new KeywordDtos.PlusResult(card(k, p, now), newScore - oldScore, playerService.summary(p));
     }
 
+    /** 이미 가진 키워드의 만료 시각만 지금부터 다시 `plus_ttl_hours`(기본 24시간)로 늘린다. 점수·EXP는 그대로(4.3, 4.20, 4.21). 새 만료 시각을 돌려준다 */
+    private Instant renewHolding(PlayerKeyword pk, Instant now) {
+        Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
+        pk.renew(now, expires);
+        playerKeywords.flush();
+        return expires;
+    }
+
     // ---------------------------------------------------------------- 구슬(4.20)
 
     @Override
@@ -176,9 +184,9 @@ public class KeywordServiceImpl implements KeywordService {
         Instant now = Instant.now(clock);
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
         if (existing.isPresent() && !existing.get().isExpired(now)) {
-            // 이미 보관함에 있는 키워드가 나오면 아무것도 바뀌지 않는다
-            return new KeywordDtos.OrbResult("DUPLICATE", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
-                    k.getHolderCount(), 0L, existing.get().getExpiresAt());
+            // 이미 보관함에 있는 키워드가 나오면 남은 시간만 지금부터 다시 24시간(사람에게서 빼앗을 때(4.3)와 같게). 점수·EXP는 그대로
+            return new KeywordDtos.OrbResult("RENEWED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
+                    k.getHolderCount(), 0L, renewHolding(existing.get(), now));
         }
         KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
         return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
@@ -200,11 +208,8 @@ public class KeywordServiceImpl implements KeywordService {
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()); // 만료됐지만 아직 안 지운 행일 수도 있다
         if (existing.isPresent() && !existing.get().isExpired(now)) {
             // 이미 가진 키워드: 사람에게서 빼앗을 때와 같이 남은 시간만 지금부터 다시 24시간(4.3)
-            Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
-            existing.get().renew(now, expires);
-            playerKeywords.flush();
             return new KeywordDtos.OrbResult("RENEWED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
-                    k.getHolderCount(), 0L, expires);
+                    k.getHolderCount(), 0L, renewHolding(existing.get(), now));
         }
         KeywordDtos.PlusResult r = addHolding(p, k, existing, now);
         return new KeywordDtos.OrbResult("GAINED", k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
@@ -463,10 +468,7 @@ public class KeywordServiceImpl implements KeywordService {
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(winnerId, keywordId);
         if (existing.isPresent() && !existing.get().isExpired(now)) {
             // 이미 가진 키워드: 남은 시간만 지금부터 다시 24시간. 점수·EXP는 그대로
-            Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
-            existing.get().renew(now, expires);
-            playerKeywords.flush();
-            return Optional.of(new StolenKeyword(text, score, "RENEWED", 0, expires));
+            return Optional.of(new StolenKeyword(text, score, "RENEWED", 0, renewHolding(existing.get(), now)));
         }
         // 없던 키워드: 일반 추가와 같이 보관함에 넣는다(24시간, EXP +1, 가진 사람 수 +1, 점수 반영). 구슬(4.20)과 같은 방식
         KeywordDtos.PlusResult r = addHolding(winner, k, existing, now);

@@ -83,7 +83,7 @@ public interface KeywordService {
 
     /**
      * 구슬 보상(4.20): 설정 확률(기본 33%)로 그 나라 🔥 키워드 중 완전 무작위 하나를 보관함에 넣고, 나머지는 꽝이다.
-     * 이미 가진 키워드가 나오면 아무것도 하지 않는다.
+     * 이미 가진 키워드가 나오면 남은 시간만 지금부터 다시 24시간으로 갱신한다(RENEWED, 점수·EXP 그대로).
      */
     KeywordDtos.OrbResult openOrb(long playerId);
 
