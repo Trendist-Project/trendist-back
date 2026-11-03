@@ -899,8 +899,8 @@ public class Room {
     }
 
     /**
-     * 대시(4.27): 쿨타임이 지났고 움직이려는 중이면 시작한다. 시작하면 본인에게만 {dash: 지속 ms, 쿨타임 ms, 배수}를 알려
-     * 클라이언트 예측이 같은 속도로 가게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
+     * 대시(4.27): 쿨타임이 지났고 움직이려는 중이면 시작한다. 시작하면 본인에게 {dash: 지속 ms, 쿨타임 ms, 배수}를 알려
+     * 클라이언트 예측이 같은 속도로 가게 하고, 모두에게 {dashFx: 원 번호, 지속 ms}를 보내 그 원에 강조 효과를 그리게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
      */
     public void dash(Member m) {
         if (m.bot || members.get(m.entityNo) != m) return;
@@ -911,6 +911,7 @@ public class Room {
         m.dashUntil = clockSeconds + d.seconds();
         m.dashReadyAt = clockSeconds + Math.max(d.seconds(), d.cooldownSeconds());
         outbox.sendText(m, Map.of("type", "dash", "ms", Math.round(d.seconds() * 1000), "cooldownMs", Math.round(Math.max(d.seconds(), d.cooldownSeconds()) * 1000), "mult", d.multiplier()));
+        broadcast(Map.of("type", "dashFx", "e", m.entityNo, "ms", Math.round(d.seconds() * 1000))); // 모두의 화면에 대시 강조 효과(4.27)
     }
 
     /** 콤보 불꽃이 붙은 사람인지(봇은 불꽃이 없다, 4.25) */

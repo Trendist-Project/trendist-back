@@ -253,6 +253,7 @@ class RoomTest {
         assertThat(a.vx).isGreaterThan(230).isLessThan(250); // 평소 240
         r.dash(a);
         assertThat(out.texts).anyMatch(m -> "dash".equals(m.get("type")) && m.get("ms").equals(3000L) && m.get("cooldownMs").equals(30000L) && m.get("mult").equals(2.0));
+        assertThat(out.texts).anyMatch(m -> "dashFx".equals(m.get("type")) && m.get("e").equals(a.entityNo) && m.get("ms").equals(3000L)); // 모두에게 효과를 알린다
         for (int i = 0; i < 20; i++) r.tick();
         assertThat(a.vx).isGreaterThan(470).isLessThan(490); // 240 × 2
         int dashes = (int) out.texts.stream().filter(m -> "dash".equals(m.get("type"))).count();
