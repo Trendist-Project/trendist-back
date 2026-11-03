@@ -167,7 +167,9 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5). 목록 한 줄에 `targetUserId`(신고된 사람), `contentDeleted`, `targetSanctions`(지금 걸린 제재) |
 | `POST /api/admin/reports/{id}/act` | 신고에서 바로 조치(13.5) `{ "sanction": "CHAT" \| "COMMENT" \| "UPLOAD" \| "BAN" \| null, "days": 1, "reason": "", "deleteContent": true, "sameTarget": true }`. 제재를 걸고(사유를 비우면 신고 번호·사유로), 댓글이면 지우고, 그 신고(와 같은 대상의 접수 신고)를 조치함으로. 응답 `{ changed, report }`. 대상 사용자가 없으면 400 `REPORT_NO_USER`, 댓글이 아닌데 지우기면 400 `REPORT_DELETE_TYPE` |
 | `GET /api/admin/settings`, `PATCH /api/admin/settings/{name}` | 설정 목록과 값 변경 `{ "value": "12" }`. 숫자·정수·허용 범위 검사, 저장하면 캐시를 비워 바로 반영(13.3) |
-| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404 |
+| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404. `aiComment`(AI 한 줄 설명, 없으면 null)와 `aiCommentRequested`(내가 갱신 요청을 해 둔 상태)를 함께 준다 |
+| `POST /api/keywords/{id}/ai-comment/request` | AI 설명 갱신 요청(4.12). 설명이 있는 키워드에만(409 `AI_COMMENT_NONE`), 같은 사람의 열린 요청은 하나(다시 눌러도 그대로), 1시간 10회(429 `AI_REQUEST_RATE`) |
+| `GET /api/admin/ai-comments?filter=requests\|missing\|all&page=`, `POST /{keywordId}/regenerate`, `PUT /{keywordId}` `{ "comment": "…" }`, `POST /{keywordId}/dismiss` | 관리자 AI 설명(13.12). 갱신 요청 목록·설명 없는 키워드·설명 있는 키워드, AI 재요청(저장하고 열린 요청을 닫음. 키 없음 409 `AI_DISABLED`, 한도 429 `AI_RATE_LIMITED`, 실패 409 `AI_FAILED`, 모른다고 함 409 `AI_UNKNOWN`), 직접 수정(1~200자, 요청을 닫음), 요청 닫기 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
 | `PATCH /api/comments/{id}`, `DELETE /api/comments/{id}` | 내 댓글 고치기(작성 후 5분 안, 지나면 409 `COMMENT_EDIT_EXPIRED`), 지우기(소프트 삭제, 댓글 점수 −1) |
 | `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT" \| "PLAYER", "targetId": 1, "reason": "..." }`(PLAYER는 같은 방의 세션 엔티티 번호). 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
@@ -317,6 +319,19 @@ record TrendBox(
 - 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외). 지금은 모든 소스가 1이다.
 - 위 표는 `data_sources`의 초기값이다. `internal`은 모든 나라가 같은 행을 쓴다. 기본 비율(3), 최대 기준값(50), 최고점 비율(0.5), 최소 인원(20), 로그 완만도(0.3), 외부 확인 관심도(10)는 `settings`에 둔다(13.3).
 
+### 10.4 AI 한 줄 설명(제미나이)
+- 연동: 구글 Gemini API의 REST `generateContent`. 모델은 `gemini-3.5-flash-lite`가 기본이고 환경 변수 `GEMINI_MODEL`로 바꾼다(2026-11 확인: `gemini-2.5-flash-lite`는 새 사용자에게 더는 열려 있지 않아 404가 난다). 키는 서버 환경 변수(로컬 `DEV_GEMINI_API_KEY`, 운영 `PROD_GEMINI_API_KEY`)에만 두고 브라우저로 보내지 않는다. 키가 없으면 기능이 꺼지고(카드에 설명 칸이 안 보임) 직접 수정은 된다. 구현은 `GeminiClient`(인터페이스, 시험에서는 가짜로 교체)·`GeminiClientImpl`.
+- 요청문: 키워드에 대해 한국어 한 문장(80자 이내, 존댓말)으로 유행어면 뜻을, 이슈면 사실만 중립적으로 요약하게 하고, 추측·루머·비방·사생활·선정적 표현·링크·이모지·마크다운을 금지하고, 확실하지 않으면 억지로 짓지 말고 `UNKNOWN`만 적게 한다. 응답은 구조화 JSON(`responseSchema`)으로 받고, 값이 비었거나 `UNKNOWN`·링크가 섞였거나 200자를 넘으면 버린다.
+- **묶음 요청**: 키워드를 하나씩 보내지 않고 한 요청에 `ai_comment_batch_size`(기본 10)개를 번호를 붙여 보내고, 응답도 `[{no, comment}]` 배열로 받아 번호로 맞춘다. 실측(2026-11-03, 실제 구글 트렌드 제목 10개): 하나씩 보내면 요청 10번·9.4초·약 2,300토큰, 묶으면 요청 1번·2.1초·약 650토큰이었다(요청 수 1/10, 시간 약 1/4.5, 토큰 약 1/3.5). 무료 한도는 요청 수(분당·하루)가 기준이라 요청 수가 줄어드는 효과가 가장 크다. 시스템 요청문(약 200토큰)을 매번 되풀이하지 않는 것이 토큰 절감의 대부분이다. 대신 한 요청이 통째로 실패하면 묶인 키워드가 같이 실패(→ 다음 분에 다시)하고, 한 키워드의 답이 빠지면 그것만 다시 시도한다. 묶음 답에서 개별 요청에서는 모른다던 키워드를 그럴듯하게 지어낼 가능성이 있어(실측에서 1건) 묶음 크기를 10으로 두고 UNKNOWN 지시를 강하게 했다.
+- 구글 검색 확인(그라운딩): 최신 이슈를 맞게 설명하려는 기능이지만 **무료 등급에서는 쓸 수 없다**(실측: 3.5 Flash-Lite·3.5 Flash 모두 429 "quota exceeded"). 그래서 기본은 꺼짐(`ai_comment_grounding` 0)이고, 결제를 연결한 뒤에 켠다. 꺼 두면 모델이 아는 범위에서만 설명해서 아주 최근 사건·신조어는 `UNKNOWN`이 늘 수 있다(실측 10개 중 2~3개). 그런 키워드는 "설명 없음"에 쌓이고 관리자가 직접 쓰거나(13.12) 나중에 재요청한다.
+- 자동 생성: `AiCommentServiceImpl.generatePending()`이 1분마다 돌아, 한 번이라도 🔥가 됐고(`activated_at`) 설명이 없고 금지가 아니고 시도 횟수가 3 미만인 키워드를 최근 🔥가 된 것부터 한 요청에 묶어 보낸다. 요청은 1분에 한 번, 하루 최대 `ai_comment_daily_max`(기본 400)번이다. 요청이 실패하면 묶인 키워드의 시도 횟수를 올리고 다음 분에 다시, 모른다고 하면(`UNKNOWN`) 그 키워드는 바로 포기(시도 횟수 3)해 같은 질문을 되풀이하지 않는다. 제미나이가 한도(429)를 알려 오면 10분 동안 자동 요청을 쉰다. 설정 `ai_comment_enabled`를 0으로 하면 멈춘다.
+- 사용자가 카드를 열 때는 DB 값만 읽는다. 그래서 접속자가 늘어도 AI 요청 수는 늘지 않는다. AI 요청은 (1) 새로 🔥가 되는 키워드 수(묶음 크기로 나눈 만큼), (2) 관리자의 [AI 재요청] 횟수에만 비례한다.
+- 한도 검토(2026-11 기준, 공식 문서·커뮤니티 자료이며 바뀔 수 있다. 배포 전 AI Studio에서 프로젝트의 실제 한도를 확인한다):
+  - 무료 등급 한도는 모델마다 다르고 일일 요청 수(RPD)·분당 요청 수(RPM)·분당 토큰 수가 있다. 한도는 프로젝트 단위, 일일 한도는 태평양 시간 자정에 초기화된다. 이전 세대 Flash-Lite는 하루 1,000·분당 15 정도였으며, 3.5 계열의 정확한 수치는 AI Studio에서 확인한다.
+  - 예상 사용량: 구글 목록에서 새로 오르는 키워드와 사용자·관리자가 만든 활성 키워드를 합쳐 하루 수십~200개 안팎이다(사용자 1,000명이어도 같은 키워드를 공유하므로 크게 늘지 않는다). 묶음 10개면 하루 요청은 많아야 수십 번이고, 자동 요청은 분당 1번·하루 400번이 상한이라 무료 한도 안이다.
+  - 무료 등급은 입력이 서비스 개선에 쓰일 수 있다는 약관이 있다. 보내는 것은 공개된 키워드 글자뿐이고 사용자 정보는 보내지 않는다.
+  - 한도는 보장되지 않는다(모델 변경·종료 — 실제로 2.5 Flash-Lite가 종료됐다). 그래서 모델 이름을 환경 변수로 빼 두었고, 실패해도 게임은 그대로 돌며(설명 칸만 안 보임) 관리자가 직접 쓸 수 있다.
+
 ## 11. 데이터 모델
 
 ### 11.1 규칙
@@ -328,7 +343,7 @@ record TrendBox(
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 개발·테스트에서는 시작할 때 JPA가 스키마를 반영하고 시더가 초기 데이터를 넣는다(11.3). 운영은 17절 SQL(`4-schema.sql`)을 기준으로 Flyway를 쓴다.
 
-### 11.2 테이블 (37개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (38개, 컬럼은 `4-schema.sql`)
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
@@ -344,6 +359,7 @@ record TrendBox(
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
 | | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수 |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
+| | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). 설명 본문은 `keywords.ai_comment` 컬럼에 둔다 |
 | | `keyword_log_24h`, `keyword_log_dailies` | 키워드 활동 기록. 시간별(키워드당 24칸 덮어쓰기)과 현지 하루별(180일), 누적 스냅샷과 증분 |
 | | `data_sources` | 데이터 소스별 반영값(가중치) |
 | 소셜 | `comments`, `comment_votes` | 키워드 댓글과 투표 |

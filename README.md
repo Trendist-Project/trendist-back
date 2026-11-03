@@ -20,6 +20,9 @@ Trendist(트렌디스트) 백엔드. REST API, WebSocket 게임 서버, 배치�
 | `PROD_MYSQL_URL` | prod | 운영 DB 주소 |
 | `MYSQL_USERNAME`, `MYSQL_PASSWORD` | dev, prod | DB 계정 |
 | `PROD_SERVER_PORT` | prod | 운영 포트(서버 docker compose가 4001로 넘긴다) |
+| `DEV_GEMINI_API_KEY` | dev | 키워드 AI 한 줄 설명(4.12)에 쓰는 구글 제미나이 API 키(로컬). 없으면 기능이 꺼진다(직접 쓰는 것은 됨) |
+| `PROD_GEMINI_API_KEY` | prod | 같은 용도의 운영 API 키 |
+| `GEMINI_MODEL` | dev, prod | 제미나이 모델 이름. 없으면 `gemini-3.5-flash-lite` |
 | `TRENDIST_JWT_SECRET` | prod | JWT 서명 키(32바이트 이상). 없으면 개발용 기본값 |
 | `PROD_ALLOWED_ORIGINS` | prod | 게임 WebSocket을 허용할 사이트 주소(쉼표로 여러 개). 없으면 `https://trendist.kr,https://www.trendist.kr` |
 | `PROD_SITE_URL` | prod | 자랑하기 카드 공유 주소·링크 미리보기(OG)에 쓰는 사이트 주소. 없으면 `https://trendist.kr` |

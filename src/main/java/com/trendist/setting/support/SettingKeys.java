@@ -54,6 +54,10 @@ public final class SettingKeys {
     public static final String CUSTOMIZE_UNLOCK_LEVEL = "customize_unlock_level";
     public static final String ART_CHANGE_MINUTES = "art_change_minutes";
     public static final String COMBO_FLAME_AT = "combo_flame_at";
+    public static final String AI_COMMENT_ENABLED = "ai_comment_enabled";
+    public static final String AI_COMMENT_BATCH_SIZE = "ai_comment_batch_size";
+    public static final String AI_COMMENT_DAILY_MAX = "ai_comment_daily_max";
+    public static final String AI_COMMENT_GROUNDING = "ai_comment_grounding";
     public static final String COMBO_BOT_COUNTS = "combo_bot_counts";
 
     public static final List<Def> DEFAULTS = List.of(
@@ -107,6 +111,10 @@ public final class SettingKeys {
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
             new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꾸고 픽셀 그림을 그릴 수 있다"),
             new Def(ART_CHANGE_MINUTES, "10", 0, 1440, "픽셀 그림 변경 간격(분): 그림을 저장한 뒤 이만큼 지나야 다시 바꿀 수 있다"),
+            new Def(AI_COMMENT_ENABLED, "1", 0, 1, "AI 한 줄 설명: 처음 🔥가 된 키워드에 제미나이로 설명을 만들지(1이면 만듦, 0이면 멈춤). API 키가 없으면 어차피 만들지 않는다"),
+            new Def(AI_COMMENT_BATCH_SIZE, "10", 1, 30, "AI 한 줄 설명을 한 번의 요청에 몇 개씩 묶어 보낼지(1분마다 한 번 요청). 많을수록 요청 수·토큰·시간이 줄지만 한 번 실패하면 같이 실패한다"),
+            new Def(AI_COMMENT_DAILY_MAX, "400", 1, 5000, "AI 한 줄 설명 자동 요청의 하루 최대 횟수(요청 한 번에 여러 키워드를 묶음). 무료 한도 일일 요청 수보다 낮게. 관리자가 직접 누르는 재요청은 세지만 막지 않는다"),
+            new Def(AI_COMMENT_GROUNDING, "0", 0, 1, "AI 한 줄 설명에 구글 검색 확인(그라운딩)을 쓸지(1이면 사용). 무료 등급은 검색 한도가 없어 429로 막히므로 결제를 연결한 뒤에 켠다. 끄면 최신 이슈는 모른다고 답할 수 있다"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));

@@ -34,6 +34,7 @@ public class DashboardServiceImpl implements DashboardService {
     /** 구글 실시간 인기는 5분마다 읽는다. 이보다 오래 못 읽었으면 살펴볼 일, 30분이 넘으면 바로 볼 일(10.2) */
     private static final Duration GOOGLE_WARN = Duration.ofMinutes(15), GOOGLE_DANGER = Duration.ofMinutes(30);
 
+    private final com.trendist.keyword.service.AiCommentService aiComments;
     private final CountryService countries;
     private final StatsService stats;
     private final ReportRepository reports;
@@ -85,6 +86,9 @@ public class DashboardServiceImpl implements DashboardService {
         todos.add(new DashboardDtos.Todo("sanctioned", "지금 제재 중인 사용자", sanctioned, "ok", "오늘 새로 건 제재 " + sanctionsToday + "건", "users", "banned"));
         todos.add(new DashboardDtos.Todo("ending", "24시간 안에 유지 기간이 끝나는 외부 키워드", ending, "ok",
                 "목록에 계속 있으면 저절로 연장, 없으면 internal로 내려가요", "keywords", null));
+        long aiOpen = aiComments.openRequestCount();
+        todos.add(new DashboardDtos.Todo("aiRequests", "AI 설명 갱신 요청", aiOpen, aiOpen >= 10 ? "danger" : aiOpen > 0 ? "warn" : "ok",
+                "AI 설명 탭에서 AI 재요청·직접 수정·닫기", "ai", null));
         if (g != null) {
             Duration since = fetched == null ? null : Duration.between(fetched, now);
             String level = since == null || since.compareTo(GOOGLE_DANGER) > 0 ? "danger" : since.compareTo(GOOGLE_WARN) > 0 ? "warn" : "ok";

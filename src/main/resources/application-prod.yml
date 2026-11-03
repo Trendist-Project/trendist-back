@@ -21,6 +21,9 @@ spring:
 trendist:
   cookie:
     secure: true
+  # 키워드 AI 한 줄 설명용 제미나이 API 키(운영, 4.12)
+  gemini:
+    api-key: ${PROD_GEMINI_API_KEY:}
   # 게임 WebSocket을 열 수 있는 사이트 주소(쉼표로 여러 개). 기본값은 운영 도메인
   ws:
     allowed-origins: ${PROD_ALLOWED_ORIGINS:https://trendist.kr,https://www.trendist.kr}

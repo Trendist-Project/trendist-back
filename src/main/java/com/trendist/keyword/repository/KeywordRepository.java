@@ -18,6 +18,24 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("select k from Keyword k where k.id = :id")
     Optional<Keyword> findByIdForUpdate(@Param("id") Long id);
 
+    /** AI 설명을 아직 못 받은 키워드(처음 🔥가 된 적 있고, 금지 아님, 시도 횟수가 한도 미만). 최근에 🔥가 된 것부터 */
+    @Query("""
+            select k.id from Keyword k
+            where k.aiComment is null and k.activatedAt is not null and k.aiAttempts < :maxAttempts
+              and k.keywordState.id <> :bannedId
+            order by k.activatedAt desc""")
+    List<Long> findIdsNeedingAiComment(@Param("bannedId") Long bannedId, @Param("maxAttempts") long maxAttempts,
+                                       org.springframework.data.domain.Pageable pageable);
+
+    /** 관리자 AI 설명 목록(요청 없이 보는 "설명 없음"과 "전체"). withComment가 true면 설명이 있는 것, false면 없는 것 */
+    @Query("""
+            select k from Keyword k join fetch k.keywordState
+            where k.country.id = :countryId and k.activatedAt is not null and k.keywordState.id <> :bannedId
+              and ((:withComment = true and k.aiComment is not null) or (:withComment = false and k.aiComment is null))""")
+    org.springframework.data.domain.Page<Keyword> findForAdminAi(@Param("countryId") Long countryId, @Param("bannedId") Long bannedId,
+                                                                 @Param("withComment") boolean withComment,
+                                                                 org.springframework.data.domain.Pageable pageable);
+
     /** 한 상태의 키워드 전체와 반영 소스(1분 트렌드 값 점검). */
     @Query("select k from Keyword k join fetch k.dataSource where k.keywordState.id = :stateId")
     List<Keyword> findAllByStateWithSource(@Param("stateId") Long stateId);

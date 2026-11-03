@@ -29,6 +29,7 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import com.trendist.keyword.repository.KeywordAiRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,6 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class KeywordServiceImpl implements KeywordService {
     private static final Logger log = LoggerFactory.getLogger(KeywordServiceImpl.class);
     private final KeywordRepository keywords;
+    private final KeywordAiRequestRepository aiRequests;
     private final PlayerKeywordRepository playerKeywords;
     private final PlayerRepository players;
     private final PlayerService playerService;
@@ -96,7 +98,7 @@ public class KeywordServiceImpl implements KeywordService {
             return new KeywordDtos.SearchResult("FOUND", card(k, p, now));
         }
         var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, 0,
-                0, 0, 0, false, null);
+                0, 0, 0, false, null, null, false);
         return new KeywordDtos.SearchResult("NEW", preview);
     }
 
@@ -616,7 +618,8 @@ public class KeywordServiceImpl implements KeywordService {
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
                 k.getHolderCount(), k.getTotalPlusCount(),
                 k.getSearchCount() + searchCounter.pending(k.getId()), mine.isPresent(),
-                mine.map(PlayerKeyword::getExpiresAt).orElse(null));
+                mine.map(PlayerKeyword::getExpiresAt).orElse(null),
+                k.getAiComment(), k.getAiComment() != null && aiRequests.existsByKeywordIdAndPlayerIdAndHandledAtIsNull(k.getId(), p.getId()));
     }
 
     /** 목록형 외부 소스 유지 끝 시각: 지금 + 설정 시간(기본 168시간 = 7일). */

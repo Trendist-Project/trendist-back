@@ -19,3 +19,8 @@ spring:
         highlight_sql: true   # SQL 쿼리를 하이라이트하여 출력
     hibernate:
       ddl-auto: update
+
+# 키워드 AI 한 줄 설명용 제미나이 API 키(로컬, 4.12). 없으면 기능이 꺼진다
+trendist:
+  gemini:
+    api-key: ${DEV_GEMINI_API_KEY:}
