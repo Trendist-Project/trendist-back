@@ -34,11 +34,9 @@ public class GoogleTrendingJob {
         } catch (Exception e) {
             log.warn("google trending fetch failed: {}", e.toString());
         }
-        // 목록을 읽지 못했으면(30분 넘게) 지금 목록을 모르므로 정리하지 않는다. 일시 장애로 한꺼번에 내려가지 않게
-        var current = source.currentTitles();
-        if (current == null) return;
+        // 유지 기간(기본 7일)이 끝난 키워드를 정리한다. 마지막으로 읽은 목록을 기준으로 하고, 읽기 실패 여부는 따지지 않는다(10.2)
         try {
-            int dropped = keywordService.expireExternal(DataSource.GOOGLE, current);
+            int dropped = keywordService.expireExternal(DataSource.GOOGLE, source.lastTitles());
             if (dropped > 0) log.info("google trending: {} keywords moved to internal", dropped);
         } catch (RuntimeException e) {
             log.warn("google trending expire failed", e);

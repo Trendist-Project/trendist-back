@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DashboardServiceImpl implements DashboardService {
-    /** 구글 실시간 인기는 5분마다 읽는다. 이보다 오래 못 읽었으면 살펴볼 일, 30분이 넘으면 유지 기간 정리를 멈추므로 바로 볼 일(10.2) */
+    /** 구글 실시간 인기는 5분마다 읽는다. 이보다 오래 못 읽었으면 살펴볼 일, 30분이 넘으면 바로 볼 일(10.2) */
     private static final Duration GOOGLE_WARN = Duration.ofMinutes(15), GOOGLE_DANGER = Duration.ofMinutes(30);
 
     private final CountryService countries;

@@ -53,7 +53,10 @@ public class GoogleTrendingSource implements ExternalTrendSource {
     /** 마지막으로 목록을 읽은 시각(관리자 대시보드, 13.11). 아직 못 읽었으면 null. */
     public Instant fetchedAt() { return fetchedAt; }
 
-    /** 최근(30분 안)에 읽은 목록의 정규화 키. 모르면 null. */
+    /** 마지막으로 읽은 목록의 정규화 키(오래됐어도 그대로). 아직 한 번도 못 읽었으면 빈 집합. 유지 기간 정리가 쓴다. */
+    public Set<String> lastTitles() { return current; }
+
+    /** 최근(30분 안)에 읽은 목록의 정규화 키. 모르면 null. 외부 확인(heat)이 쓴다. */
     public Set<String> currentTitles() {
         Instant at = fetchedAt;
         return at != null && at.plus(FRESH_FOR).isAfter(Instant.now(clock)) ? current : null;
