@@ -190,7 +190,7 @@ public class DataSeeder implements ApplicationRunner {
 
     /**
      * 칭호(4.10). 운영에서 고치는 데이터라 테이블이 비어 있을 때만 넣는다(관리자가 지운 것이 되살아나지 않게).
-     * 칭호 ID는 번역 키라서 넣는 순서를 고정한다: TITLES(1~22) 다음에 MORE_TITLES(23~46). 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10.
+     * 칭호 ID는 번역 키라서 넣는 순서를 고정한다: TITLES(1~22) 다음에 MORE_TITLES(23~51). 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10.
      */
     private int seedTitles() {
         if (titles.count() > 0) return 0;
@@ -206,12 +206,12 @@ public class DataSeeder implements ApplicationRunner {
         return (i < 0 ? TITLE_ORDER.size() : i) * 10 + 10;
     }
 
-    /** 칭호 23~46. ID가 TITLES 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
+    /** 칭호 23~51. ID가 TITLES 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
     private static final String[][] MORE_TITLES = {
             {"트렌드 탐험가", "키워드를 30번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":30}"},
             {"일취월장", "20레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":20}"},
             {"그랜드마스터", "70레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":70}"},
-            {"알뜰 수집가", "키워드를 동시에 5개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":5}"},
+            {"알뜰 수집가", "키워드를 동시에 10개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":10}"},
             {"슈퍼스타", "현재 유행도가 1,500에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":1500}"},
             {"첫 마디", "댓글 점수 1점을 모았어요", "METRIC", "{\"metric\":\"comment_score\",\"gte\":1}"},
             {"호기심 많은", "키워드를 10번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":10}"},
@@ -232,13 +232,18 @@ public class DataSeeder implements ApplicationRunner {
             {"단골", "7일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":7}"},
             {"터줏대감", "30일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":30}"},
             {"산증인", "100일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":100}"},
+            {"키워드 새싹", "키워드를 동시에 5개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":5}"},
+            {"키워드 달인", "키워드를 동시에 40개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":40}"},
+            {"키워드 거물", "키워드를 동시에 70개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":70}"},
+            {"키워드 제왕", "키워드를 동시에 100개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":100}"},
+            {"키워드 신화", "키워드를 동시에 200개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":200}"},
     };
 
     /** 칭호함에 보이는 순서: 종류별로 쉬운 것부터 */
     private static final List<String> TITLE_ORDER = List.of(
             "트렌드 워처", "트렌드 탐험가", "트렌드 수집가", "트렌드 사냥꾼", "트렌드 장인", "트렌드 전설",
             "완전체", "스타일리스트", "일취월장", "베테랑", "마스터", "그랜드마스터", "레전드",
-            "알뜰 수집가", "멀티태스커", "키워드 부자", "키워드 재벌",
+            "키워드 새싹", "알뜰 수집가", "멀티태스커", "키워드 부자", "키워드 달인", "키워드 재벌", "키워드 거물", "키워드 제왕", "키워드 신화",
             "떠오르는 별", "큰손", "슈퍼스타", "거인",
             "핫스타", "시상대", "정상",
             "첫 마디", "해설 새싹", "친절한 해설가", "해설 대장",
@@ -289,7 +294,7 @@ public class DataSeeder implements ApplicationRunner {
             {"베테랑", "30레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":30}"},
             {"마스터", "50레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":50}"},
             {"레전드", "100레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":100}"},
-            {"멀티태스커", "키워드를 동시에 10개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":10}"},
+            {"멀티태스커", "키워드를 동시에 20개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":20}"},
             {"키워드 부자", "키워드를 동시에 30개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":30}"},
             {"키워드 재벌", "키워드를 동시에 50개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":50}"},
             {"떠오르는 별", "현재 유행도가 500에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":500}"},

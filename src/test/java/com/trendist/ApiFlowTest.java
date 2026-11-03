@@ -345,7 +345,7 @@ class ApiFlowTest {
 
     @Test
     void newCounterTitlesAreGrantedFromOrbsAndActiveDays() throws Exception {
-        // 칭호 23~46: ? 구슬 10개(꽝 포함)면 "행운 탐색자", 키워드를 얻은 첫날이면 활동한 날 1(4.10)
+        // 칭호 23~51: ? 구슬 10개(꽝 포함)면 "행운 탐색자", 키워드를 얻은 첫날이면 활동한 날 1(4.10)
         String t = player("구슬칭호시험");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         for (int i = 0; i < 10; i++) keywordService.openOrb(pid);
@@ -360,7 +360,7 @@ class ApiFlowTest {
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
         java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
-        assertThat(all).hasSize(46);
+        assertThat(all).hasSize(51);
         // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
         assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
     }

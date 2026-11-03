@@ -384,7 +384,7 @@ record TrendBox(
 | `data_sources` | google 1, admin 1, internal 1 (10.3) |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
-| `titles` | 4.10의 46개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`) |
+| `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`) |
 | `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 12개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 시드 글을 고쳐도 이미 들어간 DB는 바꾸지 않는다(관리자 화면에서 고친다) |
