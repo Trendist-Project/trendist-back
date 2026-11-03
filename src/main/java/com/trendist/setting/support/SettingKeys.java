@@ -104,9 +104,9 @@ public final class SettingKeys {
             // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
             new Def(SAFE_CENTER_RATIO, "0.09", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
             new Def(SAFE_CENTER_MIN, "1800", 100, 5000, "가운데 고정 세이프존 한 변 최소(px)"),
-            new Def(SAFE_ZONE_RATIO, "0.05", 0.005, 0.2, "무작위 세이프존 한 변: 활동 영역 한 변의 이 비율"),
+            new Def(SAFE_ZONE_RATIO, "0.025", 0.005, 0.2, "무작위 세이프존 한 변: 활동 영역 한 변의 이 비율"),
             new Def(SAFE_ZONE_MIN, "1200", 100, 3000, "무작위 세이프존 한 변 최소(px)"),
-            new Def(SAFE_ZONE_DENSITY, "12", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
+            new Def(SAFE_ZONE_DENSITY, "6", 0, 100, "무작위 세이프존 수: 10,000×10,000px 넓이마다 이 개수(0이면 끔)"),
             new Def(SAFE_ZONE_MAX, "80", 0, 300, "무작위 세이프존 동시 개수 상한"),
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
             new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꾸고 픽셀 그림을 그릴 수 있다"),
