@@ -186,8 +186,8 @@ WHERE p.id IN (/* 500명 */)
 | `POST /api/admin/users/{userId}/sanctions`, `POST /api/admin/users/sanctions/{id}/release` | 제재 걸기 `{ "type": "BAN" \| "UPLOAD" \| "COMMENT" \| "CHAT", "days": 7, "reason": "…" }`(days가 null이면 영구, 1~3650일, 사유 1~500자, 관리자 계정 금지는 400 `SANCTION_ADMIN`)와 풀기(이미 끝났으면 409 `SANCTION_NOT_ACTIVE`) |
 | `PATCH /api/admin/users/{userId}/nickname`, `POST /{userId}/look/reset`, `PATCH /{userId}/role`, `POST /{userId}/kick` | 닉네임 바꾸기(닉네임 규칙 그대로, 변경 간격은 세지 않음), 꾸미기 초기화, 관리자 권한 `{ "admin": true }`(Google 계정만, 내 권한 빼기 400 `ROLE_SELF`), 강제 퇴장(접속 중이 아니면 409 `NOT_ONLINE`) |
 | `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 누적 기록, 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
-| `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [나도 플레이 하기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
-| `GET /share/{code}/play` | [나도 플레이 하기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
+| `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [플레이 하러 가기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
+| `GET /share/{code}/play` | [플레이 하러 가기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
 | `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |

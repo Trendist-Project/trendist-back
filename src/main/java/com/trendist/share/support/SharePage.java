@@ -70,7 +70,7 @@ public final class SharePage {
                 </head>
                 <body>
                 <img src="%4$s" width="1080" height="1350" alt="%1$s">
-                <a class="play" href="%5$s">나도 플레이 하기</a>
+                <a class="play" href="%5$s">플레이 하러 가기</a>
                 <p>유행을 아는 자, 커진다. Trendist</p>
                 </body>
                 </html>

@@ -41,7 +41,7 @@ public class ShareCardController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(HTML).body(SharePage.notFound(service.baseUrl())));
     }
 
-    /** [나도 플레이 하기]: 클릭을 세고 메인 화면으로 보낸다. 없는 코드도 메인으로 */
+    /** [플레이 하러 가기]: 클릭을 세고 메인 화면으로 보낸다. 없는 코드도 메인으로 */
     @GetMapping("/share/{code}/play")
     public ResponseEntity<Void> play(@PathVariable String code, HttpServletRequest req) {
         service.count(code, ShareViewCounter.Kind.PLAY, req.getRemoteAddr(), req.getHeader(HttpHeaders.USER_AGENT));

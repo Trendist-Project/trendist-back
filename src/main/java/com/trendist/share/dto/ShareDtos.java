@@ -25,7 +25,7 @@ public final class ShareDtos {
 
     /**
      * 만든 공유 주소. url은 공유 페이지, imageUrl은 카드 이미지(모두 사이트 주소 기준 절대 주소).
-     * totalViews·totalPlays는 내가 만든 모든 카드의 조회·[나도 플레이 하기] 클릭 합계(4.24)
+     * totalViews·totalPlays는 내가 만든 모든 카드의 조회·[플레이 하러 가기] 클릭 합계(4.24)
      */
     public record Created(String code, String url, String imageUrl, long totalViews, long totalPlays) {}
 
