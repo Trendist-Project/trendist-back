@@ -42,6 +42,7 @@ public final class SettingKeys {
     public static final String BOT_STEP_MAX = "bot_step_max";
     public static final String ORB_SPAWN_PERCENT = "orb_spawn_percent";
     public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
+    public static final String RANK_TITLE_MIN_PLAYERS = "rank_title_min_players";
     public static final String EXTERNAL_HOLD_HOURS = "external_hold_hours";
     public static final String SAFE_CENTER_RATIO = "safe_center_ratio";
     public static final String SAFE_CENTER_MIN = "safe_center_min";
@@ -94,6 +95,7 @@ public final class SettingKeys {
             new Def(BOT_CAP_RATIO, "1.0", 0.1, 10, "봇 유행도 상한: 그 방에 접속 중인 사람 유행도 평균의 이 배수(1이면 평균)"),
             new Def(BOT_STEP_MIN, "20", 0, 100, "봇이 가진 키워드 하나의 점수 최소(사람의 키워드 점수처럼)"),
             new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),
+            new Def(RANK_TITLE_MIN_PLAYERS, "11", 1, 1000, "순위 칭호(핫스타·시상대·정상) 최소 접속 인원: 지금 그 나라에 접속 중인 사람이 이 인원 이상일 때만 순위 칭호를 준다"),
             new Def(ORB_ACTIVE_PERCENT, "33", 0, 100, "? 구슬에서 🔥활성 키워드가 나올 확률(%). 나머지는 꽝"),
             // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
             new Def(SAFE_CENTER_RATIO, "0.09", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),

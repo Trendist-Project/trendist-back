@@ -203,7 +203,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         if (r == null) return;
         r.submit(room -> {
             Room.Member m = room.byPlayer(e.playerId());
-            if (m != null) sendText(m, Map.of("type", "titleGranted", "name", e.name(), "description", e.description()));
+            if (m != null) sendText(m, Map.of("type", "titleGranted", "titleId", e.titleId(), "name", e.name(), "description", e.description()));
         });
     }
 

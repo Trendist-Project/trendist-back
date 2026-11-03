@@ -10,6 +10,8 @@ import com.trendist.game.service.RoomManager;
 import com.trendist.player.entity.Player;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.service.PlayerService;
+import com.trendist.setting.service.SettingService;
+import com.trendist.setting.support.SettingKeys;
 import com.trendist.title.dto.TitleDtos;
 import com.trendist.title.entity.PlayerTitle;
 import com.trendist.title.entity.Title;
@@ -49,6 +51,7 @@ public class TitleServiceImpl implements TitleService {
     private final RateLimiter rateLimiter;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
+    private final SettingService settings;
 
     /** 조건을 풀어 둔 칭호. target은 METRIC이면 기준값(gte), RANK면 순위(within). */
     private record Cond(Title title, String type, String metric, long target) {}
@@ -145,7 +148,8 @@ public class TitleServiceImpl implements TitleService {
 
     /**
      * RANK 칭호(4.10): 그 나라 리더보드(접속 중인 사람끼리의 순위, 4.14)를 10초마다 보고 N위 안의 사람에게 준다.
-     * 리더보드는 방 메모리 값이라 DB를 보지 않는다.
+     * 리더보드는 방 메모리 값이라 DB를 보지 않는다. 혼자 있어도 1위가 되는 일을 막으려고, 접속 중인 사람이
+     * `rank_title_min_players`(기본 11명) 이상일 때만 준다.
      */
     @Scheduled(fixedDelay = 10_000, initialDelay = 15_000)
     public void checkRanks() {
@@ -154,7 +158,9 @@ public class TitleServiceImpl implements TitleService {
         long widest = rank.stream().mapToLong(Cond::target).max().orElse(0);
         for (Country c : countries.findAll()) {
             if (!c.isEnabled()) continue;
-            List<Room.Live> top = rooms.livePlayers(c.getId()).stream()
+            Collection<Room.Live> live = rooms.livePlayers(c.getId());
+            if (live.size() < settings.getInt(SettingKeys.RANK_TITLE_MIN_PLAYERS)) continue;
+            List<Room.Live> top = live.stream()
                     .sorted(Comparator.comparingDouble(Room.Live::score).reversed().thenComparingLong(Room.Live::playerId))
                     .limit(widest).toList();
             for (int i = 0; i < top.size(); i++) {
@@ -183,7 +189,7 @@ public class TitleServiceImpl implements TitleService {
                 continue; // 동시에 두 번 검사했다. 이미 받았다
             }
             // 새로 얻어도 자동으로 활성화하지 않는다(4.10). 알림만 보낸다
-            events.publishEvent(new GameEvents.TitleGranted(p.getCountry().getId(), p.getId(), c.title().getName(), c.title().getDescription()));
+            events.publishEvent(new GameEvents.TitleGranted(p.getCountry().getId(), p.getId(), id, c.title().getName(), c.title().getDescription()));
         }
     }
 }

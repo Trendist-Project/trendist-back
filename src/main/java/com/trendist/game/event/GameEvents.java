@@ -19,8 +19,8 @@ public final class GameEvents {
     /** 칭호 조건 수치가 바뀌었을 수 있다. 커밋 뒤 METRIC 칭호를 검사한다(4.10). */
     public record TitleCheck(long playerId) {}
 
-    /** 새 칭호를 받았다. 접속 중이면 그 사람에게 알린다(4.10). */
-    public record TitleGranted(long countryId, long playerId, String name, String description) {}
+    /** 새 칭호를 받았다. 접속 중이면 그 사람에게 알린다(4.10). titleId는 알림의 [장착하기]에 쓴다 */
+    public record TitleGranted(long countryId, long playerId, long titleId, String name, String description) {}
 
     /** 활성 칭호가 바뀌었다(title이 null이면 숨김). 접속 중이면 방의 이름표 아래 칭호를 바꾼다. */
     public record TitleChanged(long countryId, long playerId, String title) {}
