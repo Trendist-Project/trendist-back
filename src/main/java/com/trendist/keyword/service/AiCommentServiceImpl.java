@@ -5,6 +5,8 @@ import com.trendist.common.exception.ApiException;
 import com.trendist.common.support.RateLimiter;
 import com.trendist.country.service.CountryService;
 import com.trendist.keyword.ai.GeminiClient;
+import com.trendist.keyword.ai.NewsSearchClient;
+import com.trendist.keyword.ai.TrendNewsContext;
 import com.trendist.keyword.dto.AiCommentDtos;
 import com.trendist.keyword.entity.Keyword;
 import com.trendist.keyword.entity.KeywordAiRequest;
@@ -43,6 +45,8 @@ public class AiCommentServiceImpl implements AiCommentService {
     private final KeywordRepository keywords;
     private final KeywordAiRequestRepository requests;
     private final GeminiClient gemini;
+    private final TrendNewsContext newsContext;
+    private final NewsSearchClient newsSearch;
     private final SettingService settings;
     private final CodeTables codes;
     private final CountryService countries;
@@ -78,7 +82,7 @@ public class AiCommentServiceImpl implements AiCommentService {
         usedToday++;
         Map<String, Optional<String>> answers;
         try {
-            answers = gemini.describeAll(new ArrayList<>(texts.values()), grounding);
+            answers = gemini.describeAll(new ArrayList<>(texts.values()), newsOf(texts.values()), grounding);
         } catch (GeminiClient.RateLimitedException e) {
             pausedUntil = Instant.now(clock).plus(COOL_DOWN);
             log.warn("gemini rate limited: pause auto comments until {}", pausedUntil);
@@ -103,6 +107,19 @@ public class AiCommentServiceImpl implements AiCommentService {
         }
         log.info("ai comments: {} made, {} unknown, {} requested in one request", made, unknown, texts.size());
         return made;
+    }
+
+    private Map<String, List<String>> newsOf(Collection<String> texts) {
+        Map<String, List<String>> m = new HashMap<>();
+        for (String t : texts) {
+            List<String> h = newsContext.get(t);
+            if (h.isEmpty()) { // RSS가 제목을 주지 않은 키워드(사용자가 등록한 유행어 등): 구글 뉴스에서 찾아 본다
+                h = newsSearch.search(t);
+                newsContext.put(t, h);
+            }
+            if (!h.isEmpty()) m.put(t, h);
+        }
+        return m;
     }
 
     private void save(long keywordId, String comment, String by) {
@@ -162,7 +179,7 @@ public class AiCommentServiceImpl implements AiCommentService {
         Keyword k = keywords.findById(keywordId).orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
         Optional<String> text;
         try {
-            Map<String, Optional<String>> r = gemini.describeAll(List.of(k.getText()), settings.getInt(SettingKeys.AI_COMMENT_GROUNDING) == 1);
+            Map<String, Optional<String>> r = gemini.describeAll(List.of(k.getText()), newsOf(List.of(k.getText())), settings.getInt(SettingKeys.AI_COMMENT_GROUNDING) == 1);
             if (!r.containsKey(k.getText())) throw new IllegalStateException("AI 답에 이 키워드가 없어요");
             text = r.get(k.getText());
         } catch (GeminiClient.RateLimitedException e) {

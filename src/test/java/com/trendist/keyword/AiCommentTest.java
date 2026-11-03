@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -37,10 +38,11 @@ class AiCommentTest {
     @Autowired KeywordRepository keywords;
     @Autowired AiCommentService ai;
     @MockitoBean GeminiClient gemini;
+    @MockitoBean com.trendist.keyword.ai.NewsSearchClient newsSearch;
 
     /** 가짜 제미나이: 받은 키워드마다 같은 설명(또는 모름)을 돌려준다 */
     private void answer(String comment) throws Exception {
-        when(gemini.describeAll(anyList(), anyBoolean())).thenAnswer(inv -> {
+        when(gemini.describeAll(anyList(), anyMap(), anyBoolean())).thenAnswer(inv -> {
             java.util.Map<String, Optional<String>> m = new java.util.LinkedHashMap<>();
             for (String k : inv.<List<String>>getArgument(0)) m.put(k, Optional.ofNullable(comment));
             return m;
@@ -68,7 +70,7 @@ class AiCommentTest {
         ai.generatePending();
         assertThat(keywords.findById(id).orElseThrow().getAiComment()).isEqualTo("테스트 유행어를 뜻하는 말이에요.");
         ai.generatePending(); // 이미 있으면 다시 만들지 않는다
-        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyBoolean());
+        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyMap(), anyBoolean());
 
         String t = guestWithNick("설명보기");
         mvc.perform(get("/api/keywords/" + id).header("Authorization", "Bearer " + t))
@@ -121,7 +123,7 @@ class AiCommentTest {
         when(gemini.enabled()).thenReturn(true);
         long a = keywordId("묶음하나"), b = keywordId("묶음둘"), c = keywordId("묶음셋");
         // 한 번의 요청: 하나는 설명, 하나는 모름(UNKNOWN), 하나는 답이 빠짐
-        when(gemini.describeAll(anyList(), anyBoolean())).thenAnswer(inv -> {
+        when(gemini.describeAll(anyList(), anyMap(), anyBoolean())).thenAnswer(inv -> {
             java.util.Map<String, Optional<String>> m = new java.util.LinkedHashMap<>();
             m.put("묶음하나", Optional.of("첫째 설명이에요."));
             m.put("묶음둘", Optional.empty());
@@ -129,7 +131,7 @@ class AiCommentTest {
         });
         org.mockito.Mockito.clearInvocations(gemini);
         ai.generatePending();
-        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyBoolean());
+        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyMap(), anyBoolean());
         assertThat(keywords.findById(a).orElseThrow().getAiComment()).isEqualTo("첫째 설명이에요.");
         assertThat(keywords.findById(b).orElseThrow().getAiAttempts()).isGreaterThanOrEqualTo(3); // 모른다 → 포기
         var kc = keywords.findById(c).orElseThrow();
@@ -151,11 +153,25 @@ class AiCommentTest {
     @Test
     void rateLimitedPausesAutoRequests() throws Exception {
         when(gemini.enabled()).thenReturn(true);
-        when(gemini.describeAll(anyList(), anyBoolean())).thenThrow(new GeminiClient.RateLimitedException("429"));
+        when(gemini.describeAll(anyList(), anyMap(), anyBoolean())).thenThrow(new GeminiClient.RateLimitedException("429"));
         keywordId("에이아이한도");
         assertThat(ai.generatePending()).isZero();
         org.mockito.Mockito.clearInvocations(gemini);
         ai.generatePending(); // 한도를 만났으면 한동안 쉰다
-        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.never()).describeAll(anyList(), anyBoolean());
+        org.mockito.Mockito.verify(gemini, org.mockito.Mockito.never()).describeAll(anyList(), anyMap(), anyBoolean());
+    }
+
+    @Test
+    void searchesNewsForKeywordWithoutRssContextAndPassesHeadlines() throws Exception {
+        when(gemini.enabled()).thenReturn(true);
+        when(newsSearch.search("직접등록유행어")).thenReturn(List.of("직접등록유행어 열풍에 품절 대란"));
+        answer("품절 대란이 일어나 화제가 됐어요.");
+        long id = keywordId("직접등록유행어");
+        org.mockito.Mockito.clearInvocations(gemini);
+        ai.generatePending();
+        org.mockito.ArgumentCaptor<java.util.Map<String, List<String>>> cap = org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        org.mockito.Mockito.verify(gemini).describeAll(anyList(), cap.capture(), anyBoolean());
+        assertThat(cap.getValue()).containsEntry("직접등록유행어", List.of("직접등록유행어 열풍에 품절 대란"));
+        assertThat(keywords.findById(id).orElseThrow().getAiComment()).isEqualTo("품절 대란이 일어나 화제가 됐어요.");
     }
 }

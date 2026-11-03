@@ -28,14 +28,16 @@ public class GeminiClientImpl implements GeminiClient {
     static final int MAX_LEN = 200;
 
     private static final String SYSTEM = """
-            너는 한국어 실시간 트렌드 게임 'Trendist'의 키워드 설명 도우미야.
-            사용자가 준 검색어(키워드)에 대해 한국어 한 문장으로 설명해.
-            - 유행어·신조어·밈·음식·상품·콘텐츠면 무슨 뜻인지 설명해.
-            - 뉴스·사건·이슈·인물 관련이면 어떤 내용이 이슈인지 사실만 중립적으로 요약해.
-            규칙: 키워드마다 한 문장, 80자 이내, 존댓말(~예요/~해요).
-            확인되지 않은 추측, 루머, 특정인에 대한 비방·사생활, 선정적·혐오 표현은 쓰지 마.
-            광고 문구, 링크, 이모지, 따옴표, 마크다운은 쓰지 마.
-            정말 무슨 뜻인지·무슨 일인지 확실히 알 수 없으면 억지로 짓지 말고 comment에 정확히 UNKNOWN 이라고만 적어. 최신 사건은 네 지식에 없을 수 있으니 특히 조심해.
+            너는 한국어 실시간 트렌드 게임 'Trendist'의 설명 도우미야.
+            사용자가 준 검색어(키워드)가 '지금 왜 화제인지·왜 유행인지'를 한국어 한 문장으로 알려줘.
+            사전식 뜻풀이("~는 ~을 뜻하는 말")만 쓰지 말고, 지금 무슨 일이 있어서 사람들이 찾는지(사건·발표·방송·경기·출시·논란·밈 등)를 담아.
+            키워드마다 관련 뉴스 제목이 붙어 있으면 그 제목들만 근거로 이유를 써. 제목에 없는 내용을 지어내지 마.
+            뉴스 제목이 없으면 네가 확실히 아는 경우에만 쓰고, 최근 일은 네 지식에 없을 수 있으니 확실하지 않으면 UNKNOWN 이라고 적어.
+            규칙: 키워드마다 한 문장, 90자 이내, 존댓말(~예요/~해요/~했어요).
+            확인되지 않은 추측, 루머, 특정인에 대한 비방·사생활, 선정적·혐오 표현은 쓰지 마. 사건·사고는 사실만 중립적으로 써.
+            광고 문구, 링크, 이모지, 따옴표, 마크다운은 쓰지 마. 뉴스 제목을 그대로 베끼지 말고 풀어서 써.
+            좋은 예: 키워드 '장성규' + 제목 '장성규, 나혼산 김민에 팬심 고백...' → 방송인 장성규 씨가 '나 혼자 산다' 출연자에게 팬심을 밝힌 일이 화제가 됐어요.
+            나쁜 예(뜻풀이만 있음): 방송인 장성규 씨를 가리키는 이름이에요.
             키워드 목록을 번호와 함께 줄 거야. 입력된 모든 번호에 대해 JSON 배열 [{"no": 번호, "comment": "설명 또는 UNKNOWN"}]로만 답해.""";
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -56,11 +58,14 @@ public class GeminiClientImpl implements GeminiClient {
     public boolean enabled() { return !apiKey.isEmpty(); }
 
     @Override
-    public Map<String, Optional<String>> describeAll(List<String> keywords, boolean grounding) throws Exception {
+    public Map<String, Optional<String>> describeAll(List<String> keywords, Map<String, List<String>> news, boolean grounding) throws Exception {
         if (!enabled()) throw new IllegalStateException("제미나이 API 키(DEV_/PROD_GEMINI_API_KEY)가 설정되지 않았어요");
         if (keywords.isEmpty()) return Map.of();
         StringBuilder list = new StringBuilder("키워드 목록:\n");
-        for (int i = 0; i < keywords.size(); i++) list.append(i + 1).append(". ").append(keywords.get(i)).append('\n');
+        for (int i = 0; i < keywords.size(); i++) {
+            list.append(i + 1).append(". ").append(keywords.get(i)).append('\n');
+            for (String h : news.getOrDefault(keywords.get(i), List.of())) list.append("   - 뉴스 제목: ").append(h).append('\n');
+        }
         Map<String, Object> schema = Map.of("type", "ARRAY", "items", Map.of("type", "OBJECT",
                 "properties", Map.of("no", Map.of("type", "INTEGER"), "comment", Map.of("type", "STRING")),
                 "required", List.of("no", "comment")));

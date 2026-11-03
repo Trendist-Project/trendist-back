@@ -8,3 +8,5 @@ trendist:
   # 테스트에서는 외부(구글) 요청을 하지 않는다
   google-trends:
     enabled: false
+  news-search:
+    enabled: false

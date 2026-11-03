@@ -1,5 +1,6 @@
 package com.trendist.keyword.source;
 
+import com.trendist.keyword.ai.TrendNewsContext;
 import com.trendist.keyword.entity.DataSource;
 import com.trendist.keyword.support.KeywordNormalizer;
 import java.io.ByteArrayInputStream;
@@ -11,7 +12,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,10 +38,11 @@ public class GoogleTrendingSource implements ExternalTrendSource {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
     private final Clock clock;
+    private final TrendNewsContext news;
     private volatile Set<String> current = Set.of();
     private volatile Instant fetchedAt;
 
-    public GoogleTrendingSource(Clock clock) { this.clock = clock; }
+    public GoogleTrendingSource(Clock clock, TrendNewsContext news) { this.clock = clock; this.news = news; }
 
     @Override public boolean supports(String countryCode) { return "KR".equals(countryCode); }
     @Override public String sourceName() { return DataSource.GOOGLE; }
@@ -69,6 +73,7 @@ public class GoogleTrendingSource implements ExternalTrendSource {
         HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
         if (res.statusCode() != 200) throw new IllegalStateException("google trends rss HTTP " + res.statusCode());
         List<String> titles = parseTitles(res.body());
+        parseNews(res.body()).forEach(news::put); // 왜 유행인지 AI가 알 수 있게 관련 뉴스 제목을 기억한다
         current = titles.stream().map(KeywordNormalizer::normalize).collect(Collectors.toUnmodifiableSet());
         fetchedAt = Instant.now(clock);
         return titles;
@@ -88,6 +93,29 @@ public class GoogleTrendingSource implements ExternalTrendSource {
                 String title = t.item(0).getTextContent();
                 if (title != null && !title.isBlank()) out.add(title.strip());
             }
+        }
+        return out;
+    }
+
+    /** item마다 관련 뉴스 제목(ht:news_item_title)을 꺼낸다. 뉴스가 없는 item은 넣지 않는다. */
+    static Map<String, List<String>> parseNews(byte[] xml) throws Exception {
+        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+        f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        f.setExpandEntityReferences(false);
+        NodeList items = f.newDocumentBuilder().parse(new ByteArrayInputStream(xml)).getElementsByTagName("item");
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        for (int i = 0; i < items.getLength(); i++) {
+            Element item = (Element) items.item(i);
+            NodeList t = item.getElementsByTagName("title");
+            if (t.getLength() == 0 || t.item(0).getTextContent().isBlank()) continue;
+            List<String> heads = new ArrayList<>();
+            NodeList n = item.getElementsByTagName("ht:news_item_title");
+            for (int j = 0; j < n.getLength(); j++) {
+                String h = n.item(j).getTextContent();
+                if (h != null && !h.isBlank()) heads.add(h.strip());
+            }
+            if (!heads.isEmpty()) out.put(t.item(0).getTextContent().strip(), heads);
         }
         return out;
     }

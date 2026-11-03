@@ -23,6 +23,20 @@ class GoogleTrendingSourceTest {
     }
 
     @Test
+    void readsRelatedNewsTitlesPerItem() throws Exception {
+        String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rss xmlns:ht="https://trends.google.com/trending/rss" version="2.0"><channel>
+                  <item><title>병무청</title>
+                    <ht:news_item><ht:news_item_title>입영 일정 변경</ht:news_item_title></ht:news_item>
+                    <ht:news_item><ht:news_item_title>병역 제도 개편</ht:news_item_title></ht:news_item></item>
+                  <item><title>뉴스없음</title></item>
+                </channel></rss>""";
+        assertThat(GoogleTrendingSource.parseNews(xml.getBytes(StandardCharsets.UTF_8)))
+                .containsOnlyKeys("병무청").containsEntry("병무청", java.util.List.of("입영 일정 변경", "병역 제도 개편"));
+    }
+
+    @Test
     void rejectsDoctype() {
         String xml = "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><rss><channel><item><title>&x;</title></item></channel></rss>";
         assertThatThrownBy(() -> GoogleTrendingSource.parseTitles(xml.getBytes(StandardCharsets.UTF_8))).isInstanceOf(Exception.class);
