@@ -135,6 +135,14 @@ public class Room {
     private final Deque<Map<String, Object>> chatHistory = new ArrayDeque<>();
     private static final int CHAT_HISTORY = 50;
     private final Map<Long, Member> byPlayer = new HashMap<>();
+    /**
+     * 관전자(13.13): 관리자가 방을 지켜본다. members에 넣지 않아서 방 크기·활동 영역·충돌·구슬·봇·랭킹에 아무 영향이 없고,
+     * 방이 모두에게 보내는 스냅샷·미니맵·글 메시지만 받는다. 틱 스레드에서만 바꾼다.
+     */
+    private final Set<Member> spectators = new LinkedHashSet<>();
+    private int nextSpectator = -1; // 관전자의 엔티티 번호(사람·봇과 겹치지 않게 음수)
+    public static final int MAX_SPECTATORS = 10;
+    private volatile int spectatorSize;
     private final Map<Long, Set<Member>> holders = new HashMap<>();
     private final Map<Long, Double> pairCooldown = new HashMap<>();
     private final Map<Long, LastSeen> lastSeen = new HashMap<>(); // 나간 플레이어의 마지막 위치
@@ -232,6 +240,30 @@ public class Room {
         return m;
     }
 
+    /** 관전자를 받는다. 가득 찼으면 null. 방의 지금 상태(이름표·구슬·세이프존·최근 채팅)를 바로 보낸다. */
+    public Member addSpectator(Object session) {
+        if (spectators.size() >= MAX_SPECTATORS) return null;
+        Member sp = new Member(nextSpectator--, 0, session);
+        sp.lastHeardNanos = nanoClock.getAsLong();
+        sp.nickname = "(관전)";
+        spectators.add(sp);
+        spectatorSize = spectators.size();
+        outbox.sendText(sp, rosterMessage());
+        outbox.sendText(sp, orbListMessage());
+        outbox.sendText(sp, zonesMessage());
+        outbox.sendText(sp, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
+        return sp;
+    }
+
+    public void removeSpectator(Member sp) {
+        spectators.remove(sp);
+        spectatorSize = spectators.size();
+    }
+
+    public Collection<Member> spectators() { return spectators; }
+    /** 지금 지켜보는 관전자 수(다른 스레드에서 읽어도 된다) */
+    public int spectatorCount() { return spectatorSize; }
+
     /**
      * 채팅 한 줄을 방 전체에 보낸다(4.13). 보낸 사람은 세션 엔티티 번호와 지금 닉네임으로만 가리킨다.
      * 클라이언트는 이 번호로 말풍선을 아이콘 위에 띄운다.
@@ -243,6 +275,7 @@ public class Room {
         chatHistory.addLast(msg);
         while (chatHistory.size() > CHAT_HISTORY) chatHistory.pollFirst();
         for (Member m : members.values()) outbox.sendText(m, msg);
+        for (Member sp : spectators) outbox.sendText(sp, msg);
     }
 
     /** 이모트(4.26): 방 전체에 보내 그 원 위에 잠깐 띄운다. 코드는 받는 쪽에서 이미 검사했다. */
@@ -250,6 +283,7 @@ public class Room {
         if (members.get(from.entityNo) != from) return;
         Map<String, Object> msg = Map.of("type", "emote", "e", from.entityNo, "code", code);
         for (Member m : members.values()) outbox.sendText(m, msg);
+        for (Member sp : spectators) outbox.sendText(sp, msg);
     }
 
     /**
@@ -657,6 +691,7 @@ public class Room {
 
     private void broadcast(Map<String, Object> msg) {
         for (Member m : members.values()) outbox.sendText(m, msg);
+        for (Member sp : spectators) outbox.sendText(sp, msg);
     }
 
     private void collide(Tuning tu) {
@@ -755,6 +790,7 @@ public class Room {
             copy[flagsPos[k]] = 1; // 나
             outbox.send(order.get(k), ByteBuffer.wrap(copy));
         }
+        for (Member sp : spectators) outbox.send(sp, ByteBuffer.wrap(bytes)); // 관전자는 '나'가 없다(표시 0)
     }
 
     /**
@@ -771,9 +807,10 @@ public class Room {
         for (Member m : top) buf.putInt(m.entityNo).putFloat((float) m.x).putFloat((float) m.y).putFloat((float) m.displayRadius);
         byte[] bytes = buf.array();
         for (Member m : members.values()) outbox.send(m, ByteBuffer.wrap(bytes));
+        for (Member sp : spectators) outbox.send(sp, ByteBuffer.wrap(bytes));
     }
 
-    private void broadcastRoster() {
+    private Map<String, Object> rosterMessage() {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Member m : members.values()) {
             // 칭호·테두리·효과는 없을 수 있어서(null) Map.of 대신 HashMap을 쓴다
@@ -786,8 +823,13 @@ public class Room {
             e.put("combo", m.combo);
             list.add(e);
         }
-        Map<String, Object> msg = Map.of("type", "roster", "players", list, "flameAt", comboTuning.flameAt()); // 불꽃을 그릴 콤보 기준(4.25)
+        return Map.of("type", "roster", "players", list, "flameAt", comboTuning.flameAt()); // 불꽃을 그릴 콤보 기준(4.25)
+    }
+
+    private void broadcastRoster() {
+        Map<String, Object> msg = rosterMessage();
         for (Member m : members.values()) outbox.sendText(m, msg);
+        for (Member sp : spectators) outbox.sendText(sp, msg);
     }
 
     /**
@@ -803,6 +845,11 @@ public class Room {
             if (m.bot || now - m.lastHeardNanos < SILENT_SECONDS * 1_000_000_000L) continue;
             leave(m);
             outbox.close(m);
+        }
+        for (Member sp : List.copyOf(spectators)) {
+            if (now - sp.lastHeardNanos < SILENT_SECONDS * 1_000_000_000L) continue;
+            removeSpectator(sp);
+            outbox.close(sp);
         }
     }
 

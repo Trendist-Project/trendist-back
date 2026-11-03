@@ -61,6 +61,7 @@
 - 느린 클라이언트는 송신 버퍼 상한을 넘으면 오래된 스냅샷을 버린다. DB·외부 호출은 틱 스레드 밖에서 가상 스레드로 처리한다.
 - 방 관리자와 입장 라우팅은 인터페이스로 분리해 두고, 나중에 지역당 여러 방·여러 서버로 늘린다.
 - 설정값 전달: 이동 계산은 항상 서버가 `settings`(1분 캐시)의 값으로 한다. 클라이언트가 예측에 쓰는 값(최대 속도, 반지름·줌 곡선 값)은 입장할 때 서버가 보내 주고, 관리자가 바꿔서 설정이 갱신되면 방 안 모든 클라이언트에 다시 보낸다. 그러지 않으면 내 아이콘 예측이 서버 위치와 어긋난다.
+- 관리자 관전(13.13): 클라이언트가 `auth` 대신 `spectate{token, country}`를 보내면 관리자 토큰(`AccountGuard.isAdmin`)인지 확인하고 `Room.addSpectator`로 받는다. 관전자는 `members`에 넣지 않아 방 크기·활동 영역·충돌·봇 수·랭킹(`liveView`)·접속 인원에 영향이 없고, 방이 모두에게 보내는 스냅샷(`me` 표시 0)·미니맵·`roster`·`orbs`·`orbSpawn`·`orbEaten`·`safeZones`·`chat`·`emote`·`combo`·`shield`·`tuning`만 받는다. 입장할 때 `roster`·`orbs`·`safeZones`·`chatHistory`를 받고 서버는 `spectating{country, spectators}`로 알린다. 받은 입력(`input`·`move`·`chat`·`emote`)은 모두 버리고 `ping`·`bye`만 받는다. 90초 동안 신호가 없으면 정리하고(`dropSilent`), 방마다 10명까지다. 관리자가 아니거나 토큰이 틀리면 `1008 AUTH_FAILED`로 닫고, 가득 차면 `1008 SPECTATORS_FULL`이다.
 - 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
 - 연속 빼앗기 콤보(4.25): 작업 스레드가 빼앗기·잃기를 끝내면 방 큐에 결과를 넣고, 틱 스레드가 이긴 사람의 콤보 +1, 잃은 사람의 콤보 0을 하고 `combo{e, nickname, combo, event, flameAt, by, byE}`를 방 전체에 보낸다. 불꽃은 클라이언트가 `combo >= flameAt`일 때 그린다(명단 `roster`에도 `flameAt`). 설정은 1초마다 다시 읽는다(`Room.ComboTuning`).
 - 채팅(4.13)도 게임 WebSocket으로 받는다(`chat{text}`). 검사는 받는 스레드에서, 저장은 작업 스레드에서 하고, 저장이 끝나면 방에 넣어 틱 스레드가 방 전체에 `chat{id, e, nickname, text, at}`을 보낸다. 방은 최근 50개를 메모리에 두고 들어오는 사람에게 `chatHistory`로 보낸다. 보낸 사람은 세션 엔티티 번호(`e`)로만 가리킨다.

@@ -130,6 +130,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private void broadcastTuning(Room r) {
         Map<String, Object> msg = tuningMessage(r.tuning());
         r.members().forEach(m -> sendText(m, msg));
+        r.spectators().forEach(m -> sendText(m, msg));
     }
 
     /** 접속 중인 플레이어 점수(랭킹 실시간 보정용). */

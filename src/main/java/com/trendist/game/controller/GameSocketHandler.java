@@ -26,7 +26,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}, bye(페이지를 떠남)
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}, bye(페이지를 떠남),
+ * spectate{token,country}(관리자 관전, 13.13: 원 없이 방의 스냅샷만 받고 입력은 모두 무시한다)
  * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError, safeZones)
  */
 @Component
@@ -37,6 +38,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private static final String ATTR_ROOM = "room";
     private static final String ATTR_SAFE = "safe";
     private static final String ATTR_INPUTS = "inputs";
+    private static final String ATTR_SPECTATOR = "spectator";
 
     private final JwtService jwt;
     private final AccountGuard guard;
@@ -46,6 +48,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final RoomManager rooms;
     private final ObjectMapper json;
     private final com.trendist.user.service.SanctionService sanctionService;
+    private final com.trendist.country.service.CountryService countries;
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "ws-auth-timeout"));
 
     @Override
@@ -56,7 +59,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         session.getAttributes().put(ATTR_SAFE, safe);
         session.getAttributes().put(ATTR_INPUTS, new ConcurrentHashMap<String, Bucket>()); // 메시지 종류 → 토큰 버킷
         timeouts.schedule(() -> {
-            if (session.isOpen() && !session.getAttributes().containsKey(ATTR_MEMBER)) close(session, CloseStatus.POLICY_VIOLATION);
+            if (session.isOpen() && !session.getAttributes().containsKey(ATTR_MEMBER) && !session.getAttributes().containsKey(ATTR_SPECTATOR)) close(session, CloseStatus.POLICY_VIOLATION);
         }, 5, TimeUnit.SECONDS);
     }
 
@@ -66,8 +69,22 @@ public class GameSocketHandler extends TextWebSocketHandler {
         try { node = json.readTree(message.getPayload()); } catch (Exception e) { return; }
         String type = node.path("type").asString("");
         Room.Member member = (Room.Member) session.getAttributes().get(ATTR_MEMBER);
+        Room.Member spectator = (Room.Member) session.getAttributes().get(ATTR_SPECTATOR);
+        if (spectator != null) { // 관전자(13.13)는 살아 있다는 신호(ping)와 떠남(bye)만 받고, 그 밖의 입력은 모두 버린다
+            spectator.lastHeardNanos = System.nanoTime();
+            if ("bye".equals(type)) {
+                Room room = (Room) session.getAttributes().get(ATTR_ROOM);
+                if (room != null) room.submit(r -> r.removeSpectator(spectator));
+                close(session, CloseStatus.NORMAL);
+            } else if ("ping".equals(type) && allowInput(session, "ping")) {
+                double t = node.path("t").asDouble(0);
+                rooms.sendText(spectator, Map.of("type", "pong", "t", Double.isFinite(t) ? t : 0));
+            }
+            return;
+        }
         if (member == null) {
             if ("auth".equals(type)) authenticate(session, node.path("token").asString(""));
+            else if ("spectate".equals(type)) spectate(session, node.path("token").asString(""), node.path("country").asString("KR"));
             return;
         }
         member.lastHeardNanos = System.nanoTime(); // 살아 있다는 표시(응답 없는 접속 정리에 쓴다)
@@ -108,6 +125,31 @@ public class GameSocketHandler extends TextWebSocketHandler {
             }
             default -> { }
         }
+    }
+
+    /** 관리자 관전(13.13): 관리자 토큰만 받는다. 원도 플레이어도 만들지 않으므로 랭킹·접속 인원·점수에 영향이 없다. */
+    private void spectate(WebSocketSession session, String token, String countryCode) {
+        Optional<Long> uid = jwt.verify(token).filter(guard::accepts).map(JwtService.Verified::userId).filter(guard::isAdmin);
+        if (uid.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("AUTH_FAILED")); return; }
+        rooms.submitWork(() -> {
+            try {
+                com.trendist.country.entity.Country country = countries.requireOpen(countryCode);
+                Room room = rooms.room(country.getId());
+                WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
+                room.submit(r -> {
+                    if (!session.isOpen()) return;
+                    Room.Member sp = r.addSpectator(safe);
+                    if (sp == null) { close(session, CloseStatus.POLICY_VIOLATION.withReason("SPECTATORS_FULL")); return; }
+                    session.getAttributes().put(ATTR_ROOM, r);
+                    session.getAttributes().put(ATTR_SPECTATOR, sp);
+                    rooms.sendText(sp, Map.of("type", "spectating", "country", country.getCode(), "spectators", r.spectatorCount()));
+                    rooms.sendText(sp, rooms.tuningMessage(r.tuning()));
+                });
+            } catch (RuntimeException e) {
+                log.warn("ws spectate failed", e);
+                close(session, CloseStatus.SERVER_ERROR);
+            }
+        });
     }
 
     private void authenticate(WebSocketSession session, String token) {
@@ -208,7 +250,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
         Room.Member m = (Room.Member) session.getAttributes().get(ATTR_MEMBER);
+        Room.Member sp = (Room.Member) session.getAttributes().get(ATTR_SPECTATOR);
         if (room != null && m != null) room.submit(r -> r.leave(m));
+        if (room != null && sp != null) room.submit(r -> r.removeSpectator(sp));
     }
 
     private static double clamp(double v) { return Double.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0; }
