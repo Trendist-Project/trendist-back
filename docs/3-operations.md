@@ -52,7 +52,7 @@
 | | 픽셀 그림 변경 간격(`art_change_minutes`, 분) | 10 |
 | AI 한 줄 설명 | 자동 생성 켜기(`ai_comment_enabled`) / 한 요청에 묶는 키워드 수(`ai_comment_batch_size`) / 하루 요청 수(`ai_comment_daily_max`) / 구글 검색 확인 사용(`ai_comment_grounding`, 무료 등급에서는 막힘) | 1 / 10개 / 400번 / 0 |
 | 순위 칭호 | 순위 칭호(RANK)를 주는 최소 접속 인원(`rank_title_min_players`) | 11명 |
-| 대시 | 속도 배수(`dash_speed_multiplier`, 평소 최대 속도의 몇 배, 1~5) / 유지 시간(`dash_seconds`) / 쿨타임(`dash_cooldown_seconds`, 쓴 때부터, 대시 시간 포함) | 1.5배 / 3초 / 30초 |
+| 대시 | 속도 배수(`dash_speed_multiplier`, 평소 최대 속도의 몇 배, 1~5) / 유지 시간(`dash_seconds`) / 쿨타임(`dash_cooldown_seconds`, 쓴 때부터, 대시 시간 포함) | 2배 / 3초 / 30초 |
 | 연속 빼앗기 | 불꽃이 붙는 연속 수(`combo_flame_at`) / 봇을 이긴 것도 셀지(`combo_bot_counts`, 1이면 셈) / 불꽃에게 키워드를 모두 잃었을 때 떨어지는 ! 구슬 비율(`combo_wipe_orb_percent`, 잃은 🔥활성 키워드 개수 대비 %, 올림, 0이면 안 떨어짐) | 5 / 1 / 50% |
 | | 플레이어당 최대 프로필 수 / 테두리 두께 범위 | 10 / 1~8단계(한 단계 = 반지름의 3%) |
 | | 바닥과의 최소 명도 대비, 이미지 검열 기준값 | 도입 시 정함 |

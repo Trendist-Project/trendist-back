@@ -89,7 +89,7 @@ public class Room {
      * 움직이려는 중(방향 입력이나 이동 목표가 있을 때)에만 쓸 수 있다.
      */
     public record DashTuning(double multiplier, double seconds, double cooldownSeconds) {
-        public static final DashTuning DEFAULT = new DashTuning(1.5, 3, 30);
+        public static final DashTuning DEFAULT = new DashTuning(2, 3, 30);
     }
 
     /** 이모트(4.26): 원 위에 잠깐 뜨는 이모지. 코드만 주고받는다 */
