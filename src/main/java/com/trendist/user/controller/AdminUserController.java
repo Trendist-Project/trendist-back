@@ -18,8 +18,9 @@ public class AdminUserController {
     @GetMapping
     public AdminUserDtos.Page search(@RequestParam(defaultValue = "KR") String country, @RequestParam(required = false) String q,
                                      @RequestParam(defaultValue = "all") String filter, @RequestParam(defaultValue = "seen") String sort,
+                                     @RequestParam(defaultValue = "desc") String dir,
                                      @RequestParam(defaultValue = "0") int page) {
-        return service.search(country, q, filter, sort, page);
+        return service.search(country, q, filter, sort, dir, page);
     }
 
     @GetMapping("/{userId}")

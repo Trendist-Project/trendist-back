@@ -395,12 +395,15 @@ class ApiFlowTest {
         String t = player("제재대상");
         long pid = playerIdOf(t);
         long uid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.userId"));
-        var page = adminUsers.search("KR", "제재대상", "all", "seen", 0);
+        var page = adminUsers.search("KR", "제재대상", "all", "seen", "desc", 0);
         assertThat(page.items()).extracting(com.trendist.user.dto.AdminUserDtos.Row::playerId).contains(pid);
         level(t, 12); // players.level_id → levels(12레벨)
-        var byLevel = adminUsers.search("KR", null, "all", "level", 0).items();
+        var byLevel = adminUsers.search("KR", null, "all", "level", "desc", 0).items();
         assertThat(byLevel.getFirst().level()).isGreaterThanOrEqualTo(12);
         assertThat(byLevel).extracting(com.trendist.user.dto.AdminUserDtos.Row::level).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+        // 오름차순도 된다: 같은 목록이 반대로 정렬된다
+        var byLevelAsc = adminUsers.search("KR", null, "all", "level", "asc", 0).items();
+        assertThat(byLevelAsc).extracting(com.trendist.user.dto.AdminUserDtos.Row::level).isSortedAccordingTo(java.util.Comparator.naturalOrder());
         long kw = plusKeyword(t, "제재시험키워드");
         var d = adminUsers.sanction(uid, new com.trendist.user.dto.AdminUserDtos.SanctionRequest("COMMENT", 1, "욕설"));
         assertThat(d.user().commentBannedUntil()).isNotNull();

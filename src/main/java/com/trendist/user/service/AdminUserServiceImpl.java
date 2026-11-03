@@ -70,19 +70,22 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public AdminUserDtos.Page search(String countryCode, String q, String filter, String sort, int page) {
+    public AdminUserDtos.Page search(String countryCode, String q, String filter, String sort, String dir, int page) {
         Country c = countries.requireOpen(countryCode);
         String f = filter == null || !FILTERS.contains(filter) ? "all" : filter;
         String text = q == null || q.isBlank() ? null : q.trim();
         long qid = -1;
         if (text != null) { try { qid = Long.parseLong(text); } catch (NumberFormatException ignored) { /* 닉네임 검색 */ } }
         Set<Long> online = onlineIds(c.getId());
+        // 내림차순(desc)이 기본이고 오름차순(asc)도 고를 수 있다. 같은 값이면 번호 순서도 같은 방향
+        boolean asc = "asc".equalsIgnoreCase(dir);
+        java.util.function.Function<String, Sort.Order> by = p -> asc ? Sort.Order.asc(p) : Sort.Order.desc(p);
         Sort s = switch (sort == null ? "" : sort) {
-            case "created" -> Sort.by(Sort.Order.desc("createdAt"));
-            case "score" -> Sort.by(Sort.Order.desc("currentScore"));
-            case "level" -> Sort.by(Sort.Order.desc("level.level"), Sort.Order.desc("exp"));
-            case "plus" -> Sort.by(Sort.Order.desc("totalPlusCount"));
-            default -> Sort.by(Sort.Order.desc("lastSeenAt").nullsLast(), Sort.Order.desc("id"));
+            case "created" -> Sort.by(by.apply("createdAt"));
+            case "score" -> Sort.by(by.apply("currentScore"), by.apply("id"));
+            case "level" -> Sort.by(by.apply("level.level"), by.apply("exp"), by.apply("id"));
+            case "plus" -> Sort.by(by.apply("totalPlusCount"), by.apply("id"));
+            default -> Sort.by(by.apply("lastSeenAt").nullsLast(), by.apply("id")); // 접속 기록이 없는 사람은 어느 방향이든 맨 뒤
         };
         var result = players.searchForAdmin(c.getId(), text == null ? null : "%" + text.toLowerCase(Locale.ROOT) + "%", qid, f,
                 Instant.now(clock), online.isEmpty() ? List.of(-1L) : online, PageRequest.of(Math.max(0, page), PAGE_SIZE, s));
