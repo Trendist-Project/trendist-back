@@ -120,6 +120,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 double dx = clamp(node.path("dx").asDouble(0)), dy = clamp(node.path("dy").asDouble(0));
                 room.submit(r -> r.setInput(member, dx, dy, receivedNanos));
             }
+            case "dash" -> room.submit(r -> r.dash(member)); // 대시(4.27). 쿨타임·움직이는 중인지는 방이 본다
             case "move" -> {
                 double x = node.path("x").asDouble(0), y = node.path("y").asDouble(0);
                 if (Double.isFinite(x) && Double.isFinite(y)) room.submit(r -> r.setTarget(member, x, y, receivedNanos));

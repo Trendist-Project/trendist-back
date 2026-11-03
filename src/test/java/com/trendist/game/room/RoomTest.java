@@ -240,6 +240,47 @@ class RoomTest {
     }
 
     @Test
+    void dashSpeedsUpForSetTimeThenCoolsDown() {
+        // 4.27: 움직이는 중에 쓰면 3초 동안 최대 속도 1.5배, 쓴 때부터 30초가 지나야 다시 쓴다. 가만히 있으면 쓸 수 없고 쿨타임도 쓰지 않는다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 0; a.y = 0;
+        r.dash(a);
+        assertThat(out.texts).noneMatch(m -> "dash".equals(m.get("type"))); // 정지 상태
+        r.setInput(a, 1, 0);
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(a.vx).isGreaterThan(230).isLessThan(250); // 평소 240
+        r.dash(a);
+        assertThat(out.texts).anyMatch(m -> "dash".equals(m.get("type")) && m.get("ms").equals(3000L) && m.get("cooldownMs").equals(30000L) && m.get("mult").equals(1.5));
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(a.vx).isGreaterThan(350).isLessThan(370); // 240 × 1.5
+        int dashes = (int) out.texts.stream().filter(m -> "dash".equals(m.get("type"))).count();
+        r.dash(a); // 쿨타임 중
+        assertThat(out.texts.stream().filter(m -> "dash".equals(m.get("type"))).count()).isEqualTo(dashes);
+        for (int i = 0; i < 20 * 3; i++) r.tick();
+        assertThat(a.vx).isGreaterThan(230).isLessThan(250); // 3초가 지나 원래 속도
+        for (int i = 0; i < 20 * 30; i++) r.tick();
+        r.dash(a); // 30초가 지났다
+        assertThat(out.texts.stream().filter(m -> "dash".equals(m.get("type"))).count()).isEqualTo(dashes + 1);
+    }
+
+    @Test
+    void dashMultiplierComesFromTuning() {
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setDashTuning(new Room.DashTuning(2.0, 1, 5));
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 0; a.y = 0;
+        r.setInput(a, 0, 1);
+        r.dash(a);
+        for (int i = 0; i < 15; i++) r.tick();
+        assertThat(a.vy).isGreaterThan(470).isLessThan(490); // 240 × 2
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(a.vy).isLessThan(250); // 1초가 지나 원래 속도
+    }
+
+    @Test
     void minimapSendsTop20ByRadiusEverySecond() {
         Out out = new Out();
         Room r = new Room(1, T, out);

@@ -54,6 +54,9 @@ public final class SettingKeys {
     public static final String SAFE_ZONE_SECONDS = "safe_zone_seconds";
     public static final String CUSTOMIZE_UNLOCK_LEVEL = "customize_unlock_level";
     public static final String ART_CHANGE_MINUTES = "art_change_minutes";
+    public static final String DASH_SPEED_MULTIPLIER = "dash_speed_multiplier";
+    public static final String DASH_SECONDS = "dash_seconds";
+    public static final String DASH_COOLDOWN_SECONDS = "dash_cooldown_seconds";
     public static final String COMBO_FLAME_AT = "combo_flame_at";
     public static final String COMBO_WIPE_ORB_PERCENT = "combo_wipe_orb_percent";
     public static final String AI_COMMENT_ENABLED = "ai_comment_enabled";
@@ -118,6 +121,9 @@ public final class SettingKeys {
             new Def(AI_COMMENT_BATCH_SIZE, "10", 1, 30, "AI 한 줄 설명을 한 번의 요청에 몇 개씩 묶어 보낼지(1분마다 한 번 요청). 많을수록 요청 수·토큰·시간이 줄지만 한 번 실패하면 같이 실패한다"),
             new Def(AI_COMMENT_DAILY_MAX, "400", 1, 5000, "AI 한 줄 설명 자동 요청의 하루 최대 횟수(요청 한 번에 여러 키워드를 묶음). 무료 한도 일일 요청 수보다 낮게. 관리자가 직접 누르는 재요청은 세지만 막지 않는다"),
             new Def(AI_COMMENT_GROUNDING, "0", 0, 1, "AI 한 줄 설명에 구글 검색 확인(그라운딩)을 쓸지(1이면 사용). 무료 등급은 검색 한도가 없어 429로 막히므로 결제를 연결한 뒤에 켠다. 끄면 최신 이슈는 모른다고 답할 수 있다"),
+            new Def(DASH_SPEED_MULTIPLIER, "1.5", 1, 5, "대시 속도: 대시 중 최대 속도가 평소의 몇 배인지(1이면 대시가 효과 없음). 서버와 클라이언트 예측이 같은 값을 쓴다"),
+            new Def(DASH_SECONDS, "3", 0.5, 30, "대시가 유지되는 시간(초)"),
+            new Def(DASH_COOLDOWN_SECONDS, "30", 1, 600, "대시를 쓴 때부터 다시 쓸 수 있을 때까지의 시간(초, 대시 시간 포함)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(COMBO_WIPE_ORB_PERCENT, "50", 0, 100, "불꽃인 사람에게 부딪혀 키워드를 모두 잃었을 때, 잃은 🔥활성 키워드 개수의 몇 %(올림)만큼 ! 구슬이 그 자리에 떨어지는지(0이면 안 떨어짐). ! 구슬은 먹으면 항상 키워드를 얻는다"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),

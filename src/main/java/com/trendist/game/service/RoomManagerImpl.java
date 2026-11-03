@@ -50,8 +50,10 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.Tuning t = tuning();
                 Room.ZoneTuning z = zoneTuning();
                 Room.ComboTuning c = comboTuning();
+                Room.DashTuning dash = dashTuning();
                 rooms.values().forEach(r -> {
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
+                    if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);
                     r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
                     if (!t.equals(r.tuning())) { r.setTuning(t); r.submit(rr -> broadcastTuning(rr)); }
                     if (!z.equals(r.zoneTuning())) r.setZoneTuning(z);
@@ -81,6 +83,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             Room r = new Room(id, tuning(), this);
             r.setZoneTuning(zoneTuning());
             r.setComboTuning(comboTuning());
+            r.setDashTuning(dashTuning());
             r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
             try { roomStates.area(id).ifPresent(r::restoreArea); } catch (RuntimeException e) { log.warn("room area restore failed", e); } // 서버를 다시 켠 뒤 저장해 둔 활동 영역에서 시작한다
             r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
@@ -121,6 +124,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.BOT_STEP_MIN),
                 settings.getDouble(SettingKeys.BOT_STEP_MAX),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP));
+    }
+
+    /** 대시 설정(4.27). */
+    private Room.DashTuning dashTuning() {
+        return new Room.DashTuning(settings.getDouble(SettingKeys.DASH_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.DASH_SECONDS),
+                settings.getDouble(SettingKeys.DASH_COOLDOWN_SECONDS));
     }
 
     /** 연속 빼앗기 콤보 설정(4.25). */

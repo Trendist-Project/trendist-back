@@ -84,6 +84,14 @@ public class Room {
         public static final ComboTuning DEFAULT = new ComboTuning(5, true, 50);
     }
 
+    /**
+     * 대시(4.27): 쓰면 seconds초 동안 최대 속도가 multiplier배가 되고, 쓴 때부터 cooldownSeconds초가 지나야 다시 쓴다(대시 시간 포함).
+     * 움직이려는 중(방향 입력이나 이동 목표가 있을 때)에만 쓸 수 있다.
+     */
+    public record DashTuning(double multiplier, double seconds, double cooldownSeconds) {
+        public static final DashTuning DEFAULT = new DashTuning(1.5, 3, 30);
+    }
+
     /** 이모트(4.26): 원 위에 잠깐 뜨는 이모지. 코드만 주고받는다 */
     public static final List<String> EMOTES = List.of("wave", "laugh", "cool", "cry", "angry", "thumbs", "heart", "fire");
 
@@ -98,6 +106,8 @@ public class Room {
         public Skin skin = Skin.DEFAULT;
         /** 연속 빼앗기 콤보(4.25) */
         public int combo;
+        /** 대시(4.27): 대시가 끝나는 시각과 다시 쓸 수 있는 시각(방 시계 초) */
+        public double dashUntil, dashReadyAt;
         /** 이동 효과 코드(4.23). null이면 없음. 그림은 클라이언트가 그린다 */
         public String trail;
         public int level;
@@ -160,6 +170,7 @@ public class Room {
     private double nextOrbAt;
     private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
     private volatile ComboTuning comboTuning = ComboTuning.DEFAULT;
+    private volatile DashTuning dashTuning = DashTuning.DEFAULT;
     /**
      * 지금의 활동 영역 한 변(0이면 아직 정하지 않음). 목표(접속 인원에 따른 값)보다 클 때는 areaShrinkSpeed(px/s)로만 줄어들어서
      * 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀려나지 않는다. 목표가 더 크면 바로 커진다. 틱 스레드에서만 바꾼다.
@@ -215,6 +226,8 @@ public class Room {
     public void setTuning(Tuning t) { this.tuning = t; }
     public void setZoneTuning(ZoneTuning z) { this.zoneTuning = z; }
     public void setComboTuning(ComboTuning c) { this.comboTuning = c; }
+    public void setDashTuning(DashTuning d) { this.dashTuning = d; }
+    public DashTuning dashTuning() { return dashTuning; }
     public void setAreaShrinkSpeed(double pxPerSecond) { this.areaShrinkSpeed = Math.max(0, pxPerSecond); }
     /** 서버를 다시 켠 뒤 저장해 둔 활동 영역에서 시작한다(틱을 시작하기 전에 부른다). 기준 맵 범위로 맞춘다. */
     public void restoreArea(double area) {
@@ -561,7 +574,7 @@ public class Room {
      */
     private void advance(Member m, double h, Tuning tu) {
         if (h <= 0) return;
-        double speed = tu.maxSpeed(); // 크기와 관계없이 모두 같다
+        double speed = tu.maxSpeed() * (clockSeconds < m.dashUntil ? dashTuning.multiplier() : 1); // 크기와 관계없이 모두 같다. 대시 중이면 배수
         double wantX = 0, wantY = 0;
         if (m.dirX != 0 || m.dirY != 0) {
             wantX = m.dirX * speed; wantY = m.dirY * speed;
@@ -883,6 +896,21 @@ public class Room {
                 }
             }
         }
+    }
+
+    /**
+     * 대시(4.27): 쿨타임이 지났고 움직이려는 중이면 시작한다. 시작하면 본인에게만 {dash: 지속 ms, 쿨타임 ms, 배수}를 알려
+     * 클라이언트 예측이 같은 속도로 가게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
+     */
+    public void dash(Member m) {
+        if (m.bot || members.get(m.entityNo) != m) return;
+        DashTuning d = dashTuning;
+        if (clockSeconds < m.dashReadyAt) return;
+        boolean moving = m.dirX != 0 || m.dirY != 0 || m.targetX != null;
+        if (!moving || d.seconds() <= 0 || d.multiplier() <= 1) return;
+        m.dashUntil = clockSeconds + d.seconds();
+        m.dashReadyAt = clockSeconds + Math.max(d.seconds(), d.cooldownSeconds());
+        outbox.sendText(m, Map.of("type", "dash", "ms", Math.round(d.seconds() * 1000), "cooldownMs", Math.round(Math.max(d.seconds(), d.cooldownSeconds()) * 1000), "mult", d.multiplier()));
     }
 
     /** 콤보 불꽃이 붙은 사람인지(봇은 불꽃이 없다, 4.25) */
