@@ -56,6 +56,7 @@ public interface KeywordService {
      * 관리자 키워드 목록(13.6). state: 활성/비활성/금지(이름, 비우면 전체), source: data_sources.name, q: 검색어,
      * sort: trendValue / holderCount / totalPlusCount / searchCount / createdAt / activatedAt / externalUntil, dir: asc·desc.
      */
+    /** state·source는 쉼표로 여러 개(예: "활성,금지"), 비우면 전체 */
     AdminKeywordPage adminSearch(String countryCode, String state, String source, String q, String sort, String dir, int page, int size);
 
     /** 관리자 금지·해제(13.1). 금지하면 트렌드 값이 0이 되어 보유자 점수에서 바로 빠지고, 해제하면 💤비활성이다. */

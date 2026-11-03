@@ -35,27 +35,30 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query(value = """
             select k from Keyword k join fetch k.keywordState join fetch k.dataSource
             where k.country.id = :countryId
-              and (:stateId is null or k.keywordState.id = :stateId)
-              and (:sourceId is null or k.dataSource.id = :sourceId)
+              and (:anyState = true or k.keywordState.id in :stateIds)
+              and (:anySource = true or k.dataSource.id in :sourceIds)
               and (:q is null or k.normalized like :q)""",
             countQuery = """
             select count(k) from Keyword k
             where k.country.id = :countryId
-              and (:stateId is null or k.keywordState.id = :stateId)
-              and (:sourceId is null or k.dataSource.id = :sourceId)
+              and (:anyState = true or k.keywordState.id in :stateIds)
+              and (:anySource = true or k.dataSource.id in :sourceIds)
               and (:q is null or k.normalized like :q)""")
-    org.springframework.data.domain.Page<Keyword> searchForAdmin(@Param("countryId") Long countryId, @Param("stateId") Long stateId,
-                                                                  @Param("sourceId") Long sourceId, @Param("q") String q,
+    org.springframework.data.domain.Page<Keyword> searchForAdmin(@Param("countryId") Long countryId,
+                                                                  @Param("anyState") boolean anyState, @Param("stateIds") List<Long> stateIds,
+                                                                  @Param("anySource") boolean anySource, @Param("sourceIds") List<Long> sourceIds,
+                                                                  @Param("q") String q,
                                                                   org.springframework.data.domain.Pageable pageable);
 
     /** 관리자 키워드 목록의 상태별 개수(상태 필터 없이, 소스·검색어만 적용). [상태 이름, 개수] */
     @Query("""
             select k.keywordState.name, count(k) from Keyword k
             where k.country.id = :countryId
-              and (:sourceId is null or k.dataSource.id = :sourceId)
+              and (:anySource = true or k.dataSource.id in :sourceIds)
               and (:q is null or k.normalized like :q)
             group by k.keywordState.name""")
-    List<Object[]> countByStateForAdmin(@Param("countryId") Long countryId, @Param("sourceId") Long sourceId, @Param("q") String q);
+    List<Object[]> countByStateForAdmin(@Param("countryId") Long countryId, @Param("anySource") boolean anySource,
+                                        @Param("sourceIds") List<Long> sourceIds, @Param("q") String q);
 
     /** 그 나라의 한 상태 키워드 번호(구슬 보상 추첨). */
     @Query("select k.id from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId")

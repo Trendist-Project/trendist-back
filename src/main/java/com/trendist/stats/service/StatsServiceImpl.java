@@ -119,7 +119,7 @@ public class StatsServiceImpl implements StatsService {
                 players.countByCountryIdAndLastSeenAtGreaterThanEqual(c.getId(), now.minus(Duration.ofDays(30))));
 
         Map<String, Long> states = new LinkedHashMap<>();
-        for (Object[] r : keywords.countByStateForAdmin(c.getId(), null, null)) states.put((String) r[0], n(r[1]));
+        for (Object[] r : keywords.countByStateForAdmin(c.getId(), true, java.util.List.of(-1L), null)) states.put((String) r[0], n(r[1]));
 
         return new StatsDtos.Summary(rooms.livePlayers(c.getId()).size(), period(t), period(y), totals, states,
                 reports.countByStatus(Report.RECEIVED), levelBuckets(c.getId()));

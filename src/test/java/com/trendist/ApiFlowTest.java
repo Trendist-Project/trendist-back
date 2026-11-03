@@ -318,6 +318,14 @@ class ApiFlowTest {
         assertThat(all.stateCounts().get(CodeTables.KW_BANNED)).isGreaterThanOrEqualTo(1L);
         assertThat(keywordService.adminSearch("KR", "", "", "", "trendValue", "desc", 0, 100).items())
                 .anyMatch(k -> k.id() == added.id());
+        // 상태·소스를 여러 개 고를 수 있다(쉼표로 이음)
+        var multi = keywordService.adminSearch("KR", CodeTables.KW_BANNED + "," + CodeTables.KW_ACTIVE, null, null, "trendValue", "desc", 0, 100);
+        assertThat(multi.items()).isNotEmpty().allMatch(k -> k.state().equals(CodeTables.KW_BANNED) || k.state().equals(CodeTables.KW_ACTIVE));
+        assertThat(multi.items()).anyMatch(k -> k.id() == added.id());
+        var onlyOne = keywordService.adminSearch("KR", CodeTables.KW_BANNED, null, null, "trendValue", "desc", 0, 100);
+        assertThat(onlyOne.items()).isNotEmpty().allMatch(k -> k.state().equals(CodeTables.KW_BANNED));
+        var twoSources = keywordService.adminSearch("KR", null, DataSource.ADMIN + "," + DataSource.GOOGLE, null, "trendValue", "desc", 0, 100);
+        assertThat(twoSources.items()).allMatch(k -> k.source().equals(DataSource.ADMIN) || k.source().equals(DataSource.GOOGLE));
     }
 
     @Test
