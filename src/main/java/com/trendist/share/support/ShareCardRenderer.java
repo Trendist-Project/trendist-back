@@ -205,7 +205,7 @@ public class ShareCardRenderer {
 
         // 바닥: 한 줄 홍보 + 주소
         g.setColor(ACCENT); g.setFont(f(800, 34));
-        text(g, "유행을 아는 자, 커진다.", W / 2.0, H - 96, Align.CENTER);
+        text(g, "트랜드를 아는 자, 커진다.", W / 2.0, H - 96, Align.CENTER);
         g.setColor(MUTED); g.setFont(f(500, 26));
         text(g, site + " 에서 나랑 겨뤄 봐!", W / 2.0, H - 50, Align.CENTER);
     }

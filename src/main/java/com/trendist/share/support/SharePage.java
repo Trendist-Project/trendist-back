@@ -28,7 +28,7 @@ public final class SharePage {
     public static String title(ShareDtos.CardData d) { return d.nickname() + "의 트렌드 성적표"; }
 
     public static String description(ShareDtos.CardData d) {
-        return String.format("유행도 %,d · %d레벨%s. 유행을 아는 자, 커진다!", d.score(), d.level(),
+        return String.format("유행도 %,d · %d레벨%s. 트랜드를 아는 자, 커진다!", d.score(), d.level(),
                 d.rank() != null ? " · 지금 " + d.rank() + "위" : "");
     }
 
@@ -71,7 +71,7 @@ public final class SharePage {
                 <body>
                 <img src="%4$s" width="1080" height="1350" alt="%1$s">
                 <a class="play" href="%5$s">플레이 하러 가기</a>
-                <p>유행을 아는 자, 커진다. Trendist</p>
+                <p>트랜드를 아는 자, 커진다. Trendist</p>
                 </body>
                 </html>
                 """.formatted(t, desc, escape(url), escape(image), escape(play));
