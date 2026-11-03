@@ -31,11 +31,11 @@ class RoomTest {
     }
 
     @Test
-    void comboGrowsOrbitsAndBreaksOnLoss() {
-        // 4.25: 5번 연속 이기면 위성이 생기기 시작해 간격마다 늘고, 한 번이라도 잃으면 콤보와 위성이 모두 사라진다
+    void comboLightsFlameAndBreaksOnLoss() {
+        // 4.25: 5번 연속 이기면 불꽃이 붙고(start), 한 번이라도 잃으면 콤보와 불꽃이 모두 사라진다(broken)
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, 1, 3, false));
+        r.setComboTuning(new Room.ComboTuning(5, false));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 4; i++) r.fightResult(1L, 2L, false);
@@ -44,13 +44,8 @@ class RoomTest {
         r.fightResult(1L, 2L, false);
         assertThat(a.combo).isEqualTo(5);
         assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "start".equals(m.get("event")));
-        r.tick();
-        assertThat(a.orbits).isEqualTo(1); // 바로 첫 위성
-        for (int i = 0; i < 200; i++) r.tick(); // 10초: 1초 간격, 최대 3개
-        assertThat(a.orbits).isEqualTo(3);
         r.fightResult(2L, 1L, false);
         assertThat(a.combo).isZero();
-        assertThat(a.orbits).isZero();
         assertThat(b.combo).isEqualTo(1);
         assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "broken".equals(m.get("event")) && "b".equals(m.get("by")));
     }

@@ -52,9 +52,7 @@ public final class SettingKeys {
     public static final String SAFE_ZONE_SECONDS = "safe_zone_seconds";
     public static final String CUSTOMIZE_UNLOCK_LEVEL = "customize_unlock_level";
     public static final String ART_CHANGE_MINUTES = "art_change_minutes";
-    public static final String COMBO_ORBIT_AT = "combo_orbit_at";
-    public static final String ORBIT_INTERVAL_SECONDS = "orbit_interval_seconds";
-    public static final String ORBIT_MAX = "orbit_max";
+    public static final String COMBO_FLAME_AT = "combo_flame_at";
     public static final String COMBO_BOT_COUNTS = "combo_bot_counts";
 
     public static final List<Def> DEFAULTS = List.of(
@@ -107,9 +105,7 @@ public final class SettingKeys {
             new Def(SAFE_ZONE_SECONDS, "300", 10, 3600, "무작위 세이프존 유지 시간(초)"),
             new Def(CUSTOMIZE_UNLOCK_LEVEL, "11", 1, 100, "꾸미기 해금 레벨: 이 레벨부터 원의 바탕색·테두리를 바꾸고 픽셀 그림을 그릴 수 있다"),
             new Def(ART_CHANGE_MINUTES, "10", 0, 1440, "픽셀 그림 변경 간격(분): 그림을 저장한 뒤 이만큼 지나야 다시 바꿀 수 있다"),
-            new Def(COMBO_ORBIT_AT, "5", 1, 50, "궤도 위성: 키워드를 이만큼 연속으로 빼앗으면 위성이 생기기 시작한다(한 번이라도 잃으면 사라짐)"),
-            new Def(ORBIT_INTERVAL_SECONDS, "6", 1, 300, "궤도 위성이 하나씩 늘어나는 간격(초)"),
-            new Def(ORBIT_MAX, "8", 1, 20, "궤도 위성 최대 개수"),
+            new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

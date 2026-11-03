@@ -103,10 +103,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP));
     }
 
-    /** 연속 빼앗기 콤보와 궤도 위성 설정(4.25). */
+    /** 연속 빼앗기 콤보 설정(4.25). */
     private Room.ComboTuning comboTuning() {
-        return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_ORBIT_AT), settings.getDouble(SettingKeys.ORBIT_INTERVAL_SECONDS),
-                settings.getInt(SettingKeys.ORBIT_MAX), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0);
+        return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_FLAME_AT), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0);
     }
 
     /** 세이프존 설정(4.22). */
@@ -226,7 +225,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 if (winnerId == null) {
                     // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
-                        r.fightResult(null, loserId, true); // 잃으면 콤보·위성이 사라진다(4.25)
+                        r.fightResult(null, loserId, true); // 잃으면 콤보와 불꽃이 사라진다(4.25)
                         Room.Member m = r.byPlayer(loserId);
                         if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
                     }));
