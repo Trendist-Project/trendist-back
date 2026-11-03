@@ -171,19 +171,35 @@ public class KeywordServiceImpl implements KeywordService {
     @Override
     @Transactional
     public KeywordDtos.OrbResult openOrb(long playerId) {
+        return openOrb(playerId, false);
+    }
+
+    @Override
+    @Transactional
+    public KeywordDtos.OrbResult openPrizeOrb(long playerId) {
+        return openOrb(playerId, true);
+    }
+
+    private KeywordDtos.OrbResult openOrb(long playerId, boolean prize) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.ORB); // 사이트 통계(13.9)
         p.incOrb(); // 꽝이어도 먹은 횟수는 센다(칭호, 4.10)
         events.publishEvent(new GameEvents.TitleCheck(p.getId()));
-        // 설정 확률(기본 50%)로 🔥활성 키워드를 얻고, 나머지는 내 키워드 하나를 잃는다(없으면 꽝)
-        if (ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
+        // ? 구슬: 설정 확률(기본 50%)로 🔥활성 키워드를 얻고, 나머지는 내 키워드 하나를 잃는다(없으면 꽝). ! 구슬(prize)은 항상 얻는다
+        if (!prize && ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
             return loseFromOrb(p);
         }
+        Instant now = Instant.now(clock);
         List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
+        if (prize && ids.size() > 1) {
+            // 꽝 없이 "얻는" 구슬이므로, 가능하면 내 보관함에 없는 키워드에서 고른다(이미 가진 키워드면 시간만 갱신돼 얻은 느낌이 없다)
+            Set<Long> held = new HashSet<>(activeKeywordIds(p.getId()));
+            List<Long> fresh = ids.stream().filter(id -> !held.contains(id)).toList();
+            if (!fresh.isEmpty()) ids = fresh;
+        }
         if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
         Keyword k = keywords.findByIdForUpdate(ids.get(ThreadLocalRandom.current().nextInt(ids.size()))).orElseThrow();
-        Instant now = Instant.now(clock);
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId());
         if (existing.isPresent() && !existing.get().isExpired(now)) {
             // 이미 보관함에 있는 키워드가 나오면 남은 시간만 지금부터 다시 24시간(사람에게서 빼앗을 때(4.3)와 같게). 점수·EXP는 그대로
@@ -465,6 +481,28 @@ public class KeywordServiceImpl implements KeywordService {
         p.incLose(); // 칭호(4.10). removeHolding이 재합산하며 칭호를 검사한다
         removeHolding(p, keywordId, now);
         return Optional.of(new LostKeyword(text, score));
+    }
+
+    @Override
+    @Transactional
+    public Optional<LostAll> loseAll(long playerId) {
+        Player p = players.findByIdForUpdate(playerId).orElse(null);
+        if (p == null || p.getHoldCount() == 0) return Optional.empty();
+        Instant now = Instant.now(clock);
+        List<PlayerKeyword> candidates = playerKeywords.findLosableByPlayer(playerId, now, codes.keywordStateId(CodeTables.KW_BANNED));
+        if (candidates.isEmpty()) return Optional.empty();
+        long score = 0;
+        List<Long> keywordIds = new ArrayList<>();
+        for (PlayerKeyword pk : candidates) {
+            if (isState(pk.getKeyword(), CodeTables.KW_ACTIVE)) score += pk.getKeyword().getTrendValue(); // 💤는 점수에 더해 주지 않았다
+            keywordIds.add(pk.getKeyword().getId());
+        }
+        playerKeywords.deleteAll(candidates);
+        playerKeywords.flush();
+        p.incLose(); // 칭호(4.10): 한 번 부딪혀 잃은 것이므로 한 번으로 센다
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
+        for (Long keywordId : keywordIds) removeHolding(p, keywordId, now); // 인원·트렌드 값·점수를 키워드마다 고친다
+        return Optional.of(new LostAll(keywordIds.size(), score));
     }
 
     @Override

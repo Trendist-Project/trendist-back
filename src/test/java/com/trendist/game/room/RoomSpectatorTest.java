@@ -17,7 +17,8 @@ class RoomSpectatorTest {
         final Map<Integer, List<Map<String, Object>>> texts = new HashMap<>();
         final List<Integer> closed = new ArrayList<>();
         public void requestLose(Room room, Room.Member loser, Room.Member winner) { }
-        public void requestOrb(Room room, Room.Member eater) { }
+        public void requestOrb(Room room, Room.Member eater, boolean prize) { }
+        public void requestWipe(Room room, Room.Member loser, Room.Member winner) { }
         public void requestBotWin(Room room, Room.Member winner, Room.Member bot) { }
         public void send(Room.Member m, ByteBuffer b) { binaries.computeIfAbsent(m.entityNo, k -> new ArrayList<>()).add(b); }
         public void sendText(Room.Member m, Map<String, Object> msg) { texts.computeIfAbsent(m.entityNo, k -> new ArrayList<>()).add(msg); }

@@ -125,7 +125,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     /** 연속 빼앗기 콤보 설정(4.25). */
     private Room.ComboTuning comboTuning() {
-        return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_FLAME_AT), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0);
+        return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_FLAME_AT), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0,
+                settings.getInt(SettingKeys.COMBO_WIPE_ORB_PERCENT));
     }
 
     /** 세이프존 설정(4.22). */
@@ -269,6 +270,26 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
+    public void requestWipe(Room room, Room.Member loser, Room.Member winner) {
+        long loserId = loser.playerId, winnerId = winner.playerId;
+        String winnerName = winner.nickname;
+        workers.submit(() -> {
+            try {
+                keywordService.loseAll(loserId).ifPresent(lost -> room.submit(r -> {
+                    r.fightResult(winnerId, loserId, false); // 이긴 쪽 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
+                    r.dropPrizeOrbs(loserId, lost.count()); // 잃은 수만큼 ! 구슬(4.20)
+                    Room.Member m = r.byPlayer(loserId);
+                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "wiped", lost.count(), "score", lost.score()));
+                    Room.Member w = r.byPlayer(winnerId);
+                    if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score()));
+                }));
+            } catch (RuntimeException e) {
+                log.warn("wipe keywords failed for player {}", loserId, e);
+            }
+        });
+    }
+
+    @Override
     public void requestBotWin(Room room, Room.Member winner, Room.Member bot) {
         long playerId = winner.playerId;
         String botName = bot.nickname;
@@ -298,11 +319,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
-    public void requestOrb(Room room, Room.Member eater) {
+    public void requestOrb(Room room, Room.Member eater, boolean prize) {
         long playerId = eater.playerId;
         workers.submit(() -> {
             try {
-                KeywordDtos.OrbResult r = keywordService.openOrb(playerId);
+                KeywordDtos.OrbResult r = prize ? keywordService.openPrizeOrb(playerId) : keywordService.openOrb(playerId);
                 Map<String, Object> msg = new HashMap<>();
                 msg.put("type", "orbResult");
                 msg.put("status", r.status());

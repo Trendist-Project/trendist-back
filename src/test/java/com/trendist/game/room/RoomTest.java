@@ -20,7 +20,10 @@ class RoomTest {
         int snapshots;
         public void requestLose(Room room, Room.Member loser, Room.Member winner) { loses.add(new long[]{loser.playerId, winner.playerId}); }
         final List<Long> orbEaters = new ArrayList<>();
-        public void requestOrb(Room room, Room.Member eater) { orbEaters.add(eater.playerId); }
+        public void requestOrb(Room room, Room.Member eater, boolean prize) { (prize ? prizeEaters : orbEaters).add(eater.playerId); }
+        final List<Long> prizeEaters = new ArrayList<>();
+        final List<long[]> wipes = new ArrayList<>();
+        public void requestWipe(Room room, Room.Member loser, Room.Member winner) { wipes.add(new long[]{loser.playerId, winner.playerId}); }
         final List<Long> botWinners = new ArrayList<>();
         public void requestBotWin(Room room, Room.Member winner, Room.Member bot) { botWinners.add(winner.playerId); }
         public void send(Room.Member m, ByteBuffer binary) { snapshots++; sent.add(binary); }
@@ -35,7 +38,7 @@ class RoomTest {
         // 4.25: 5번 연속 이기면 불꽃이 붙고(start), 한 번이라도 잃으면 콤보와 불꽃이 모두 사라진다(broken)
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, false));
+        r.setComboTuning(new Room.ComboTuning(5, false, 50));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 4; i++) r.fightResult(1L, 2L, false);
@@ -156,6 +159,83 @@ class RoomTest {
         assertThat(out.loses).hasSize(1);
         assertThat(out.loses.get(0)[0]).isEqualTo(1L);
         assertThat(out.snapshots).isGreaterThanOrEqualTo(0);
+    }
+
+    /** 두 사람을 가운데 세이프존 밖에서 겹치게 하고 a에 콤보를 준다. */
+    private static Room fightRoom(Out out, int comboA, int comboB) {
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 10, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
+        a.protectUntil = 0; b.protectUntil = 0;
+        a.combo = comboA; b.combo = comboB;
+        a.x = 800; a.y = 800; b.x = 810; b.y = 800;
+        return r;
+    }
+
+    @Test
+    void flameBeatsNonFlameRegardlessOfScoreAndWipesKeywords() {
+        // 4.25: 불꽃인 사람(점수 10)이 불꽃 없는 사람(점수 50)과 부딪히면 점수와 상관없이 이기고 상대는 키워드를 모두 잃는다
+        Out out = new Out();
+        Room r = fightRoom(out, 5, 0);
+        r.tick();
+        assertThat(out.wipes).hasSize(1);
+        assertThat(out.wipes.get(0)).containsExactly(2L, 1L);
+        assertThat(out.loses).isEmpty();
+    }
+
+    @Test
+    void bothFlameFallBackToScoreRule() {
+        Out out = new Out();
+        Room r = fightRoom(out, 5, 5);
+        r.tick();
+        assertThat(out.wipes).isEmpty();
+        assertThat(out.loses).hasSize(1);
+        assertThat(out.loses.get(0)[0]).isEqualTo(1L); // 점수가 낮은 쪽이 하나 잃는다
+    }
+
+    @Test
+    void noFlameKeepsScoreRule() {
+        Out out = new Out();
+        fightRoom(out, 4, 0).tick();
+        assertThat(out.wipes).isEmpty();
+        assertThat(out.loses).hasSize(1);
+    }
+
+    @Test
+    void flameVsBotKeepsOldRule() {
+        // 봇은 예전 규칙: 불꽃이어도 봇에게는 점수 비교(작으면 키워드 하나 잃음), 키워드를 모두 잃게 하지 않는다
+        Out out = new Out();
+        Room r = new Room(1, withBots(2), out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member human = r.join(1, "s1", "사람", 1, 100, List.of(11L));
+        for (int i = 0; i < 25; i++) r.tick();
+        Room.Member bot = r.members().stream().filter(m -> m.bot).findFirst().orElseThrow();
+        bot.protectUntil = 0; human.protectUntil = 0;
+        human.combo = 5;
+        bot.score = 900; human.score = 100;
+        bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
+        r.tick();
+        assertThat(out.wipes).isEmpty();
+        assertThat(out.loses).containsExactly(new long[]{1L, bot.playerId}); // 불꽃이어도 큰 봇에게 지면 하나 잃는다
+    }
+
+    @Test
+    void prizeOrbsDropAroundAndAlwaysGiveKeyword() {
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 10, List.of());
+        a.x = 1000; a.y = 1000;
+        r.dropPrizeOrbs(1L, 5); // 5개 잃음 → 50% 올림 = 3개
+        assertThat(r.prizeOrbCount()).isEqualTo(3);
+        r.dropPrizeOrbs(1L, 1); // 1개 잃어도 최소 1개
+        assertThat(r.prizeOrbCount()).isEqualTo(4);
+        a.x = -900; a.y = -900; // 떨어진 구슬에서 멀리
+        r.placePrizeOrb(-903, -900);
+        r.tick();
+        assertThat(out.prizeEaters).containsExactly(1L);
+        assertThat(out.orbEaters).isEmpty();
     }
 
     @Test

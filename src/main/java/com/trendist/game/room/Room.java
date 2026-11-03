@@ -46,7 +46,9 @@ public class Room {
     public interface Outbox {
         void requestLose(Room room, Member loser, Member winner);
         /** ? 구슬을 먹었다. 보상(무작위 🔥 키워드)은 틱 밖에서 정하고 먹은 사람에게 알린다(4.20). */
-        void requestOrb(Room room, Member eater);
+        void requestOrb(Room room, Member eater, boolean prize);
+        /** 불꽃인 사람(winner)에게 져서 키워드를 모두 잃는다. 잃은 수만큼 ! 구슬이 떨어진다(4.25). */
+        void requestWipe(Room room, Member loser, Member winner);
         /** 사람이 봇을 이겼다. 보상(내 보관함에 없는 무작위 🔥 키워드)은 틱 밖에서 정하고 이긴 사람에게 알린다(4.21). */
         void requestBotWin(Room room, Member winner, Member bot);
         void send(Member m, ByteBuffer binary);
@@ -75,9 +77,11 @@ public class Room {
     /**
      * 연속 빼앗기 콤보(4.25). flameAt번 연속으로 이기면 원 둘레에 불꽃이 타오르고(그림은 클라이언트가 combo로 그린다),
      * 한 번이라도 싸움에서 키워드를 잃으면 콤보와 불꽃이 모두 사라진다. countBots면 봇을 이긴 것도 센다.
+     * 불꽃인 사람이 불꽃이 없는 사람과 부딪히면 점수와 상관없이 이기고 상대는 키워드를 모두 잃는다(4.25).
+     * wipeOrbPercent는 그때 잃은 키워드 수의 몇 %만큼 ! 구슬로 떨어뜨릴지(올림, 4.20).
      */
-    public record ComboTuning(int flameAt, boolean countBots) {
-        public static final ComboTuning DEFAULT = new ComboTuning(5, true);
+    public record ComboTuning(int flameAt, boolean countBots, int wipeOrbPercent) {
+        public static final ComboTuning DEFAULT = new ComboTuning(5, true, 50);
     }
 
     /** 이모트(4.26): 원 위에 잠깐 뜨는 이모지. 코드만 주고받는다 */
@@ -148,6 +152,10 @@ public class Room {
     private final Map<Long, Double> pairCooldown = new HashMap<>();
     private final Map<Long, LastSeen> lastSeen = new HashMap<>(); // 나간 플레이어의 마지막 위치
     private final Map<Integer, double[]> orbs = new LinkedHashMap<>(); // ? 구슬 번호 → {x, y}
+    private final Map<Integer, double[]> prizeOrbs = new LinkedHashMap<>(); // ! 구슬(불꽃에게 키워드를 모두 잃은 자리에 떨어짐) 번호 → {x, y, 사라질 시각}
+    /** ! 구슬이 먹히지 않으면 사라지는 시간(초)과 방 전체 상한(4.20) */
+    static final double PRIZE_ORB_SECONDS = 90;
+    static final int PRIZE_ORB_MAX = 300;
     private int nextOrb = 1;
     private double nextOrbAt;
     private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
@@ -663,6 +671,7 @@ public class Room {
 
     /** 원이 구슬 중심을 덮으면 먹는다. 구슬은 바로 사라지고, 모두에게 누가 먹었는지 알려 먹는 연출을 보여 준다. */
     private void eatOrbs() {
+        eatPrizeOrbs();
         if (orbs.isEmpty()) return;
         Iterator<Map.Entry<Integer, double[]>> it = orbs.entrySet().iterator();
         while (it.hasNext()) {
@@ -676,8 +685,68 @@ public class Room {
             it.remove();
             broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", eater.entityNo));
             if (eater.bot) botOrb(eater);
-            else outbox.requestOrb(this, eater);
+            else outbox.requestOrb(this, eater, false);
         }
+    }
+
+    /** ! 구슬: ? 구슬과 같이 덮으면 먹고, 먹으면 항상 키워드를 얻는다. 시간이 지나도 안 먹히면 사라진다(4.20). */
+    private void eatPrizeOrbs() {
+        if (prizeOrbs.isEmpty()) return;
+        Iterator<Map.Entry<Integer, double[]>> it = prizeOrbs.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, double[]> o = it.next();
+            double[] p = o.getValue();
+            if (clockSeconds >= p[2]) {
+                it.remove();
+                broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", 0));
+                continue;
+            }
+            Member eater = null;
+            for (Member m : members.values()) {
+                if (Math.hypot(m.x - p[0], m.y - p[1]) < m.displayRadius + ORB_RADIUS * 0.5) { eater = m; break; }
+            }
+            if (eater == null) continue;
+            it.remove();
+            broadcast(Map.of("type", "orbEaten", "id", o.getKey(), "e", eater.entityNo));
+            if (eater.bot) botPlus(eater, tuning);
+            else outbox.requestOrb(this, eater, true);
+        }
+    }
+
+    /**
+     * 불꽃에게 키워드를 모두 잃은 사람 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25). 개수 = 잃은 수 × wipeOrbPercent%(올림, 잃은 게 있으면 최소 1개).
+     * 원 가장자리 바깥으로 흩어지고, 활동 영역 안·세이프존 밖에만 놓는다. 방 전체 상한을 넘으면 더 만들지 않는다.
+     */
+    public void dropPrizeOrbs(long playerId, int lostCount) {
+        Member m = byPlayer.get(playerId);
+        if (m == null || lostCount <= 0) return;
+        int count = (int) Math.ceil(lostCount * comboTuning.wipeOrbPercent() / 100.0);
+        if (comboTuning.wipeOrbPercent() > 0) count = Math.max(1, count);
+        double half = currentHalf(), expires = clockSeconds + PRIZE_ORB_SECONDS;
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        for (int i = 0; i < count && prizeOrbs.size() < PRIZE_ORB_MAX; i++) {
+            for (int tries = 0; tries < 8; tries++) {
+                double ang = rnd.nextDouble() * Math.PI * 2;
+                double dist = m.displayRadius + 50 + rnd.nextDouble() * (120 + Math.sqrt(count) * 45);
+                double x = Math.max(-half + ORB_RADIUS, Math.min(half - ORB_RADIUS, m.x + Math.cos(ang) * dist));
+                double y = Math.max(-half + ORB_RADIUS, Math.min(half - ORB_RADIUS, m.y + Math.sin(ang) * dist));
+                if (inSafeZone(x, y, ORB_RADIUS)) continue;
+                int id = nextOrb++;
+                prizeOrbs.put(id, new double[]{x, y, expires});
+                broadcast(Map.of("type", "orbSpawn", "id", id, "x", x, "y", y, "prize", true));
+                break;
+            }
+        }
+    }
+
+    /** 테스트·관리용: 지금 떠 있는 ! 구슬 수. */
+    public int prizeOrbCount() { return prizeOrbs.size(); }
+
+    /** 테스트용: 그 자리에 ! 구슬을 놓는다. */
+    public int placePrizeOrb(double x, double y) {
+        int id = nextOrb++;
+        prizeOrbs.put(id, new double[]{x, y, clockSeconds + PRIZE_ORB_SECONDS});
+        return id;
     }
 
     /**
@@ -728,7 +797,8 @@ public class Room {
 
     private Map<String, Object> orbListMessage() {
         List<List<Object>> list = new ArrayList<>();
-        orbs.forEach((id, p) -> list.add(List.of(id, p[0], p[1])));
+        orbs.forEach((id, p) -> list.add(List.of(id, p[0], p[1], 0)));
+        prizeOrbs.forEach((id, p) -> list.add(List.of(id, p[0], p[1], 1))); // 마지막 값: 1이면 ! 구슬
         return Map.of("type", "orbs", "orbs", list);
     }
 
@@ -786,8 +856,17 @@ public class Room {
                 }
                 if (fresh) {
                     pairCooldown.put(key, clockSeconds + tu.cooldownSeconds());
-                    // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음.
-                    if (a.score != b.score) {
+                    boolean aFlame = isFlame(a), bFlame = isFlame(b);
+                    if (aFlame != bFlame && !(aFlame ? b : a).bot) {
+                        // 불꽃인 사람이 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25). 봇은 예전 규칙대로
+                        Member hot = aFlame ? a : b, cold = hot == a ? b : a;
+                        if (cold.protectUntil <= clockSeconds && !cold.keywords.isEmpty()) {
+                            cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
+                            shield(cold, tu);
+                            outbox.requestWipe(this, cold, hot);
+                        }
+                    // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음. 둘 다 불꽃이어도 이 규칙이다
+                    } else if (a.score != b.score) {
                         Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
                         if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
@@ -805,6 +884,9 @@ public class Room {
             }
         }
     }
+
+    /** 콤보 불꽃이 붙은 사람인지(봇은 불꽃이 없다, 4.25) */
+    private boolean isFlame(Member m) { return !m.bot && m.combo >= comboTuning.flameAt(); }
 
     /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
     private void shield(Member m, Tuning tu) {

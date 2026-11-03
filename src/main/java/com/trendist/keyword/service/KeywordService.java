@@ -25,9 +25,14 @@ public interface KeywordService {
 
     /** 충돌로 잃은 키워드: 이름과 잃는 순간의 키워드 점수(💤면 0). 이름은 이긴 쪽에만, 점수는 양쪽에 보여 준다(4.3). */
     record LostKeyword(String text, long score) {}
+    /** 키워드를 모두 잃은 결과: 잃은 개수와 그 점수 합 */
+    record LostAll(int count, long score) {}
 
     /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. */
     Optional<LostKeyword> loseRandom(long playerId);
+
+    /** 불꽃에게 져서 가진 키워드를 모두 잃는다(금지 제외, 🔥·💤 무관, 4.25). 잃은 것이 없으면 빈 값. */
+    Optional<LostAll> loseAll(long playerId);
 
     /**
      * 빼앗긴 키워드(4.3). result: ADDED(이긴 사람 보관함에 새로 들어감) / RENEWED(이미 가진 키워드라 남은 시간만 24시간으로).
@@ -87,6 +92,9 @@ public interface KeywordService {
      * 이미 가진 키워드가 나오면 남은 시간만 지금부터 다시 24시간으로 갱신한다(RENEWED, 점수·EXP 그대로).
      */
     KeywordDtos.OrbResult openOrb(long playerId);
+
+    /** ! 구슬을 먹었다(4.20). 꽝 없이 항상 🔥 키워드를 얻는다(가능하면 내 보관함에 없는 것). */
+    KeywordDtos.OrbResult openPrizeOrb(long playerId);
 
     /**
      * 봇을 이긴 보상(4.21): 그 나라 🔥 키워드 중 하나를 무작위로 얻는다. 없던 키워드는 일반 추가와 같이 넣고(EXP +1, 24시간),

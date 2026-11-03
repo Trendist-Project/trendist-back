@@ -192,6 +192,21 @@ class ApiFlowTest {
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(gained - lost));
     }
 
+    @Test
+    void prizeOrbAlwaysGainsAndWipeLosesEverything() throws Exception {
+        // ! 구슬은 꽝·잃기 없이 항상 얻고(가능하면 안 가진 키워드), 불꽃에게 지면 가진 키워드를 모두 잃는다(4.20, 4.25)
+        String t = player("느낌표러");
+        long pid = playerIdOf(t);
+        keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("느낌표하나", "느낌표둘", "느낌표셋"));
+        for (int i = 0; i < 3; i++) assertThat(keywordService.openPrizeOrb(pid).status()).isEqualTo("GAINED"); // 안 가진 것부터
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(3));
+        var lost = keywordService.loseAll(pid).orElseThrow();
+        assertThat(lost.count()).isEqualTo(3);
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(0));
+        assertThat(keywordService.loseAll(pid)).isEmpty(); // 잃을 것이 없다
+        for (int i = 0; i < 20; i++) assertThat(keywordService.openPrizeOrb(pid).status()).isIn("GAINED", "RENEWED");
+    }
+
     private long playerIdOf(String token) throws Exception {
         return ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
