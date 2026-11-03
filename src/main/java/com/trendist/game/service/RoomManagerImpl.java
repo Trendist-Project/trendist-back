@@ -277,7 +277,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             try {
                 keywordService.loseAll(loserId).ifPresent(lost -> room.submit(r -> {
                     r.fightResult(winnerId, loserId, false); // 이긴 쪽 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
-                    r.dropPrizeOrbs(loserId, lost.count()); // 잃은 수만큼 ! 구슬(4.20)
+                    r.dropPrizeOrbs(loserId, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
                     Room.Member m = r.byPlayer(loserId);
                     if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "wiped", lost.count(), "score", lost.score()));
                     Room.Member w = r.byPlayer(winnerId);

@@ -202,6 +202,7 @@ class ApiFlowTest {
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(3));
         var lost = keywordService.loseAll(pid).orElseThrow();
         assertThat(lost.count()).isEqualTo(3);
+        assertThat(lost.activeCount()).isEqualTo(3); // 모두 🔥라 활성 수도 3
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(0));
         assertThat(keywordService.loseAll(pid)).isEmpty(); // 잃을 것이 없다
         for (int i = 0; i < 20; i++) assertThat(keywordService.openPrizeOrb(pid).status()).isIn("GAINED", "RENEWED");

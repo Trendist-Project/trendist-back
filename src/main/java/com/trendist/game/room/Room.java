@@ -78,7 +78,7 @@ public class Room {
      * 연속 빼앗기 콤보(4.25). flameAt번 연속으로 이기면 원 둘레에 불꽃이 타오르고(그림은 클라이언트가 combo로 그린다),
      * 한 번이라도 싸움에서 키워드를 잃으면 콤보와 불꽃이 모두 사라진다. countBots면 봇을 이긴 것도 센다.
      * 불꽃인 사람이 불꽃이 없는 사람과 부딪히면 점수와 상관없이 이기고 상대는 키워드를 모두 잃는다(4.25).
-     * wipeOrbPercent는 그때 잃은 키워드 수의 몇 %만큼 ! 구슬로 떨어뜨릴지(올림, 4.20).
+     * wipeOrbPercent는 그때 잃은 🔥활성 키워드 수의 몇 %만큼 ! 구슬로 떨어뜨릴지(올림, 4.20).
      */
     public record ComboTuning(int flameAt, boolean countBots, int wipeOrbPercent) {
         public static final ComboTuning DEFAULT = new ComboTuning(5, true, 50);
@@ -714,13 +714,13 @@ public class Room {
     }
 
     /**
-     * 불꽃에게 키워드를 모두 잃은 사람 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25). 개수 = 잃은 수 × wipeOrbPercent%(올림, 잃은 게 있으면 최소 1개).
+     * 불꽃에게 키워드를 모두 잃은 사람 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25). 개수 = 잃은 🔥활성 키워드 수 × wipeOrbPercent%(올림, 활성이 하나라도 있었으면 최소 1개).
      * 원 가장자리 바깥으로 흩어지고, 활동 영역 안·세이프존 밖에만 놓는다. 방 전체 상한을 넘으면 더 만들지 않는다.
      */
-    public void dropPrizeOrbs(long playerId, int lostCount) {
+    public void dropPrizeOrbs(long playerId, int lostActiveCount) {
         Member m = byPlayer.get(playerId);
-        if (m == null || lostCount <= 0) return;
-        int count = (int) Math.ceil(lostCount * comboTuning.wipeOrbPercent() / 100.0);
+        if (m == null || lostActiveCount <= 0) return;
+        int count = (int) Math.ceil(lostActiveCount * comboTuning.wipeOrbPercent() / 100.0);
         if (comboTuning.wipeOrbPercent() > 0) count = Math.max(1, count);
         double half = currentHalf(), expires = clockSeconds + PRIZE_ORB_SECONDS;
         ThreadLocalRandom rnd = ThreadLocalRandom.current();

@@ -25,8 +25,8 @@ public interface KeywordService {
 
     /** 충돌로 잃은 키워드: 이름과 잃는 순간의 키워드 점수(💤면 0). 이름은 이긴 쪽에만, 점수는 양쪽에 보여 준다(4.3). */
     record LostKeyword(String text, long score) {}
-    /** 키워드를 모두 잃은 결과: 잃은 개수와 그 점수 합 */
-    record LostAll(int count, long score) {}
+    /** 키워드를 모두 잃은 결과: 잃은 개수, 그중 🔥활성이던 개수(! 구슬 수의 기준), 점수 합 */
+    record LostAll(int count, int activeCount, long score) {}
 
     /** 충돌로 잃기(4.3): 금지되지 않은 키워드 중 하나를 무작위로 지운다. */
     Optional<LostKeyword> loseRandom(long playerId);

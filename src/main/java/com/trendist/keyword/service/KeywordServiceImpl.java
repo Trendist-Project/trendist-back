@@ -492,9 +492,10 @@ public class KeywordServiceImpl implements KeywordService {
         List<PlayerKeyword> candidates = playerKeywords.findLosableByPlayer(playerId, now, codes.keywordStateId(CodeTables.KW_BANNED));
         if (candidates.isEmpty()) return Optional.empty();
         long score = 0;
+        int activeCount = 0;
         List<Long> keywordIds = new ArrayList<>();
         for (PlayerKeyword pk : candidates) {
-            if (isState(pk.getKeyword(), CodeTables.KW_ACTIVE)) score += pk.getKeyword().getTrendValue(); // 💤는 점수에 더해 주지 않았다
+            if (isState(pk.getKeyword(), CodeTables.KW_ACTIVE)) { score += pk.getKeyword().getTrendValue(); activeCount++; } // 💤는 점수에 더해 주지 않았다
             keywordIds.add(pk.getKeyword().getId());
         }
         playerKeywords.deleteAll(candidates);
@@ -502,7 +503,7 @@ public class KeywordServiceImpl implements KeywordService {
         p.incLose(); // 칭호(4.10): 한 번 부딪혀 잃은 것이므로 한 번으로 센다
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
         for (Long keywordId : keywordIds) removeHolding(p, keywordId, now); // 인원·트렌드 값·점수를 키워드마다 고친다
-        return Optional.of(new LostAll(keywordIds.size(), score));
+        return Optional.of(new LostAll(keywordIds.size(), activeCount, score));
     }
 
     @Override

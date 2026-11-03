@@ -227,9 +227,10 @@ class RoomTest {
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member a = r.join(1, "s1", "a", 1, 10, List.of());
         a.x = 1000; a.y = 1000;
-        r.dropPrizeOrbs(1L, 5); // 5개 잃음 → 50% 올림 = 3개
+        r.dropPrizeOrbs(1L, 5); // 활성 5개 잃음 → 50% 올림 = 3개
         assertThat(r.prizeOrbCount()).isEqualTo(3);
-        r.dropPrizeOrbs(1L, 1); // 1개 잃어도 최소 1개
+        r.dropPrizeOrbs(1L, 1); // 활성 1개 잃어도 최소 1개
+        r.dropPrizeOrbs(1L, 0); // 활성이 없었으면(💤만 잃음) 구슬 없음
         assertThat(r.prizeOrbCount()).isEqualTo(4);
         a.x = -900; a.y = -900; // 떨어진 구슬에서 멀리
         r.placePrizeOrb(-903, -900);
