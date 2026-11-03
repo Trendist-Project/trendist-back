@@ -170,7 +170,7 @@ class ApiFlowTest {
     }
 
     @Test
-    void orbGivesActiveKeywordAtSetChanceOtherwiseMiss() throws Exception {
+    void orbGivesActiveKeywordAtSetChanceOtherwiseLosesOne() throws Exception {
         String t = player("구슬러");
         long playerId = ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
@@ -546,7 +546,7 @@ class ApiFlowTest {
         mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + guest))
                 .andExpect(jsonPath("$.borders[0].unlocked").value(false));
         String body = mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
-                .andExpect(jsonPath("$.trails.length()").value(12)).andExpect(jsonPath("$.borders.length()").value(5))
+                .andExpect(jsonPath("$.trails.length()").value(16)).andExpect(jsonPath("$.borders.length()").value(5))
                 .andExpect(jsonPath("$.borders[0].unlocked").value(true)).andReturn().getResponse().getContentAsString();
         int trail = JsonPath.read(body, "$.trails[0].id"), border = JsonPath.read(body, "$.borders[4].id");
         saveProfile(guest, 1, "{\"background\":\"#ff6b6b\",\"trailEffectId\":" + trail + "}")

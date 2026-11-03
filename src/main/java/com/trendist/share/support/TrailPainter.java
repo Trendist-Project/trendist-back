@@ -30,6 +30,7 @@ final class TrailPainter {
             case "bolt" -> new Spec(0.25, 9, 260, 18);
             case "smoke" -> new Spec(0.3, 9, 1300, 16);
             case "snow" -> new Spec(0.4, 12, 1600, 10);
+            case "pawprint", "birdprint", "bearprint", "rabbitprint" -> new Spec(0.6, 14, 1700, 2.5);
             default -> null;
         };
     }
@@ -152,7 +153,7 @@ final class TrailPainter {
                 p.vx = rnd(R, -6, 6) * k; p.vy = -rnd(R, 14, 30) * k; p.size = s * rnd(R, 0.1, 0.22);
                 p.life = life * rnd(R, 0.75, 1.15); p.rot = rnd(R, 0, Math.PI * 2); p.vr = rnd(R, 2, 4);
             }
-            case "footprint" -> {
+            case "footprint", "pawprint", "birdprint", "bearprint", "rabbitprint" -> {
                 step ^= 1;
                 double side = (step == 1 ? 1 : -1) * r * 0.32;
                 p.x = x - ux * (tail + s * 0.2) + px * side; p.y = y - uy * (tail + s * 0.2) + py * side;
@@ -244,6 +245,39 @@ final class TrailPainter {
 
     private static Ellipse2D circle(double x, double y, double r) { return new Ellipse2D.Double(x - r, y - r, r * 2, r * 2); }
 
+    /** 발자국류 한 개의 모양(프론트 trails.ts의 footprint·pawprint·birdprint·bearprint·rabbitprint와 같다). 앞쪽이 -y */
+    private static void stepShape(Graphics2D g, String code, double s) {
+        switch (code) {
+            case "pawprint" -> {
+                g.fill(new Ellipse2D.Double(-s * 0.85, s * 0.3 - s * 0.68, s * 1.7, s * 1.36));
+                double[][] toes = {{-1.05, -0.5}, {-0.4, -1.1}, {0.4, -1.1}, {1.05, -0.5}};
+                for (double[] t : toes) g.fill(new Ellipse2D.Double(t[0] * s - s * 0.27, t[1] * s - s * 0.34, s * 0.54, s * 0.68));
+            }
+            case "birdprint" -> {
+                Stroke old = g.getStroke();
+                g.setStroke(new BasicStroke((float) (s * 0.3), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g.draw(new Line2D.Double(0, s * 0.2, 0, -s * 1.6));
+                g.draw(new Line2D.Double(0, s * 0.2, -s * 1.15, -s * 1.1));
+                g.draw(new Line2D.Double(0, s * 0.2, s * 1.15, -s * 1.1));
+                g.draw(new Line2D.Double(0, s * 0.2, 0, s * 1.0));
+                g.setStroke(old);
+            }
+            case "bearprint" -> {
+                g.fill(new Ellipse2D.Double(-s, s * 0.35 - s * 0.85, s * 2, s * 1.7));
+                double[][] toes = {{-1.2, -0.45}, {-0.65, -0.95}, {0, -1.15}, {0.65, -0.95}, {1.2, -0.45}};
+                for (double[] t : toes) g.fill(circle(t[0] * s, t[1] * s, s * 0.27));
+            }
+            case "rabbitprint" -> {
+                for (double tx : new double[]{-0.55, 0.55}) g.fill(new Ellipse2D.Double(tx * s - s * 0.3, s * 0.6 - s * 0.95, s * 0.6, s * 1.9));
+                for (double tx : new double[]{-0.3, 0.3}) g.fill(circle(tx * s, -s * 1.1, s * 0.26));
+            }
+            default -> {
+                g.fill(new Ellipse2D.Double(-s * 0.7, -s, s * 1.4, s * 2));
+                for (double tx : new double[]{-0.55, 0, 0.55}) g.fill(circle(tx * s, -s * 1.35, s * 0.28));
+            }
+        }
+    }
+
     private static void draw(Graphics2D g, String code, List<Particle> parts, List<PathPoint> path, double now, Color body) {
         switch (code) {
             case "afterimage" -> {
@@ -317,16 +351,14 @@ final class TrailPainter {
                     g.fill(q);
                 }
             }
-            case "footprint" -> {
+            case "footprint", "pawprint", "birdprint", "bearprint", "rabbitprint" -> {
                 g.setColor(new Color(10, 20, 15, 140));
                 for (Particle p : parts) {
                     double a = age(p.born, now, p.life);
                     alpha(g, a < 0.1 ? a / 0.1 : 1 - (a - 0.1) / 0.9);
-                    double s = p.size;
                     AffineTransform old = g.getTransform();
                     g.translate(p.x, p.y); g.rotate(p.rot);
-                    g.fill(new Ellipse2D.Double(-s * 0.7, -s, s * 1.4, s * 2));
-                    for (double tx : new double[]{-0.55, 0, 0.55}) g.fill(circle(tx * s, -s * 1.35, s * 0.28));
+                    stepShape(g, code, p.size);
                     g.setTransform(old);
                 }
             }

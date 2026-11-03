@@ -297,6 +297,10 @@ public class DataSeeder implements ApplicationRunner {
             {"bolt", "번개"},
             {"smoke", "연기"},
             {"snow", "눈송이"},
+            {"pawprint", "고양이·강아지 발바닥"},
+            {"birdprint", "새 발자국"},
+            {"bearprint", "곰 발자국"},
+            {"rabbitprint", "토끼 발자국"},
     };
 
     /** 테두리 효과(4.9). 그림은 프론트엔드 game/skin.ts가 코드값으로 그린다 */
