@@ -121,8 +121,16 @@ public class DataSeeder implements ApplicationRunner {
         if (levels.count() < 100) {
             var existing = levels.findAllByOrderByLevelAsc().stream().map(Level::getLevel).toList();
             for (int lv = 1; lv <= 100; lv++) {
-                if (!existing.contains(lv)) { levels.save(new Level(lv, defaultRequiredExp(lv))); added++; }
+                if (!existing.contains((long) lv)) { levels.save(new Level(lv, defaultRequiredExp(lv))); added++; }
             }
+        }
+        // 레벨 표시 옆 아이콘 바탕(4.9): 값을 한 번도 넣지 않은 행(badge_alpha가 null)에만 기본 규칙으로 채운다. 그 뒤 운영에서 고친 값은 건드리지 않는다
+        for (Level l : levels.findAllByOrderByLevelAsc()) {
+            if (l.getBadgeAlpha() != null) continue;
+            String[] b = badgeFor((int) l.getLevel());
+            l.applyBadge(b[0], Long.parseLong(b[1]), "RAINBOW".equals(b[2]));
+            levels.save(l);
+            added++;
         }
         added += seedTitles();
         // 효과 종류와 효과(4.9, 4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 것만 넣는다(이름·조건·순서는 운영에서 고친다)
@@ -179,6 +187,23 @@ public class DataSeeder implements ApplicationRunner {
     private User operator() {
         return users.findFirstByRoleOrderByIdAsc(User.ROLE_ADMIN)
                 .orElseGet(() -> users.save(User.operator(userStates.findByName(CodeTables.USER_NORMAL).orElseThrow())));
+    }
+
+    /** 10레벨 구간별 바탕색(11~19, 20~29, … 90~99레벨) */
+    private static final String[] BADGE_BAND_COLORS = {
+            "#4f8cff", "#26c6da", "#66bb6a", "#d4e157", "#ffca28", "#ff9800", "#ef5350", "#ec407a", "#ab47bc"};
+
+    /**
+     * 레벨 표시 옆 성장 아이콘 바탕의 기본값(4.9) → {색, 진하기(%), 종류(SOLID/RAINBOW)}.
+     * 1~10레벨은 기본 거북이 색(null), 11레벨부터는 10레벨 구간마다 색이 바뀌고 일의 자리가 0에서 9로 갈수록 옅은 색에서 진한 색(30~100%),
+     * 100레벨은 무지개 그라데이션이다. 시드 값일 뿐이고 실제 값은 levels 테이블에서 관리한다.
+     */
+    static String[] badgeFor(int level) {
+        if (level <= 10) return new String[]{null, "100", "SOLID"};
+        if (level >= 100) return new String[]{null, "100", "RAINBOW"};
+        String color = BADGE_BAND_COLORS[level / 10 - 1];
+        long alpha = 30 + Math.round((level % 10) * 70 / 9.0);
+        return new String[]{color, String.valueOf(alpha), "SOLID"};
     }
 
     /** 4.9의 기본 곡선: 2~10레벨은 표, 11~100레벨은 100 × (레벨/10)². */

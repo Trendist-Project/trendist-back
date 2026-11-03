@@ -69,11 +69,14 @@ CREATE TABLE levels (
   id           BIGINT NOT NULL AUTO_INCREMENT COMMENT '레벨 ID',
   level        BIGINT NOT NULL COMMENT '레벨(1~100). 1레벨은 필요 EXP 0',
   required_exp BIGINT NOT NULL COMMENT '그 레벨에 필요한 누적 EXP(레벨이 오를수록 커져야 함, 애플리케이션이 검사)',
+  badge_color  VARCHAR(7) NULL COMMENT '레벨 표시 옆 성장 아이콘의 바탕색(#RRGGBB). NULL이면 기본 거북이 색(4.9)',
+  badge_alpha  BIGINT NULL COMMENT '바탕색 진하기(0~100%, 낮을수록 옅음). NULL이면 아직 값을 넣지 않은 행(시더가 기본 규칙으로 채움)',
+  badge_rainbow BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'TRUE면 바탕을 색 대신 무지개 그라데이션으로(100레벨)',
   created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
   UNIQUE KEY uk_levels_level (level)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='레벨별 필요 누적 EXP';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='레벨별 필요 누적 EXP와 레벨 표시 아이콘 바탕';
 
 CREATE TABLE user_states (
   id         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '사용자 상태 ID',

@@ -41,6 +41,13 @@ public class LevelServiceImpl implements LevelService {
         throw new IllegalArgumentException("levels 표에 " + level + "레벨이 없어요");
     }
 
+    @Override
+    public List<Badge> badges() {
+        return cache.get("all").stream()
+                .map(l -> new Badge((int) l.getLevel(), l.getBadgeColor(), l.getBadgeAlpha() == null ? 100 : l.getBadgeAlpha().intValue(), l.isBadgeRainbow()))
+                .toList();
+    }
+
     /** 다음 레벨에 필요한 누적 EXP. 최고 레벨이면 -1. */
     @Override
     public long nextRequired(long level) {
