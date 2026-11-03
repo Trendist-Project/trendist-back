@@ -30,14 +30,10 @@ public class Keyword extends BaseTimeEntity {
     /** 목록형 외부 소스(google)로 활성이 유지되는 끝 시각. 지나면 그 소스 목록에 아직 있는지 다시 본다(10.2). */
     @Column(name = "external_until", columnDefinition = "DATETIME(6)") private Instant externalUntil;
 
-    /**
-     * AI 한 줄 설명(4.12). 유행어면 뜻, 이슈면 무슨 내용인지. 처음 🔥가 될 때 한 번 만들어 저장하고, 모두에게 같은 글을 보여 준다.
-     * aiCommentBy는 AI / ADMIN(관리자가 고침), aiAttempts는 만들기를 시도한 횟수(실패·모름이 반복되면 멈춘다).
-     */
-    @Column(name = "ai_comment", length = 200) private String aiComment;
-    @Column(name = "ai_comment_by", length = 10) private String aiCommentBy;
-    @Column(name = "ai_commented_at", columnDefinition = "DATETIME(6)") private Instant aiCommentedAt;
-    @Column(name = "ai_attempts", nullable = false) private long aiAttempts;
+    /** AI 한 줄 설명(4.12). 처음 만들기를 시도할 때 행이 생기고, 그 전에는 null이다. 설명 내용은 {@link KeywordAiComment}가 갖는다. */
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "ai_comment_id", unique = true)
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    private KeywordAiComment aiComment;
 
     public Keyword(Country country, DataSource source, KeywordState state, String text, String normalized) {
         this.country = country; this.dataSource = source; this.keywordState = state;
@@ -46,12 +42,7 @@ public class Keyword extends BaseTimeEntity {
 
     public void setDataSource(DataSource dataSource) { this.dataSource = dataSource; }
 
-    /** AI 한 줄 설명을 저장한다(by: AI / ADMIN). 시도 횟수는 0으로 되돌린다. */
-    public void saveAiComment(String comment, String by, Instant now) {
-        this.aiComment = comment; this.aiCommentBy = by; this.aiCommentedAt = now; this.aiAttempts = 0;
-    }
-    public void incAiAttempts() { aiAttempts++; }
-    public void giveUpAiComment(long max) { aiAttempts = max; }
+    public void attachAiComment(KeywordAiComment row) { this.aiComment = row; }
     public void setTrendValue(long trendValue) { this.trendValue = trendValue; }
     public void incTotalPlus() { totalPlusCount++; }
     public void incHolder() { holderCount++; }

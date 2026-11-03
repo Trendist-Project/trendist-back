@@ -607,7 +607,7 @@ public class KeywordServiceImpl implements KeywordService {
     @Transactional(readOnly = true)
     public KeywordDtos.KeywordCard detail(long userId, long keywordId) {
         Player p = playerService.requireCurrent(userId);
-        Keyword k = keywords.findById(keywordId)
+        Keyword k = keywords.findWithAiById(keywordId)
                 .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !isBanned(x))
                 .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
         return card(k, p, Instant.now(clock));
@@ -615,11 +615,12 @@ public class KeywordServiceImpl implements KeywordService {
 
     private KeywordDtos.KeywordCard card(Keyword k, Player p, Instant now) {
         Optional<PlayerKeyword> mine = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()).filter(pk -> !pk.isExpired(now));
+        String ai = k.getAiComment() == null ? null : k.getAiComment().getComment();
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
                 k.getHolderCount(), k.getTotalPlusCount(),
                 k.getSearchCount() + searchCounter.pending(k.getId()), mine.isPresent(),
                 mine.map(PlayerKeyword::getExpiresAt).orElse(null),
-                k.getAiComment(), k.getAiComment() != null && aiRequests.existsByKeywordIdAndPlayerIdAndHandledAtIsNull(k.getId(), p.getId()));
+                ai, ai != null && aiRequests.existsByKeywordIdAndPlayerIdAndHandledAtIsNull(k.getId(), p.getId()));
     }
 
     /** 목록형 외부 소스 유지 끝 시각: 지금 + 설정 시간(기본 168시간 = 7일). */

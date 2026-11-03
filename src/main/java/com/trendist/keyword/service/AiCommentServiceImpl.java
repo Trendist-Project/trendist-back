@@ -9,7 +9,9 @@ import com.trendist.keyword.ai.NewsSearchClient;
 import com.trendist.keyword.ai.TrendNewsContext;
 import com.trendist.keyword.dto.AiCommentDtos;
 import com.trendist.keyword.entity.Keyword;
+import com.trendist.keyword.entity.KeywordAiComment;
 import com.trendist.keyword.entity.KeywordAiRequest;
+import com.trendist.keyword.repository.KeywordAiCommentRepository;
 import com.trendist.keyword.repository.KeywordAiRequestRepository;
 import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.player.entity.Player;
@@ -44,6 +46,7 @@ public class AiCommentServiceImpl implements AiCommentService {
 
     private final KeywordRepository keywords;
     private final KeywordAiRequestRepository requests;
+    private final KeywordAiCommentRepository aiRows;
     private final GeminiClient gemini;
     private final TrendNewsContext newsContext;
     private final NewsSearchClient newsSearch;
@@ -89,7 +92,7 @@ public class AiCommentServiceImpl implements AiCommentService {
             return 0;
         } catch (Exception e) {
             log.warn("ai comments failed for {} keywords: {}", texts.size(), e.toString());
-            tx.executeWithoutResult(s -> texts.keySet().forEach(id -> keywords.findById(id).ifPresent(Keyword::incAiAttempts)));
+            tx.executeWithoutResult(s -> texts.keySet().forEach(id -> keywords.findById(id).ifPresent(k -> aiRow(k).incAttempts())));
             return 0;
         }
         int made = 0, unknown = 0;
@@ -97,11 +100,11 @@ public class AiCommentServiceImpl implements AiCommentService {
             long id = e.getKey();
             Optional<String> a = answers.get(e.getValue());
             if (a == null) { // 이 키워드의 답이 빠졌다: 다음 분에 다시
-                tx.executeWithoutResult(s -> keywords.findById(id).ifPresent(Keyword::incAiAttempts));
+                tx.executeWithoutResult(s -> keywords.findById(id).ifPresent(k -> aiRow(k).incAttempts()));
             } else if (a.isPresent()) {
                 save(id, a.get(), BY_AI); made++;
             } else { // 모른다고 했다: 다시 물어도 같다
-                tx.executeWithoutResult(s -> keywords.findById(id).ifPresent(x -> x.giveUpAiComment(MAX_ATTEMPTS)));
+                tx.executeWithoutResult(s -> keywords.findById(id).ifPresent(x -> aiRow(x).giveUp(MAX_ATTEMPTS)));
                 unknown++;
             }
         }
@@ -125,7 +128,7 @@ public class AiCommentServiceImpl implements AiCommentService {
     private void save(long keywordId, String comment, String by) {
         tx.executeWithoutResult(s -> {
             Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();
-            k.saveAiComment(comment, by, Instant.now(clock));
+            aiRow(k).write(comment, by, Instant.now(clock));
         });
     }
 
@@ -138,7 +141,7 @@ public class AiCommentServiceImpl implements AiCommentService {
         Keyword k = keywords.findById(keywordId)
                 .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !x.getKeywordState().getId().equals(codes.keywordStateId(CodeTables.KW_BANNED)))
                 .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
-        if (k.getAiComment() == null) throw ApiException.conflict("AI_COMMENT_NONE", "아직 AI 설명이 없어요");
+        if (k.getAiComment() == null || k.getAiComment().getComment() == null) throw ApiException.conflict("AI_COMMENT_NONE", "아직 AI 설명이 없어요");
         if (requests.existsByKeywordIdAndPlayerIdAndHandledAtIsNull(keywordId, p.getId())) return; // 이미 접수됨
         if (!rateLimiter.tryAcquire("aireq:" + p.getId(), 10, Duration.ofHours(1))) {
             throw ApiException.tooMany("AI_REQUEST_RATE", "요청이 너무 많아요. 잠시 뒤에 다시 해 주세요");
@@ -165,7 +168,7 @@ public class AiCommentServiceImpl implements AiCommentService {
             total = open.size();
             List<Long> ids = open.stream().skip((long) pg * PAGE_SIZE).limit(PAGE_SIZE).map(o -> (Long) o[0]).toList();
             Map<Long, Keyword> byId = new HashMap<>();
-            keywords.findAllById(ids).forEach(x -> byId.put(x.getId(), x));
+            keywords.findAllWithAiByIds(ids).forEach(x -> byId.put(x.getId(), x));
             list = ids.stream().map(byId::get).filter(Objects::nonNull).toList();
         }
         Map<Long, Object[]> counts = openCounts(list.stream().map(Keyword::getId).toList());
@@ -191,7 +194,7 @@ public class AiCommentServiceImpl implements AiCommentService {
         if (text.isEmpty()) throw ApiException.conflict("AI_UNKNOWN", "AI가 이 키워드를 설명하지 못했어요. 직접 써 주세요");
         return tx.execute(s -> {
             Keyword x = keywords.findByIdForUpdate(keywordId).orElseThrow();
-            x.saveAiComment(text.get(), BY_AI, Instant.now(clock));
+            aiRow(x).write(text.get(), BY_AI, Instant.now(clock));
             requests.closeAll(keywordId, Instant.now(clock));
             return row(x, null);
         });
@@ -203,7 +206,7 @@ public class AiCommentServiceImpl implements AiCommentService {
         String c = comment == null ? "" : comment.strip().replaceAll("\\s+", " ");
         if (c.isEmpty() || c.length() > 200) throw ApiException.badRequest("AI_COMMENT_LENGTH", "설명은 1~200자로 써 주세요");
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
-        k.saveAiComment(c, BY_ADMIN, Instant.now(clock));
+        aiRow(k).write(c, BY_ADMIN, Instant.now(clock));
         requests.closeAll(keywordId, Instant.now(clock));
         return row(k, null);
     }
@@ -227,8 +230,16 @@ public class AiCommentServiceImpl implements AiCommentService {
         return m;
     }
 
+    /** 키워드의 AI 설명 행. 아직 없으면 만들어 키워드에 잇는다(처음 시도할 때). 트랜잭션 안에서 불러야 한다. */
+    private KeywordAiComment aiRow(Keyword k) {
+        if (k.getAiComment() == null) k.attachAiComment(aiRows.save(KeywordAiComment.create()));
+        return k.getAiComment();
+    }
+
     private AiCommentDtos.Row row(Keyword k, Object[] open) {
-        return new AiCommentDtos.Row(k.getId(), k.getText(), k.getKeywordState().getName(), k.getAiComment(), k.getAiCommentBy(),
-                k.getAiCommentedAt(), k.getAiAttempts(), open == null ? 0 : (Long) open[1], open == null ? null : (Instant) open[2]);
+        KeywordAiComment a = k.getAiComment();
+        return new AiCommentDtos.Row(k.getId(), k.getText(), k.getKeywordState().getName(),
+                a == null ? null : a.getComment(), a == null ? null : a.getWrittenBy(), a == null ? null : a.getCommentedAt(), a == null ? 0 : a.getAttempts(),
+                open == null ? 0 : (Long) open[1], open == null ? null : (Instant) open[2]);
     }
 }

@@ -187,6 +187,17 @@ CREATE TABLE keyword_states (
   UNIQUE KEY uk_keyword_states_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키워드 상태';
 
+CREATE TABLE keyword_ai_comments (
+  id           BIGINT NOT NULL AUTO_INCREMENT COMMENT 'AI 설명 ID',
+  comment      VARCHAR(200) NULL COMMENT 'AI 한 줄 설명(4.12): 키워드가 왜 지금 화제인지 한 문장. 처음 활성이 될 때 만들어 저장하고 모두에게 같은 글을 보여 준다. NULL이면 시도했지만 아직 못 받음',
+  written_by   VARCHAR(10) NULL COMMENT '설명을 쓴 쪽: AI / ADMIN(관리자가 고침)',
+  commented_at DATETIME(6) NULL COMMENT '설명을 저장한 시각',
+  attempts     BIGINT NOT NULL DEFAULT 0 COMMENT 'AI 자동 요청 시도 횟수(3이면 모르거나 실패가 반복돼 자동 요청을 멈춘 상태, 관리자 재요청으로 다시 시도)',
+  created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키워드 AI 한 줄 설명(keywords.ai_comment_id가 가리킨다)';
+
 CREATE TABLE keywords (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '키워드 ID',
   country_id       BIGINT NOT NULL COMMENT '지역 ID',
@@ -201,19 +212,18 @@ CREATE TABLE keywords (
   activated_at     DATETIME(6) NULL COMMENT '처음 🔥활성이 된 시각(NULL이면 한 번도 활성 전)',
   inactive_at      DATETIME(6) NULL COMMENT '비활성 전환 시각',
   banned_at        DATETIME(6) NULL COMMENT '금지 시각',
-  ai_comment       VARCHAR(200) NULL COMMENT 'AI 한 줄 설명(4.12): 유행어면 뜻, 이슈면 내용. 처음 활성이 될 때 만들어 저장하고 모두에게 같은 글을 보여 준다. NULL이면 아직 없음',
-  ai_comment_by    VARCHAR(10) NULL COMMENT '설명을 쓴 쪽: AI / ADMIN(관리자가 고침)',
-  ai_commented_at  DATETIME(6) NULL COMMENT '설명을 저장한 시각',
-  ai_attempts      BIGINT NOT NULL DEFAULT 0 COMMENT 'AI 자동 요청 시도 횟수(3이면 모르거나 실패가 반복돼 자동 요청을 멈춘 상태, 관리자 재요청으로 다시 시도)',
+  ai_comment_id    BIGINT NULL COMMENT 'AI 한 줄 설명 행(keyword_ai_comments, 4.12). 처음 만들기를 시도할 때 연결한다. NULL이면 아직 시도 전',
   external_until   DATETIME(6) NULL COMMENT '목록형 외부 소스(google)에 의한 활성 유지 끝 시각(목록에 보일 때마다 지금 + 7일). 지나면 목록에 아직 있는지 다시 본다(10.2)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
   UNIQUE KEY uk_keywords_country_normalized (country_id, normalized),
+  UNIQUE KEY uk_keywords_ai_comment (ai_comment_id),
   KEY idx_keywords_state (country_id, keyword_state_id, trend_value),
   CONSTRAINT fk_keywords_country FOREIGN KEY (country_id) REFERENCES countries (id),
   CONSTRAINT fk_keywords_data_source FOREIGN KEY (data_source_id) REFERENCES data_sources (id),
-  CONSTRAINT fk_keywords_keyword_state FOREIGN KEY (keyword_state_id) REFERENCES keyword_states (id)
+  CONSTRAINT fk_keywords_keyword_state FOREIGN KEY (keyword_state_id) REFERENCES keyword_states (id),
+  CONSTRAINT fk_keywords_ai_comment FOREIGN KEY (ai_comment_id) REFERENCES keyword_ai_comments (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키워드(지역별)';
 
 CREATE TABLE keyword_ai_requests (

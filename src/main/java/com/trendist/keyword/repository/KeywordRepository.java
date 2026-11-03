@@ -18,23 +18,35 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("select k from Keyword k where k.id = :id")
     Optional<Keyword> findByIdForUpdate(@Param("id") Long id);
 
-    /** AI 설명을 아직 못 받은 키워드(처음 🔥가 된 적 있고, 금지 아님, 시도 횟수가 한도 미만). 최근에 🔥가 된 것부터 */
+    /** AI 설명을 아직 못 받은 키워드(처음 🔥가 된 적 있고, 금지 아님, 설명 행이 없거나 설명이 비고 시도 횟수가 한도 미만). 최근에 🔥가 된 것부터 */
     @Query("""
-            select k.id from Keyword k
-            where k.aiComment is null and k.activatedAt is not null and k.aiAttempts < :maxAttempts
-              and k.keywordState.id <> :bannedId
+            select k.id from Keyword k left join k.aiComment a
+            where k.activatedAt is not null and k.keywordState.id <> :bannedId
+              and (a.id is null or (a.comment is null and a.attempts < :maxAttempts))
             order by k.activatedAt desc""")
     List<Long> findIdsNeedingAiComment(@Param("bannedId") Long bannedId, @Param("maxAttempts") long maxAttempts,
                                        org.springframework.data.domain.Pageable pageable);
 
     /** 관리자 AI 설명 목록(요청 없이 보는 "설명 없음"과 "전체"). withComment가 true면 설명이 있는 것, false면 없는 것 */
-    @Query("""
-            select k from Keyword k join fetch k.keywordState
+    @Query(value = """
+            select k from Keyword k join fetch k.keywordState left join fetch k.aiComment a
             where k.country.id = :countryId and k.activatedAt is not null and k.keywordState.id <> :bannedId
-              and ((:withComment = true and k.aiComment is not null) or (:withComment = false and k.aiComment is null))""")
+              and ((:withComment = true and a.comment is not null) or (:withComment = false and a.comment is null))""",
+            countQuery = """
+            select count(k) from Keyword k left join k.aiComment a
+            where k.country.id = :countryId and k.activatedAt is not null and k.keywordState.id <> :bannedId
+              and ((:withComment = true and a.comment is not null) or (:withComment = false and a.comment is null))""")
     org.springframework.data.domain.Page<Keyword> findForAdminAi(@Param("countryId") Long countryId, @Param("bannedId") Long bannedId,
                                                                  @Param("withComment") boolean withComment,
                                                                  org.springframework.data.domain.Pageable pageable);
+
+    /** 키워드 여러 개를 상태·AI 설명과 함께 한 번에(관리자 요청 목록). */
+    @Query("select k from Keyword k join fetch k.keywordState left join fetch k.aiComment where k.id in :ids")
+    List<Keyword> findAllWithAiByIds(@Param("ids") java.util.Collection<Long> ids);
+
+    /** 키워드 하나를 AI 설명과 함께 한 쿼리로(키워드 상세 카드). */
+    @Query("select k from Keyword k join fetch k.keywordState left join fetch k.aiComment where k.id = :id")
+    Optional<Keyword> findWithAiById(@Param("id") Long id);
 
     /** 한 상태의 키워드 전체와 반영 소스(1분 트렌드 값 점검). */
     @Query("select k from Keyword k join fetch k.dataSource where k.keywordState.id = :stateId")

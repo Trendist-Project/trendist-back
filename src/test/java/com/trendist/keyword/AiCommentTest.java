@@ -36,7 +36,9 @@ class AiCommentTest {
     @Autowired MockMvc mvc;
     @Autowired KeywordService keywordService;
     @Autowired KeywordRepository keywords;
+    @Autowired com.trendist.keyword.repository.KeywordAiCommentRepository aiRows;
     @Autowired AiCommentService ai;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @MockitoBean GeminiClient gemini;
     @MockitoBean com.trendist.keyword.ai.NewsSearchClient newsSearch;
 
@@ -56,6 +58,10 @@ class AiCommentTest {
         return t;
     }
 
+    /** 키워드의 AI 설명(행이 없거나 설명이 비면 null) / 시도 횟수(행이 없으면 0) */
+    private String commentOf(long id) { return aiRows.findByKeywordId(id).map(com.trendist.keyword.entity.KeywordAiComment::getComment).orElse(null); }
+    private long attemptsOf(long id) { return aiRows.findByKeywordId(id).map(com.trendist.keyword.entity.KeywordAiComment::getAttempts).orElse(0L); }
+
     private long keywordId(String text) {
         keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of(text));
         return keywords.findAll().stream().filter(k -> k.getText().equals(text)).findFirst().orElseThrow().getId();
@@ -66,9 +72,9 @@ class AiCommentTest {
         when(gemini.enabled()).thenReturn(true);
         answer("테스트 유행어를 뜻하는 말이에요.");
         long id = keywordId("에이아이설명1");
-        assertThat(keywords.findById(id).orElseThrow().getAiComment()).isNull();
+        assertThat(commentOf(id)).isNull();
         ai.generatePending();
-        assertThat(keywords.findById(id).orElseThrow().getAiComment()).isEqualTo("테스트 유행어를 뜻하는 말이에요.");
+        assertThat(commentOf(id)).isEqualTo("테스트 유행어를 뜻하는 말이에요.");
         ai.generatePending(); // 이미 있으면 다시 만들지 않는다
         org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyMap(), anyBoolean());
 
@@ -83,9 +89,8 @@ class AiCommentTest {
         answer(null);
         long id = keywordId("에이아이모름");
         ai.generatePending();
-        var k = keywords.findById(id).orElseThrow();
-        assertThat(k.getAiComment()).isNull();
-        assertThat(k.getAiAttempts()).isGreaterThanOrEqualTo(3); // 모른다고 하면 자동 요청은 멈춘다
+        assertThat(commentOf(id)).isNull();
+        assertThat(attemptsOf(id)).isGreaterThanOrEqualTo(3); // 모른다고 하면 자동 요청은 멈춘다
         var missing = ai.list("KR", "missing", 0);
         assertThat(missing.items()).anyMatch(r -> r.keywordId() == id);
         assertThatThrownBy(() -> ai.regenerate(id)).isInstanceOf(ApiException.class); // AI가 계속 모르면 오류로 알려 준다
@@ -132,11 +137,10 @@ class AiCommentTest {
         org.mockito.Mockito.clearInvocations(gemini);
         ai.generatePending();
         org.mockito.Mockito.verify(gemini, org.mockito.Mockito.times(1)).describeAll(anyList(), anyMap(), anyBoolean());
-        assertThat(keywords.findById(a).orElseThrow().getAiComment()).isEqualTo("첫째 설명이에요.");
-        assertThat(keywords.findById(b).orElseThrow().getAiAttempts()).isGreaterThanOrEqualTo(3); // 모른다 → 포기
-        var kc = keywords.findById(c).orElseThrow();
-        assertThat(kc.getAiComment()).isNull();
-        assertThat(kc.getAiAttempts()).isEqualTo(1); // 답이 빠짐 → 다음에 다시
+        assertThat(commentOf(a)).isEqualTo("첫째 설명이에요.");
+        assertThat(attemptsOf(b)).isGreaterThanOrEqualTo(3); // 모른다 → 포기
+        assertThat(commentOf(c)).isNull();
+        assertThat(attemptsOf(c)).isEqualTo(1); // 답이 빠짐 → 다음에 다시
     }
 
     @Test
@@ -144,7 +148,7 @@ class AiCommentTest {
         when(gemini.enabled()).thenReturn(false);
         long id = keywordId("에이아이꺼짐");
         assertThat(ai.generatePending()).isZero();
-        assertThat(keywords.findById(id).orElseThrow().getAiComment()).isNull();
+        assertThat(commentOf(id)).isNull();
         assertThatThrownBy(() -> ai.regenerate(id)).isInstanceOf(ApiException.class);
     }
 
@@ -172,6 +176,20 @@ class AiCommentTest {
         org.mockito.ArgumentCaptor<java.util.Map<String, List<String>>> cap = org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
         org.mockito.Mockito.verify(gemini).describeAll(anyList(), cap.capture(), anyBoolean());
         assertThat(cap.getValue()).containsEntry("직접등록유행어", List.of("직접등록유행어 열풍에 품절 대란"));
-        assertThat(keywords.findById(id).orElseThrow().getAiComment()).isEqualTo("품절 대란이 일어나 화제가 됐어요.");
+        assertThat(commentOf(id)).isEqualTo("품절 대란이 일어나 화제가 됐어요.");
+    }
+
+    @Test
+    void keywordPointsToAiRowOnlyAfterFirstAttemptAndDeletingRowClearsPointer() throws Exception {
+        when(gemini.enabled()).thenReturn(true);
+        answer("연결 확인용 설명이에요.");
+        long id = keywordId("연결확인키워드");
+        assertThat(jdbc.queryForObject("select ai_comment_id from keywords where id = ?", Long.class, id)).isNull(); // 시도 전에는 행이 없다
+        ai.generatePending();
+        Long rowId = jdbc.queryForObject("select ai_comment_id from keywords where id = ?", Long.class, id);
+        assertThat(rowId).isNotNull();
+        assertThat(jdbc.queryForObject("select comment from keyword_ai_comments where id = ?", String.class, rowId)).isEqualTo("연결 확인용 설명이에요.");
+        jdbc.update("delete from keyword_ai_comments where id = ?", rowId); // 설명 행을 지워도 키워드는 남고 연결만 풀린다
+        assertThat(jdbc.queryForObject("select ai_comment_id from keywords where id = ?", Long.class, id)).isNull();
     }
 }

@@ -360,7 +360,8 @@ record TrendBox(
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
 | | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수 |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
-| | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). 설명 본문은 `keywords.ai_comment` 컬럼에 둔다 |
+| | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). |
+| | `keyword_ai_comments` | 키워드 AI 한 줄 설명(4.12): 설명, 쓴 쪽(AI/ADMIN), 쓴 시각, 자동 시도 횟수. `keywords.ai_comment_id`가 가리키고(키워드 하나에 행 하나, 처음 만들기를 시도할 때 만듦) 키워드 행은 가볍게 둔다 |
 | | `keyword_log_24h`, `keyword_log_dailies` | 키워드 활동 기록. 시간별(키워드당 24칸 덮어쓰기)과 현지 하루별(180일), 누적 스냅샷과 증분 |
 | | `data_sources` | 데이터 소스별 반영값(가중치) |
 | 소셜 | `comments`, `comment_votes` | 키워드 댓글과 투표 |
