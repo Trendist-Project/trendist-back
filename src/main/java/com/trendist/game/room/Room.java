@@ -18,7 +18,8 @@ public class Room {
     private static final int MINIMAP_TOP = 20;   // 큰 아이콘 상위 20명(4.2)
     /** 목표 속도로 다가가는 빠르기. 50ms마다 차이가 절반이 된다(클라이언트 Arena 예측과 같은 값). */
     static final double ACCEL_RATE = Math.log(2) / 0.05;
-    public static final double REJOIN_KEEP_SECONDS = 60;
+    /** 나간 플레이어의 마지막 위치를 기억하는 시간(초). 서버를 다시 켜도 DB에 저장한 위치를 이 시간 안에는 돌려준다 */
+    public static final double REJOIN_KEEP_SECONDS = 300;
     public static final double ORB_RADIUS = 14; // ? 구슬 반지름(px)
  // 나간 뒤 이 시간 안에 다시 들어오면 마지막 위치에서 이어 간다(4.2)
 
@@ -151,12 +152,35 @@ public class Room {
     private double nextOrbAt;
     private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
     private volatile ComboTuning comboTuning = ComboTuning.DEFAULT;
+    /**
+     * 지금의 활동 영역 한 변(0이면 아직 정하지 않음). 목표(접속 인원에 따른 값)보다 클 때는 areaShrinkSpeed(px/s)로만 줄어들어서
+     * 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀려나지 않는다. 목표가 더 크면 바로 커진다. 틱 스레드에서만 바꾼다.
+     */
+    private double areaNow;
+    private volatile double areaShrinkSpeed; // 0이면 줄 때도 바로(예전 방식)
     private final List<SafeZone> zones = new ArrayList<>();
     private int nextZone = 1;
     private double centerSize, sentCenterSize = -1;
 
     /** 나간 플레이어의 마지막 위치와 보호 종료 시각. keepUntil이 지나면 버린다. */
     private record LastSeen(double x, double y, double protectUntil, double keepUntil, int combo) {}
+
+    /** DB에 저장해 둔 마지막 위치와 저장한 지 지난 시간(초). 서버를 다시 켠 뒤 들어올 때 쓴다. */
+    public record Resume(double x, double y, double ageSeconds) {}
+
+    /** 저장할 위치 하나: 접속 중이면 ageSeconds 0, 나간 지 얼마 안 됐으면 나간 뒤 지난 시간. */
+    public record SavedPos(long playerId, double x, double y, double ageSeconds) {}
+
+    /** 접속 중인 사람과 최근(REJOIN_KEEP_SECONDS 안에) 나간 사람의 위치. 틱 스레드에서 부른다. */
+    public List<SavedPos> snapshotPositions() {
+        List<SavedPos> out = new ArrayList<>();
+        for (Member m : members.values()) if (!m.bot) out.add(new SavedPos(m.playerId, m.x, m.y, 0));
+        for (Map.Entry<Long, LastSeen> e : lastSeen.entrySet()) {
+            double age = REJOIN_KEEP_SECONDS - (e.getValue().keepUntil() - clockSeconds);
+            if (age < REJOIN_KEEP_SECONDS) out.add(new SavedPos(e.getKey(), e.getValue().x(), e.getValue().y(), Math.max(0, age)));
+        }
+        return out;
+    }
     private volatile Tuning tuning;
     private int nextEntity = 1;
     private long tick;
@@ -183,6 +207,22 @@ public class Room {
     public void setTuning(Tuning t) { this.tuning = t; }
     public void setZoneTuning(ZoneTuning z) { this.zoneTuning = z; }
     public void setComboTuning(ComboTuning c) { this.comboTuning = c; }
+    public void setAreaShrinkSpeed(double pxPerSecond) { this.areaShrinkSpeed = Math.max(0, pxPerSecond); }
+    /** 서버를 다시 켠 뒤 저장해 둔 활동 영역에서 시작한다(틱을 시작하기 전에 부른다). 기준 맵 범위로 맞춘다. */
+    public void restoreArea(double area) {
+        if (area > 0) areaNow = clamp(area, tuning.worldSize() / 4, tuning.worldSize());
+    }
+    /** 지금 활동 영역 한 변(저장용) */
+    public double currentArea() { return areaNow > 0 ? areaNow : activeArea(members.size()); }
+    private double currentHalf() { return currentArea() / 2; }
+
+    /** 영역을 목표에 맞춘다: 커질 때는 바로, 줄 때는 areaShrinkSpeed만큼씩. */
+    private void updateArea(double dt) {
+        double target = activeArea(members.size());
+        double speed = areaShrinkSpeed;
+        if (areaNow <= 0 || target >= areaNow || speed <= 0) areaNow = target;
+        else areaNow = Math.max(target, areaNow - speed * dt);
+    }
     public ComboTuning comboTuning() { return comboTuning; }
     public ZoneTuning zoneTuning() { return zoneTuning; }
     public Tuning tuning() { return tuning; }
@@ -208,6 +248,12 @@ public class Room {
 
     public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
                        boolean firstTime, Appearance look) {
+        return join(playerId, session, nickname, level, score, keywordIds, firstTime, look, null);
+    }
+
+    /** resume가 있고 방이 기억하는 위치가 없으면(서버를 다시 켠 뒤) 저장해 둔 위치에서 시작한다. REJOIN_KEEP_SECONDS가 지났으면 쓰지 않는다. */
+    public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
+                       boolean firstTime, Appearance look, Resume resume) {
         Member old = byPlayer.get(playerId);
         if (old != null) leave(old); // 한 계정은 한 방에 한 연결
         Member m = new Member(nextEntity++, playerId, session);
@@ -215,7 +261,8 @@ public class Room {
         m.nickname = nickname; m.level = level; m.score = score;
         m.title = look.title(); m.skin = look.skin() == null ? Skin.DEFAULT : look.skin(); m.trail = look.trail();
         m.radius = radiusFor(score); m.displayRadius = m.radius;
-        double area = activeArea(members.size() + 1);
+        double area = Math.max(currentArea(), activeArea(members.size() + 1)); // 들어오는 사람 때문에 영역이 커져야 하면 바로 커진다
+        areaNow = area;
         LastSeen seen = lastSeen.remove(playerId);
         if (seen != null && seen.keepUntil() >= clockSeconds) {
             // 새로고침으로 위치를 바꾸거나 보호를 다시 받지 못하게, 마지막 위치와 남은 보호 시간을 그대로 이어 간다
@@ -223,6 +270,11 @@ public class Room {
             m.x = clamp(seen.x(), -half, half); m.y = clamp(seen.y(), -half, half);
             m.protectUntil = seen.protectUntil();
             m.combo = seen.combo(); // 콤보도 이어 간다(4.25)
+        } else if (resume != null && resume.ageSeconds() < REJOIN_KEEP_SECONDS) {
+            // 서버를 다시 켠 뒤: 저장해 둔 마지막 위치에서 시작한다. 모두가 한꺼번에 돌아오므로 입장 보호를 준다
+            double half = area / 2;
+            m.x = clamp(resume.x(), -half, half); m.y = clamp(resume.y(), -half, half);
+            m.protectUntil = clockSeconds + tuning.joinProtectSeconds();
         } else {
             double[] spawn = firstTime ? centerSpawn(area) : findSpawn(area);
             m.x = spawn[0]; m.y = spawn[1];
@@ -338,7 +390,7 @@ public class Room {
     }
 
     public void setTarget(Member m, double x, double y) {
-        double half = activeArea(members.size()) / 2;
+        double half = currentHalf();
         m.targetX = clamp(x, -half, half); m.targetY = clamp(y, -half, half);
         m.dirX = 0; m.dirY = 0;
     }
@@ -442,7 +494,8 @@ public class Room {
         clockSeconds += dt;
         tick++;
         Tuning tu = tuning;
-        double half = activeArea(members.size()) / 2;
+        updateArea(dt);
+        double half = currentHalf();
         if (tick % 20 == 0) { dropSilent(); maintainBots(tu); }
         thinkBots(tu, half);
         for (Member m : members.values()) move(m, dt, tu, half);
@@ -941,7 +994,7 @@ public class Room {
         m.botNextPlusAt = clockSeconds + 15 + rnd.nextDouble() * 30;
         botRecompute(m, tu);
         m.displayRadius = m.radius;
-        double[] spawn = findSpawn(activeArea(members.size() + 1));
+        double[] spawn = findSpawn(Math.max(currentArea(), activeArea(members.size() + 1)));
         m.x = spawn[0]; m.y = spawn[1];
         m.protectUntil = clockSeconds + tu.joinProtectSeconds();
         members.put(m.entityNo, m);

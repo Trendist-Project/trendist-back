@@ -1,7 +1,7 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 37개, 외래 키 38개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 39개, 외래 키 38개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
 -- 확인 범위: 88판 스키마는 MariaDB 10.11.14에서 두 번 연속 실행해 확인했다. 이후 판은 DB 접속 권한이 없어 실행하지 못했고, 쉼표·괄호·외래 키 참조 대상·생성 순서만 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다.
@@ -593,3 +593,27 @@ CREATE TABLE setting_histories (
   KEY idx_sh_setting (setting_id, created_at),
   CONSTRAINT fk_sh_setting FOREIGN KEY (setting_id) REFERENCES settings (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정 변경 이력';
+
+CREATE TABLE player_positions (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '위치 ID',
+  player_id  BIGINT NOT NULL COMMENT '플레이어(players)',
+  x          DOUBLE NOT NULL COMMENT '마지막 위치 x(px, 맵 가운데가 0)',
+  y          DOUBLE NOT NULL COMMENT '마지막 위치 y(px)',
+  saved_at   DATETIME(6) NOT NULL COMMENT '이 위치에 있던 시각(5분이 지나면 쓰지 않는다)',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_player_positions_player (player_id),
+  KEY idx_player_positions_saved (saved_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어 마지막 위치(서버를 다시 켜도 이어 가기, 9.2)';
+
+CREATE TABLE room_states (
+  id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '방 상태 ID',
+  country_id  BIGINT NOT NULL COMMENT '나라(countries)',
+  active_area DOUBLE NOT NULL COMMENT '활동 영역 한 변(px)',
+  saved_at    DATETIME(6) NOT NULL COMMENT '저장 시각(5분이 지나면 쓰지 않는다)',
+  created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_room_states_country (country_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='방(나라) 저장 상태(활동 영역, 9.2)';

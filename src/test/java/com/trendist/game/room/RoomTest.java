@@ -122,14 +122,14 @@ class RoomTest {
     }
 
     @Test
-    void rejoinWithinOneMinuteKeepsLastPositionAndProtection() {
+    void rejoinWithinFiveMinutesKeepsLastPositionAndProtection() {
         Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 5, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
         Room r = new Room(1, withProtect, new Out());
         Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
         m.x = 321; m.y = -123;
         double protectUntil = m.protectUntil;
         r.leave(m);
-        for (int i = 0; i < 20 * 30; i++) r.tick(); // 30초 뒤 새로고침
+        for (int i = 0; i < 20 * 240; i++) r.tick(); // 4분 뒤 새로고침(기억하는 시간은 5분)
 
         Room.Member back = r.join(1, "s2", "a", 1, 0, List.of());
         assertThat(back.x).isEqualTo(321);
@@ -138,7 +138,7 @@ class RoomTest {
 
         back.x = 321; back.y = -123;
         r.leave(back);
-        for (int i = 0; i < 20 * 61; i++) r.tick(); // 1분이 지나면 새 자리
+        for (int i = 0; i < 20 * 301; i++) r.tick(); // 5분이 지나면 새 자리
         Room.Member later = r.join(1, "s3", "a", 1, 0, List.of());
         assertThat(later.x != 321 || later.y != -123).isTrue();
         assertThat(later.protectUntil).isGreaterThan(protectUntil);

@@ -37,8 +37,10 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private final KeywordService keywordService;
     private final LevelService levels;
     private final ObjectMapper json;
+    private final RoomStateService roomStates;
 
-    public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json) {
+    public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json, RoomStateService roomStates) {
+        this.roomStates = roomStates;
         this.settings = settings;
         this.levels = levels;
         this.keywordService = keywordService;
@@ -50,11 +52,27 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.ComboTuning c = comboTuning();
                 rooms.values().forEach(r -> {
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
+                    r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
                     if (!t.equals(r.tuning())) { r.setTuning(t); r.submit(rr -> broadcastTuning(rr)); }
                     if (!z.equals(r.zoneTuning())) r.setZoneTuning(z);
                 });
             } catch (RuntimeException e) { log.warn("tuning refresh failed", e); }
         }, 1, 1, TimeUnit.SECONDS);
+        // 30초마다 접속 중인 사람의 위치와 활동 영역을 저장한다(서버가 갑자기 꺼져도 최대 30초 전 위치에서 이어 간다)
+        tuningRefresher.scheduleAtFixedRate(() -> {
+            try { rooms.values().forEach(this::saveStateAsync); } catch (RuntimeException e) { log.warn("room state save failed", e); }
+        }, 30, 30, TimeUnit.SECONDS);
+    }
+
+    /** 틱 스레드에서 위치를 모아 작업 스레드에서 저장한다(DB는 틱 밖에서). */
+    private void saveStateAsync(Room r) {
+        r.submit(room -> {
+            List<Room.SavedPos> snap = room.snapshotPositions();
+            double area = room.currentArea();
+            workers.submit(() -> {
+                try { roomStates.save(room.countryId(), area, snap); } catch (RuntimeException e) { log.warn("room state save failed", e); }
+            });
+        });
     }
 
     @Override
@@ -63,6 +81,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             Room r = new Room(id, tuning(), this);
             r.setZoneTuning(zoneTuning());
             r.setComboTuning(comboTuning());
+            r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
+            try { roomStates.area(id).ifPresent(r::restoreArea); } catch (RuntimeException e) { log.warn("room area restore failed", e); } // 서버를 다시 켠 뒤 저장해 둔 활동 영역에서 시작한다
             r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
             ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(
                     run -> { Thread t = new Thread(run, "room-" + id); t.setDaemon(true); return t; }); // 틱은 플랫폼 스레드
@@ -343,6 +363,17 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @PreDestroy
     public void shutdown() {
+        // 서버를 끌 때: 접속 중인 사람과 방금 나간 사람의 위치와 활동 영역을 한 번 저장한다(웹소켓이 먼저 닫혀도 나간 위치를 기억하고 있다)
+        for (Room r : rooms.values()) {
+            try {
+                CompletableFuture<Object[]> snap = new CompletableFuture<>();
+                r.submit(room -> snap.complete(new Object[]{room.snapshotPositions(), room.currentArea()}));
+                @SuppressWarnings("unchecked")
+                List<Room.SavedPos> positions = (List<Room.SavedPos>) snap.get(3, TimeUnit.SECONDS)[0];
+                roomStates.save(r.countryId(), (double) snap.get()[1], positions);
+                log.info("room {} state saved on shutdown: {} positions", r.countryId(), positions.size());
+            } catch (Exception e) { log.warn("room state save on shutdown failed", e); }
+        }
         tickers.values().forEach(ExecutorService::shutdownNow);
         tuningRefresher.shutdownNow();
         workers.shutdownNow();

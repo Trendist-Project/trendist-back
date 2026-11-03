@@ -46,6 +46,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final KeywordService keywordService;
     private final ChatService chatService;
     private final RoomManager rooms;
+    private final com.trendist.game.service.RoomStateService roomStates;
     private final ObjectMapper json;
     private final com.trendist.user.service.SanctionService sanctionService;
     private final com.trendist.country.service.CountryService countries;
@@ -162,11 +163,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 PlayerService.JoinInfo player = info.get();
                 List<Long> keywordIds = keywordService.activeKeywordIds(player.playerId());
                 Room room = rooms.room(player.countryId());
+                Room.Resume resume = roomStates.position(player.playerId()).orElse(null); // 서버를 다시 켠 뒤라면 저장해 둔 마지막 위치
                 WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
                 room.submit(r -> {
                     if (!session.isOpen()) return;
                     Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime(),
-                            new Room.Appearance(player.title(), player.skin(), player.trail()));
+                            new Room.Appearance(player.title(), player.skin(), player.trail()), resume);
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),

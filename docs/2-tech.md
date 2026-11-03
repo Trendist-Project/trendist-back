@@ -61,6 +61,8 @@
 - 느린 클라이언트는 송신 버퍼 상한을 넘으면 오래된 스냅샷을 버린다. DB·외부 호출은 틱 스레드 밖에서 가상 스레드로 처리한다.
 - 방 관리자와 입장 라우팅은 인터페이스로 분리해 두고, 나중에 지역당 여러 방·여러 서버로 늘린다.
 - 설정값 전달: 이동 계산은 항상 서버가 `settings`(1분 캐시)의 값으로 한다. 클라이언트가 예측에 쓰는 값(최대 속도, 반지름·줌 곡선 값)은 입장할 때 서버가 보내 주고, 관리자가 바꿔서 설정이 갱신되면 방 안 모든 클라이언트에 다시 보낸다. 그러지 않으면 내 아이콘 예측이 서버 위치와 어긋난다.
+- 위치·활동 영역 저장: 위치는 방 메모리(`members`, 나간 사람은 `lastSeen`)에만 있어서 서버를 다시 켜면 사라졌다. 그래서 30초마다(`RoomManagerImpl`의 스케줄) 그리고 서버를 끌 때(`@PreDestroy`, 웹소켓이 먼저 닫혀도 `lastSeen`에 남은 위치까지 포함) `Room.snapshotPositions()`를 모아 `RoomStateService.save`가 `player_positions`(플레이어당 한 행, 위치와 저장 시각)와 `room_states`(나라당 한 행, 활동 영역)에 덮어쓴다. 저장은 틱 스레드에서 값만 모으고 DB는 작업 스레드에서 쓰며, 하루가 지난 위치는 지운다. 입장할 때 방이 기억하는 위치(`lastSeen`, 5분)가 있으면 그것을, 없으면 DB의 위치를 `Room.Resume`으로 받아 그 자리에서 시작한다(저장한 지 5분(`REJOIN_KEEP_SECONDS`)이 지났으면 쓰지 않고, 활동 영역 밖이면 영역 안으로 맞추며, 서버를 다시 켠 직후라 입장 보호를 준다). 나간 사람 위치는 나간 뒤 지난 시간만큼 전의 것으로 저장해 5분이 늘어나지 않게 한다.
+- 활동 영역 서서히 줄이기: 한 변의 목표는 `기준 맵 × √(인원/1000)`(최소 기준 맵의 1/4)이고, `Room`이 지금 영역(`areaNow`)을 따로 들고 있다가 목표가 크면 바로 커지고 작으면 설정 `area_shrink_speed`(px/s, 기본 60, 0이면 바로)만큼씩 줄인다. 방을 만들 때 저장해 둔 영역(5분 안)에서 시작해, 서버를 다시 켠 직후 몇 명만 돌아와도 영역이 좁아져 모두가 가장자리로 밀리는 일이 없다. 구슬·세이프존 개수와 이동 범위(`clamp`)는 이 지금 영역을 쓴다.
 - 관리자 관전(13.13): 클라이언트가 `auth` 대신 `spectate{token, country}`를 보내면 관리자 토큰(`AccountGuard.isAdmin`)인지 확인하고 `Room.addSpectator`로 받는다. 관전자는 `members`에 넣지 않아 방 크기·활동 영역·충돌·봇 수·랭킹(`liveView`)·접속 인원에 영향이 없고, 방이 모두에게 보내는 스냅샷(`me` 표시 0)·미니맵·`roster`·`orbs`·`orbSpawn`·`orbEaten`·`safeZones`·`chat`·`emote`·`combo`·`shield`·`tuning`만 받는다. 입장할 때 `roster`·`orbs`·`safeZones`·`chatHistory`를 받고 서버는 `spectating{country, spectators}`로 알린다. 받은 입력(`input`·`move`·`chat`·`emote`)은 모두 버리고 `ping`·`bye`만 받는다. 90초 동안 신호가 없으면 정리하고(`dropSilent`), 방마다 10명까지다. 관리자가 아니거나 토큰이 틀리면 `1008 AUTH_FAILED`로 닫고, 가득 차면 `1008 SPECTATORS_FULL`이다.
 - 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
 - 연속 빼앗기 콤보(4.25): 작업 스레드가 빼앗기·잃기를 끝내면 방 큐에 결과를 넣고, 틱 스레드가 이긴 사람의 콤보 +1, 잃은 사람의 콤보 0을 하고 `combo{e, nickname, combo, event, flameAt, by, byE}`를 방 전체에 보낸다. 불꽃은 클라이언트가 `combo >= flameAt`일 때 그린다(명단 `roster`에도 `flameAt`). 설정은 1초마다 다시 읽는다(`Room.ComboTuning`).
@@ -361,6 +363,7 @@ record TrendBox(
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
 | | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수 |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
+| | `player_positions`, `room_states` | 방 메모리 상태 저장(9.2): 플레이어의 마지막 위치와 저장 시각(플레이어당 한 행), 나라의 활동 영역과 저장 시각(나라당 한 행). 서버를 다시 켜도 5분 안이면 이어 간다 |
 | | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). |
 | | `keyword_ai_comments` | 키워드 AI 한 줄 설명(4.12): 설명, 쓴 쪽(AI/ADMIN), 쓴 시각, 자동 시도 횟수. `keywords.ai_comment_id`가 가리키고(키워드 하나에 행 하나, 처음 만들기를 시도할 때 만듦) 키워드 행은 가볍게 둔다 |
 | | `keyword_log_24h`, `keyword_log_dailies` | 키워드 활동 기록. 시간별(키워드당 24칸 덮어쓰기)과 현지 하루별(180일), 누적 스냅샷과 증분 |
