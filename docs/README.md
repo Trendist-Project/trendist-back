@@ -22,6 +22,15 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 168판 (2026-11-04)
+- 뉴스 제목 기억(`TrendNewsContext`)의 키에 설명 언어를 넣어 KR·GLOBAL이 같은 철자의 키워드에서 서로 덮어쓰지 않게 함(10.4).
+- GLOBAL(영어) 방 오픈(4.18, 5.1, 10.1~10.4, 16.1~16.2): 나라 = UI 언어(KR=ko, GLOBAL=en), 메인 화면 카드 맨 아래의 작은 '서버' 목록에서 선택(기본은 브라우저 언어로 자동, localStorage `trendist.country`, 바꾸면 새로고침, 3.1). GLOBAL 외부 소스는 구글 트렌드 `geo=US`로 결정, 나라별 수집 루프, GLOBAL AI 설명은 영어 프롬프트·미국 영어 뉴스 RSS. 기존 DB는 `UPDATE countries SET enabled = true WHERE code = 'GLOBAL';`을 직접 실행. RSS 상업적 이용은 여전히 미확인(출처 표기 요구, 2026-11-04 확인)
+- `GET /api/me?country=`, `Accept-Language: ko|en`, WebSocket 첫 메시지 `lang`, `chatError` 현지화와 `CHAT_BANNED.until`(9.3, 9.6). 서버 오류 메시지는 한국어 유지, 프론트는 오류 코드로 번역. 프론트 자체 i18n(`src/i18n/{ko,en}`, `src/country.ts`), 관리자 화면은 한국어 고정(8)
+- DB: `titles.name_en`·`description_en`, `guide_categories.name_en`, `guides.title_en`·`body_en`, `notices.title_en`·`body_en`, `effects.name_en`, `effect_types.name_en` 추가(11.2, 4-schema.sql). 영어 시드(`EnglishSeed`)와 시작 때 NULL 칸만 채우는 `EnglishBackfill`(11.3), 가이드 그림 토큰 영어 별칭(4.17)
+- 관리자(13): 나라 선택(KR/GLOBAL)을 대시보드·통계·사용자·AI 설명·키워드에 적용, 사용자 조치 API `?country=`, 공지·가이드·카테고리 영어 입력 칸. 칭호 영어는 시드로만
+- 자랑하기 카드(4.24): GLOBAL은 영어 카드·영어 OG 페이지. 개발 프로필 GLOBAL 키워드 5개
+- 알려진 문제를 16.2에 기록: 뉴스 제목 기억 키가 나라별이 아님, 공유·채팅 날짜 경계 KST, 카드 링크가 나라를 담지 않음, 테스트 드문 불안정, GLOBAL 시간대 UTC
+
 ### 167판 (2026-11-04)
 - 대시 강조 효과(4.27): 뒤로 늘어나는 속도선을 없애고, 원 뒤로 좁아지며 사라지는 하늘색 꼬리 빛으로 바꾸고 더 진하게 함
 

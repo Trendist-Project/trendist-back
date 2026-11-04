@@ -33,8 +33,8 @@
   - 캔버스 크기는 정수로 맞추고 DPR은 2까지만 쓴다(DPR이 소수인 휴대폰에서 매 프레임 캔버스를 새로 만들지 않게). 원 그림자는 `shadowBlur` 대신 반투명 원, ? 구슬은 한 번 그린 그림을 찍는다. 그리다 오류가 나도 다음 프레임은 계속 돈다.
 - 바닥 격자는 작은 타일을 한 번 그려 반복한다. 화면 밖 아이콘은 그리지 않고 이미지는 한 번 받아 캐시한다.
 - 서버 데이터는 TanStack Query, 전역 UI 상태는 Zustand(후보, 버전 고정).
-- 다국어: react-i18next로 언어별 JSON. 빠진 번역은 영어(영어 지원 전에는 한국어)로 대체, 빌드 때 누락 키 검사. DB의 이름(칭호, 키워드·사용자 상태, 나라)은 한글 하나만 두고 다른 언어는 키로 찾는다(칭호·키워드 상태는 ID, 예: `titles.7.name`, 나라는 `countries.code`). ID는 초기 데이터를 넣는 순서로 정해지므로 순서를 바꾸거나 지우지 않는다(안 쓰는 칭호는 `enabled`를 끈다). 서버 오류는 코드와 파라미터로만 받는다.
-- 날짜·숫자는 `Intl` API, 폰트는 Noto Sans(KR·JP·SC·Devanagari)를 필요한 것만 불러온다.
+- 다국어: 외부 라이브러리 없이 작은 자체 i18n을 `src/i18n`에 둔다. 네임스페이스마다 `ko/`·`en/` 파일을 따로 두고(예: `src/i18n/ko/errors.ts`, `src/i18n/en/errors.ts`), 빠진 영어는 한국어로 대체한다. 나라는 `src/country.ts`가 정한다(KR=ko, GLOBAL=en, localStorage `trendist.country`, 바꾸면 페이지 새로 불러옴). 모든 API 요청에 `Accept-Language: ko|en`을 싣는다. 관리자 화면은 한국어로 고정한다. 서버 오류 메시지는 한국어 그대로이고, 화면이 오류 코드로 번역한다(`src/i18n/{ko,en}/errors.ts`). DB의 이름(칭호, 가이드, 공지, 효과 등)은 한국어 칸과 영어 칸(`*_en`)을 함께 두고 서버가 `Accept-Language`에 맞춰 내려 준다(9.6, 11.2). 키워드 상태·사용자 상태·나라 이름은 한글 하나만 두고 코드·ID로 번역한다(ID는 초기 데이터 순서로 정해지므로 순서를 바꾸거나 지우지 않는다. 안 쓰는 칭호는 `enabled`를 끈다).
+- 날짜·숫자는 `Intl` API, 폰트는 Noto Sans(KR·JP·SC·Devanagari)를 필요한 것만 불러온다. 가이드 본문의 그림 토큰은 한국어 토큰이 기준이고 영어 별칭(`[[controls]]` 등)도 받는다(4.17).
 - 키워드 활동 그래프(4.12): SVG로 직접 그리거나 가벼운 차트 라이브러리(후보 uPlot·Recharts, 버전 고정)를 쓴다. 응답은 TanStack Query로 1분 캐시한다.
 - 성공 알림(토스트): 저장·수정·삭제·복사·신고처럼 요청이 잘 끝나면 화면 위 가운데에 초록 알림을 약 2.4초 띄운다(창 위에 겹쳐 보임, 최대 3개, 같은 문구는 하나만). 어느 화면에서든 `successToast('저장했어요')`를 부르고, 알림 영역(`<Toaster />`)은 게임·관리자 페이지에 하나씩 둔다. 오류는 그 입력 칸·창 안에 보여 준다(무엇을 고쳐야 하는지 그 자리에서 보이게). 아레나의 게임 알림(키워드 잃기·빼앗기 등)은 따로다.
 - 접근성: 키보드 포커스, 화면 낭독기 라벨(예: "거북이 아이콘 5단계"), 그래프 요약 문장.
@@ -89,7 +89,7 @@
 - 구현: 버튼을 누르면 구글 계정 선택 페이지(`https://accounts.google.com/o/oauth2/v2/auth`, `response_type=id_token`, `scope=openid`, `prompt=select_account`)로 이동한다. `prompt=select_account`라 브라우저에 로그인된 계정이 자동으로 쓰이지 않고 매번 계정을 고르거나 다른 계정을 추가할 수 있다. 시작할 때 만든 state·nonce를 탭 저장소(sessionStorage)에 두고, 돌아오는 `/oauth/google-callback.html`이 state를 비교한 뒤 ID 토큰을 넘기면 앱이 `POST /api/auth/google {idToken, nonce}`로 보낸다(서버는 토큰 안의 nonce와 비교). 게임 중에 로그인해도 페이지를 다녀와 바로 게임으로 다시 들어온다. 서버는 구글 공개 키(JWKS, `https://www.googleapis.com/oauth2/v3/certs`)로 서명을 확인하고 발급자(accounts.google.com)·대상(우리 클라이언트 ID, 설정 `trendist.google.client-id`)·만료를 본 뒤, 이 사이트의 JWT(액세스 토큰, `sub`=`users.id`)와 갱신 토큰 쿠키(`refresh_token`, 경로 `/`)를 준다. 이후 모든 API·WebSocket은 이 사이트의 JWT로만 인증하고 구글 토큰은 다시 쓰지 않는다. 클라이언트 보안 비밀번호는 쓰지 않으므로 코드·설정·저장소 어디에도 두지 않는다. 구글 콘솔의 OAuth 클라이언트(웹 애플리케이션)에 "승인된 리디렉션 URI"로 `사이트 주소/oauth/google-callback.html`(로컬은 `http://localhost:8080/oauth/google-callback.html`)을 넣어야 한다.
 - 탈퇴 계정 복구: 로그인한 구글 계정이 탈퇴 상태이면 서버는 토큰을 발급하지 않고 `{ "status": "WITHDRAWN" }`을 돌려준다. 클라이언트가 복구 여부를 묻고, 확인하면 같은 구글 ID 토큰으로 `POST /api/auth/google/restore`를 부른다. 서버가 토큰을 다시 검증하고, 탈퇴 상태일 때만 상태를 정상으로 되돌리고 `deleted_at`을 비운 뒤 액세스·갱신 토큰을 발급한다(탈퇴 상태가 아니면 거절). 취소하면 요청을 보내지 않으므로 아무것도 바뀌지 않는다.
 - 로그아웃·탈퇴·계정 금지: 그 사용자의 갱신 토큰을 폐기한다. 로그아웃은 `users.tokens_revoked_at`에 시각을 남겨, 그보다 먼저 발급한 액세스 토큰(JWT의 `iat`)을 남은 수명과 관계없이 바로 거절한다(입장·WebSocket·API 모두, 30초 캐시를 지운다). 액세스 토큰이 살아 있는 15분 동안도 막으려고 입장, WebSocket 연결, 민감한 요청에서는 `banned_until`과 사용자 상태(`user_state_id`)를 짧은 캐시(Caffeine)로 확인하고, 접속 중이면 연결을 끊는다. 탈퇴 상태인 사용자는 구글 로그인 후 복구 확인으로만 돌아올 수 있다(4.1).
-- WebSocket: 토큰을 연결 주소의 쿼리에 담지 않고(로그에 남는다) 연결 직후 첫 메시지로 액세스 토큰을 보낸다. 5초 안에 인증하지 못하면 끊는다. 이미 연결된 뒤에 토큰이 만료되어도 그 연결은 유지하고, 다시 접속할 때 새 토큰을 쓴다.
+- WebSocket: 토큰을 연결 주소의 쿼리에 담지 않고(로그에 남는다) 연결 직후 첫 메시지로 액세스 토큰을 보낸다. 첫 메시지에는 화면 언어 `lang`(ko/en)도 실어 서버가 그 연결의 `chatError` 같은 메시지를 그 언어로 보낸다(채팅 금지 `CHAT_BANNED`에는 끝나는 시각 `until`(epoch ms, 0은 영구)이 있다). 5초 안에 인증하지 못하면 끊는다. 이미 연결된 뒤에 토큰이 만료되어도 그 연결은 유지하고, 다시 접속할 때 새 토큰을 쓴다.
 - 갱신 요청은 `POST`이고 `SameSite=Lax` 쿠키라 다른 사이트에서 보낼 수 없다. CORS는 우리 도메인에만 허용한다. 방문자 ID와 토큰은 URL·쿼리·로그에 넣지 않는다.
 - OAuth 제공자의 사용자 ID(구글은 `sub`)는 SHA-256 해시로만 저장하고, 제공자 종류와 함께 `oauth_type`·`oauth_id`에 둔다. 금지된 계정(`users.banned_until`이 지금보다 뒤)은 입장과 WebSocket 연결을 막는다. 관리자 API는 `ROLE_ADMIN`을 서버에서 검사한다.
 
@@ -155,15 +155,18 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/keywords/{id}/comments/top` | 추천 상위 3개(10초 캐시) |
 | `GET /api/keywords/{id}/comments?page=&size=` | 최신순, `size` 최대 50 |
 | `GET /api/keywords/{id}/activity?range=24h\|7d\|30d\|180d` | 검색 수·`+` 수·가진 사람 수 증분(24시간은 시간별, 나머지는 현지 하루별)과 누적값(1분 캐시). 이번 시간은 메모리 카운터를 합쳐 "집계 중"으로 표시 |
+| `GET /api/me?country=KR\|GLOBAL` | 그 나라 플레이어(없으면 아직 닉네임 전)를 돌려주고 `users.country_id`(마지막으로 플레이한 지역)를 고친다. 모르는 나라·닫힌 나라는 400 |
+| (공통) `Accept-Language: ko\|en` | 없으면 ko. 칭호·가이드·가이드 카테고리·공지·이동/테두리 효과 이름·잠금 사유는 기존 필드에 그 언어 값을 담아 보내고, 영어 값이 비어 있으면 한국어로 대체한다. 서버 오류 메시지는 한국어 그대로이며 화면이 오류 코드로 번역한다(8) |
 | `PATCH /api/me/nickname` | `{ "nickname": "..." }`. 현재 나라 닉네임을 바꾼다(4.1). 규칙 위반 400, 지금과 같으면 400 `NICKNAME_SAME`, 변경 간격 전이면 409 `NICKNAME_TOO_SOON`. 응답은 플레이어 요약이고 `nicknameChangeableAt`(다음 변경 가능 시각, 없으면 바로 가능)을 담는다 |
 | `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW), `popup`(팝업 기간 안, 4.16). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 서버에 남기는 팝업 본 기록(`user_notices`). 아직 없음(지금은 `popup`과 브라우저 저장으로 판단, 4.16) |
-| `GET /api/admin/guide/categories`, `POST /categories`, `PUT /categories/{id}`, `POST /categories/{id}/move`, `DELETE /categories/{id}`, `GET`·`POST /categories/{id}/articles`, `PUT`·`DELETE /articles/{id}`, `POST /articles/{id}/move` | 관리자 가이드 관리(13.4). 카테고리 `{ "code", "name", "displayType": "ARTICLE"\|"FAQ", "enabled" }`(code는 만들 때만, 400 `GUIDE_CODE`, 409 `GUIDE_CODE_EXISTS`), 글이 있는 카테고리 삭제 409 `GUIDE_CATEGORY_NOT_EMPTY`. 글 `{ "title", "body" }`(제목 1~100자, 본문 1~20,000자, 400 `GUIDE_TITLE`·`GUIDE_BODY`), 삭제는 소프트. 순서 `{ "direction": -1\|1 }`는 한 칸 옮기고 전체를 1부터 다시 매긴 목록을 돌려준다 |
-| `GET`·`POST /api/admin/notices`, `PUT`·`DELETE /api/admin/notices/{id}` | 관리자 공지 목록(팝업 설정 포함)·등록·수정·삭제(소프트) `{ "title", "body", "pinned", "popupEnabled", "popupDays" }`. 제목 400 `NOTICE_TITLE`, 본문 400 `NOTICE_BODY`, 팝업 기간 400 `NOTICE_POPUP_DAYS`, 없는 공지 404 `NOTICE_NOT_FOUND`(4.16) |
+| `GET /api/admin/guide/categories`, `POST /categories`, `PUT /categories/{id}`, `POST /categories/{id}/move`, `DELETE /categories/{id}`, `GET`·`POST /categories/{id}/articles`, `PUT`·`DELETE /articles/{id}`, `POST /articles/{id}/move` | 관리자 가이드 관리(13.4). 카테고리 `{ "code", "name", "nameEn", "displayType": "ARTICLE"\|"FAQ", "enabled" }`(code는 만들 때만, 400 `GUIDE_CODE`, 409 `GUIDE_CODE_EXISTS`), 글이 있는 카테고리 삭제 409 `GUIDE_CATEGORY_NOT_EMPTY`. 글 `{ "title", "body", "titleEn", "bodyEn" }`(영어 칸은 선택, 제목 1~100자, 본문 1~20,000자, 400 `GUIDE_TITLE`·`GUIDE_BODY`), 삭제는 소프트. 순서 `{ "direction": -1\|1 }`는 한 칸 옮기고 전체를 1부터 다시 매긴 목록을 돌려준다 |
+| `GET`·`POST /api/admin/notices`, `PUT`·`DELETE /api/admin/notices/{id}` | 관리자 공지 목록(팝업 설정 포함)·등록·수정·삭제(소프트) `{ "title", "body", "titleEn", "bodyEn", "pinned", "popupEnabled", "popupDays" }`(영어 칸은 선택). 제목 400 `NOTICE_TITLE`, 본문 400 `NOTICE_BODY`, 팝업 기간 400 `NOTICE_POPUP_DAYS`, 없는 공지 404 `NOTICE_NOT_FOUND`(4.16) |
 | `GET /api/me/score-history?range=24h\|7d\|30d\|all` | 내 점수 추이(현재 나라). 점 `{t, score, live}`, 기록이 없는 칸은 직전 값, 마지막 점은 지금 값 |
 | `GET /api/room/players/{entity_no}` | 같은 방 다른 플레이어 정보(4.11): 닉네임, 관리자 여부, 활성 칭호, 레벨, 현재 유행도, 댓글 점수, 보관함 상위 3개(이름·상태). 계정당 초당 2회(429 `INFO_TOO_FAST`) |
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404. 7일 외의 range는 400 |
+| `GET /api/admin/users`·사용자 조치 API | 사용자 관리(13.10)는 선택 쿼리 `?country=KR\|GLOBAL`을 받는다(없으면 KR). 대시보드·통계·AI 설명도 같다 |
 | `GET /api/me/admin` | 관리자인지만(`{ "admin": true }`). 관리자 화면과 게임의 [🛠 관리자] 버튼이 부른다 |
 | `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
 | `POST /api/admin/keywords` | `{ "text": "...", "country": "KR" }`. 🔥활성 키워드 추가(반영 소스 admin, 7일, 13.7) |
@@ -288,17 +291,18 @@ record TrendBox(
 
 | name(`data_sources.name`) | 소스 | 지역 | 내용 | 갱신 |
 |---|---|---|---|---|
-| google | 구글 트렌드 실시간 인기 RSS(`https://trends.google.com/trending/rss?geo=KR`) | KR | 지금 급상승 중인 검색어 상위 10개의 제목(`title`). 대략 검색량·관련 뉴스도 오지만 쓰지 않는다 | 약 10분(5분마다 조회) |
+| google | 구글 트렌드 실시간 인기 RSS(`https://trends.google.com/trending/rss?geo=KR`, GLOBAL은 `geo=US`) | KR, GLOBAL | 지금 급상승 중인 검색어 상위 10개의 제목(`title`). 대략 검색량·관련 뉴스도 오지만 쓰지 않는다 | 약 10분(5분마다 조회) |
 | admin | 관리자가 직접 넣은 키워드(13.7) | 전체 | 관리자 화면에서 넣은 🔥활성 키워드. 넣은 때부터 7일 유지 | - |
 | internal | 서비스 내부 | 전체 | 외부에서 확인되지 않은 키워드의 반영 소스. 점수는 가진 사람 수만으로 정함(4.8) | - |
 
-- 구글 실시간 인기는 공식 API가 아니라 구독용으로 공개된 RSS다. 인증·한도가 없고 `robots.txt`가 막지 않는 경로지만, 형식이 바뀌거나 막힐 수 있다. 그래서 읽지 못해도 게임은 그대로 돈다(10.2). 정식 출시 전에 상업적 이용 가능 여부를 확인한다(16.2).
+- 구글 실시간 인기는 공식 API가 아니라 구독용으로 공개된 RSS다. 인증·한도가 없고 `robots.txt`가 막지 않는 경로지만, 형식이 바뀌거나 막힐 수 있다. 그래서 읽지 못해도 게임은 그대로 돈다(10.2). 정식 출시 전에 상업적 이용 가능 여부를 확인한다(16.2). 구글 도움말은 출처 표기("Data source: Google Trends")를 요구한다.
 - 쓰지 않는 것: Google Ads 키워드 플래너, Google Trends API(알파), 구글 트렌드 웹 화면 스크래핑(내부 API `batchexecute` 포함), Custom Search JSON API, Search Console API, 네이버 데이터랩·검색 API, BigQuery Google Trends 공개 데이터셋, 위키백과, YouTube, 바이두, 웨이보, Yahoo! JAPAN.
+- 개발 프로필의 외부 소스 흉내(`dev-trends`)는 KR 키워드 외에 GLOBAL용 영어 키워드 5개(`trendist.dev-trends.global-keywords`)도 넣는다.
 - 나라별로 쓰는 소스는 위 표의 '지역' 열을 기준으로 코드(설정)에 둔다. `data_sources`에는 나라 열이 없고 소스마다 가중치 하나만 있어서, 같은 소스를 여러 나라가 쓰면 가중치를 공유한다.
-- 해외 지역은 외부 소스를 정한 뒤 연다(16.1). 나라별로 독립 수집해서 한 소스가 막혀도 나머지는 계속된다.
+- GLOBAL은 미국(`geo=US`) 구글 트렌드로 정했다(소스 이름 `google`은 KR과 같고, 가중치도 공유한다). JP·IN은 외부 소스를 정한 뒤 연다(16.1). 나라별로 독립 수집해서 한 나라나 소스가 막혀도 나머지는 계속된다.
 
 ### 10.2 수집 방식
-- 구글 실시간 인기(google, KR)
+- 구글 실시간 인기(google, KR·GLOBAL): 열린 나라마다 수집 루프를 따로 돌린다(나라별 `geo`로 RSS를 읽고, 키워드·유지 기간 `external_until`·만료 처리도 그 나라 안에서만 한다). 아래 설명은 한 나라 기준이다.
   - 5분마다 RSS를 읽는다. 각 제목(`title`)에서 키워드에 쓸 수 없는 문자(`:` 같은 문장 부호)는 공백으로 바꾸고 4.6 등록 조건 검사를 거친다. 통과하지 못한 제목은 버린다.
   - 처음 올라온 제목은 키워드를 새로 만들어 🔥활성, 반영 소스 `google`로 시작한다. 이미 있는 키워드(금지 제외)는 반영 소스를 `google`로 바꾸고 🔥로 만든다. 이때부터 7일 동안 외부 데이터에 의한 활성으로 유지한다(`keywords.external_until` = 지금 + 7일, 설정값 `external_hold_hours` 기본 168). 목록에 다시 보일 때마다(5분마다) 지금 시각부터 7일로 다시 센다.
   - 유지 기간이 끝나면(5분마다 검사, 마지막으로 읽은 목록 기준) 지금 목록에 아직 있으면 지금부터 다시 7일 유지한다. 목록에 없으면 반영 소스를 `internal`(내부 데이터)로 바꾸고, 가진 사람이 활성 조건(3명) 이상이면 🔥를 유지, 미만이면 💤비활성으로 바꾼다. 트렌드 값과 보유자 점수도 다시 계산한다.
@@ -317,7 +321,8 @@ record TrendBox(
 | 나라 | 소스 | 가중치(반영값, 0~2) |
 |---|---|---|
 | KR | google / admin / internal | 1 / 1 / 1 |
-| GLOBAL·JP·IN | internal(외부 소스 미정, 16.1) | 1 |
+| GLOBAL | google / admin / internal | 1 / 1 / 1 |
+| JP·IN | internal(외부 소스 미정, 16.1) | 1 |
 
 - 나라마다 외부 소스는 하나이고, 한 키워드는 한 번에 반영 소스를 하나만 가진다(`internal` 아니면 그 외부 소스). 외부 소스를 더 붙이면 외부 확인된 소스 중 가중치가 큰 쪽을 쓴다. 트렌드 값의 식은 4.8에 있다.
 - 가중치는 소스마다 하나이고 0~2다(식의 최대 기준값 50 × 최대 가중치 2 = 100 상한 때문). 0이면 그 소스를 반영 소스로 쓰지 않는다(외부 확인에서도 제외). 지금은 모든 소스가 1이다.
@@ -325,8 +330,10 @@ record TrendBox(
 
 ### 10.4 AI 한 줄 설명(제미나이)
 - 연동: 구글 Gemini API의 REST `generateContent`. 모델은 `gemini-3.5-flash-lite`가 기본이고 환경 변수 `GEMINI_MODEL`로 바꾼다(2026-11 확인: `gemini-2.5-flash-lite`는 새 사용자에게 더는 열려 있지 않아 404가 난다). 키는 서버 환경 변수(로컬 `DEV_GEMINI_API_KEY`, 운영 `PROD_GEMINI_API_KEY`)에만 두고 브라우저로 보내지 않는다. 키가 없으면 기능이 꺼지고(카드에 설명 칸이 안 보임) 직접 수정은 된다. 구현은 `GeminiClient`(인터페이스, 시험에서는 가짜로 교체)·`GeminiClientImpl`.
+- 언어: 키워드를 그 나라의 기본 언어별로 묶어 요청한다. KR은 한국어 요청문과 한국어 뉴스 RSS, GLOBAL은 영어 요청문과 미국 영어 뉴스 RSS(`hl=en-US`)를 쓰고, 저장되는 설명도 영어다. 아래 요청문 설명은 한국어 기준이다.
 - 요청문: 사전식 뜻풀이가 아니라 "지금 왜 화제인지"(사건·발표·방송·경기·출시·논란·밈)를 한국어 한 문장(90자 이내, 존댓말)으로 쓰게 한다. 키워드마다 RSS가 준 관련 뉴스 제목(`TrendNewsContext`, 최대 5개)을 붙여 보내고 그 제목만 근거로 쓰게 하며(제목을 베끼지 않고 풀어서), 제목이 없으면 확실히 알 때만 쓰고 아니면 `UNKNOWN`이다. 추측·루머·비방·사생활·선정적 표현·링크·이모지·마크다운은 금지한다. 뉴스 제목은 `GoogleTrendingSource`가 5분마다 RSS를 읽을 때 `ht:news_item_title`에서 꺼내 서버 메모리에 둔다(재시작하면 다음 읽기에 다시 채워지고, 최대 1000개).
-- **RSS 밖 키워드의 뉴스 찾기**: 사용자가 직접 등록해 🔥가 된 키워드에는 RSS의 뉴스 제목이 없다. 이때는 `GoogleNewsSearchClient`가 구글 뉴스 검색 RSS(`news.google.com/rss/search?q=키워드 when:7d`, 키 없이 무료)에서 제목을 찾아 같은 방식으로 제미나이에 보낸다. 제목에 키워드(공백·대소문자 무시)가 든 것만 최대 5개 쓰고 " - 매체" 꼬리는 뗀다. 결과가 없거나 실패하면 빈 목록이라 AI는 "모름"으로 답하고 관리자가 직접 쓴다. 키워드당 시도는 최대 3번이라 검색도 그만큼만 나가고, 찾은 제목은 `TrendNewsContext`에 기억한다. 테스트·로컬에서 끄려면 `trendist.news-search.enabled=false`.
+- **뉴스 제목 기억의 키**: `TrendNewsContext`는 (설명 언어 ko·en, 정규화한 키워드)로 기억해, 철자가 같은 키워드가 KR과 GLOBAL에 모두 있어도 한국어·영어 뉴스 제목이 서로 덮어쓰지 않는다.
+**RSS 밖 키워드의 뉴스 찾기**: 사용자가 직접 등록해 🔥가 된 키워드에는 RSS의 뉴스 제목이 없다. 이때는 `GoogleNewsSearchClient`가 구글 뉴스 검색 RSS(`news.google.com/rss/search?q=키워드 when:7d`, 키 없이 무료)에서 제목을 찾아 같은 방식으로 제미나이에 보낸다. 제목에 키워드(공백·대소문자 무시)가 든 것만 최대 5개 쓰고 " - 매체" 꼬리는 뗀다. 결과가 없거나 실패하면 빈 목록이라 AI는 "모름"으로 답하고 관리자가 직접 쓴다. 키워드당 시도는 최대 3번이라 검색도 그만큼만 나가고, 찾은 제목은 `TrendNewsContext`에 기억한다. 테스트·로컬에서 끄려면 `trendist.news-search.enabled=false`.
 - **묶음 요청**: 키워드를 하나씩 보내지 않고 한 요청에 `ai_comment_batch_size`(기본 10)개를 번호를 붙여 보내고, 응답도 `[{no, comment}]` 배열로 받아 번호로 맞춘다. 실측(2026-11-03, 실제 구글 트렌드 제목 10개): 하나씩 보내면 요청 10번·9.4초·약 2,300토큰, 묶으면 요청 1번·2.1초·약 650토큰이었다(요청 수 1/10, 시간 약 1/4.5, 토큰 약 1/3.5). 무료 한도는 요청 수(분당·하루)가 기준이라 요청 수가 줄어드는 효과가 가장 크다. 시스템 요청문(약 200토큰)을 매번 되풀이하지 않는 것이 토큰 절감의 대부분이다. 대신 한 요청이 통째로 실패하면 묶인 키워드가 같이 실패(→ 다음 분에 다시)하고, 한 키워드의 답이 빠지면 그것만 다시 시도한다. 묶음 답에서 개별 요청에서는 모른다던 키워드를 그럴듯하게 지어낼 가능성이 있어(실측에서 1건) 묶음 크기를 10으로 두고 UNKNOWN 지시를 강하게 했다.
 - 구글 검색 확인(그라운딩): 최신 이슈를 맞게 설명하려는 기능이지만 **무료 등급에서는 쓸 수 없다**(실측: 3.5 Flash-Lite·3.5 Flash 모두 429 "quota exceeded"). 그래서 기본은 꺼짐(`ai_comment_grounding` 0)이고, 결제를 연결한 뒤에 켠다. 꺼 두면 모델이 아는 범위에서만 설명해서 아주 최근 사건·신조어는 `UNKNOWN`이 늘 수 있다(실측 10개 중 2~3개). 그런 키워드는 "설명 없음"에 쌓이고 관리자가 직접 쓰거나(13.12) 나중에 재요청한다.
 - 자동 생성: `AiCommentServiceImpl.generatePending()`이 1분마다 돌아, 한 번이라도 🔥가 됐고(`activated_at`) 설명이 없고 금지가 아니고 시도 횟수가 3 미만인 키워드를 최근 🔥가 된 것부터 한 요청에 묶어 보낸다. 요청은 1분에 한 번, 하루 최대 `ai_comment_daily_max`(기본 400)번이다. 요청이 실패하면 묶인 키워드의 시도 횟수를 올리고 다음 분에 다시, 모른다고 하면(`UNKNOWN`) 그 키워드는 바로 포기(시도 횟수 3)해 같은 질문을 되풀이하지 않는다. 제미나이가 한도(429)를 알려 오면 10분 동안 자동 요청을 쉰다. 설정 `ai_comment_enabled`를 0으로 하면 멈춘다.
@@ -356,8 +363,8 @@ record TrendBox(
 | | `users` | 계정(게스트 포함). 방문자 ID, OAuth 종류·ID, 상태, 권한, UI 언어, 계정 금지·업로드 정지 만료 시각, 탈퇴 시각 |
 | | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 마지막 접속 시각, 누적 `+` 횟수, 댓글 점수 |
 | | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
-| | `titles`, `player_titles` | 칭호 목록과 플레이어별 보유 칭호 |
-| | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
+| | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
+| | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
 | | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자가 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
@@ -373,8 +380,8 @@ record TrendBox(
 | | `chat_messages` | 채팅(30일 보관) |
 | | `share_cards` | 자랑하기 카드 공유 주소(4.24). 공개 코드와 공유한 순간의 카드 값(JSON, 고치지 않음), 누적 조회·클릭 수, 영구 보관 |
 | | `report_types`, `reports` | 신고 대상 유형과 신고(대상 유형 + ID) |
-| 운영 | `notices`, `user_notices` | 공지와 팝업 열람 기록 |
-| | `guide_categories`, `guides` | 게임 가이드 |
+| 운영 | `notices`, `user_notices` | 공지(영어 `title_en`·`body_en`)와 팝업 열람 기록 |
+| | `guide_categories`, `guides` | 게임 가이드(영어 `name_en` / `title_en`·`body_en`) |
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
 | | `settings`, `setting_histories` | 밸런스 설정과 변경 이력 |
 | | `blocked_terms`, `blocked_nicknames` | 차단어, 금지 닉네임 |
@@ -397,17 +404,18 @@ record TrendBox(
 초기 데이터
 - 시작할 때마다 시더(`ApplicationRunner`)가 스키마 반영이 끝난 뒤 필요한 테이블을 검사해서, 비어 있으면 초기값을 자동으로 넣는다. 그래서 `reset` 직후나 새 DB에서도 바로 테스트할 수 있다.
 - 코드가 이름으로 찾는 테이블(`user_states`, `keyword_states`, `data_sources`, `settings`, `report_types`, `sanction_types`, `countries`, `levels`)은 없는 행만 채운다(고유 이름·번호 기준, 기존 값은 덮어쓰지 않는다). 코드를 고쳐 새 설정이나 상태가 늘어도 다음 실행에 채워진다.
+- 영어 값(`name_en` 등)은 `seed/EnglishSeed.java`에 있다(칭호 51개, 가이드 카테고리 7개와 글 38개, 효과 21개와 효과 종류 2개). `EnglishBackfill`이 시작할 때마다 영어 칸이 NULL인 행만 채우고(칭호는 한국어 이름, 효과는 코드, 카테고리는 코드, 글은 (카테고리 코드, 한국어 제목)으로 짝지음) 이미 있는 값은 덮어쓰지 않는다. 알려진 한계: 관리자가 영어 칸을 비우면 다음 재시작에 다시 채워진다.
 - 운영에서 지우거나 고치는 데이터(`titles`, `guide_categories`, `blocked_nicknames`, `blocked_terms`)는 테이블이 비어 있을 때만 넣는다. 관리자가 일부러 지운 행이 다시 생기지 않게 하려는 것이다.
 - ID 순서가 번역 키가 되는 테이블(`titles`, `keyword_states`, `user_states`)은 시드 순서를 고정해서 `reset`을 해도 같은 ID가 나오게 한다.
 
 | 테이블 | 넣는 값 |
 |---|---|
-| `countries` | KR(오픈), GLOBAL·JP·IN·CN(닫힘), 시간대·기본 언어·방 상한 |
+| `countries` | KR·GLOBAL(오픈), JP·IN·CN(닫힘), 시간대·기본 언어·방 상한. 이미 있는 DB는 기본값이 바뀌지 않으므로 GLOBAL을 열려면 `UPDATE countries SET enabled = true WHERE code = 'GLOBAL';`을 직접 실행한다 |
 | `settings` | 13.3의 기본값과 허용 범위 |
 | `data_sources` | google 1, admin 1, internal 1 (10.3) |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
-| `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`) |
+| `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`). 영어 칸은 위 `EnglishBackfill`이 채운다 |
 | `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 12개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 시드 글을 고쳐도 이미 들어간 DB는 바꾸지 않는다(관리자 화면에서 고친다) |
