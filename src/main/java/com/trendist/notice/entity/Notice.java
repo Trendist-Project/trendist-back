@@ -2,6 +2,7 @@ package com.trendist.notice.entity;
 
 import com.trendist.common.entity.BaseTimeEntity;
 import com.trendist.user.entity.User;
+import com.trendist.common.support.Lang;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -19,6 +20,8 @@ public class Notice extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false) private User user;
     @Column(nullable = false, length = 100) private String title;
     @Column(nullable = false, columnDefinition = "TEXT") private String body;
+    @Column(name = "title_en", length = 100) private String titleEn;
+    @Column(name = "body_en", columnDefinition = "TEXT") private String bodyEn;
     @Column(nullable = false) private boolean pinned;
     @Column(name = "popup_enabled", nullable = false) private boolean popupEnabled = true;
     @Column(name = "popup_until", columnDefinition = "DATETIME(6)") private Instant popupUntil;
@@ -28,6 +31,14 @@ public class Notice extends BaseTimeEntity {
     public void change(String title, String body, boolean pinned, boolean popupEnabled, Instant popupUntil) {
         this.title = title; this.body = body; this.pinned = pinned; this.popupEnabled = popupEnabled; this.popupUntil = popupUntil;
     }
+
+    /** 관리자 수정(영어판 포함) */
+    public void change(String title, String titleEn, String body, String bodyEn, boolean pinned, boolean popupEnabled, Instant popupUntil) {
+        change(title, body, pinned, popupEnabled, popupUntil); this.titleEn = titleEn; this.bodyEn = bodyEn;
+    }
+
+    public String title(Lang lang) { return lang.pick(title, titleEn); }
+    public String body(Lang lang) { return lang.pick(body, bodyEn); }
 
     /** 소프트 삭제(4.16) */
     public void delete(Instant now) { this.deletedAt = now; }

@@ -61,11 +61,11 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     @Transactional(readOnly = true)
-    public ProfileDtos.Box box(long userId) {
-        return box(playerService.requireCurrent(userId));
+    public ProfileDtos.Box box(long userId, com.trendist.common.support.Lang lang) {
+        return box(playerService.requireCurrent(userId), lang);
     }
 
-    private ProfileDtos.Box box(Player p) {
+    private ProfileDtos.Box box(Player p, com.trendist.common.support.Lang lang) {
         int unlock = settings.getInt(SettingKeys.CUSTOMIZE_UNLOCK_LEVEL);
         Instant now = Instant.now(clock);
         List<Profile> mine = profiles.findByPlayerIdOrderBySlotAsc(p.getId());
@@ -79,17 +79,17 @@ public class ProfileServiceImpl implements ProfileService {
                     : new ProfileDtos.Slot(s, true, s == equippedSlot, pr.getProfileType(), looks.look(p, pr),
                             pr.hasArt() ? art(pr) : null, pr.getTrailEffectId(), pr.getBorderEffectId(), pr.getUpdatedAt()));
         }
-        String lock = p.getUser().isGuest() ? "Google로 로그인하면 그림을 그릴 수 있어요"
-                : p.getUser().isUploadBanned(now) ? "그림 저장이 정지된 계정이에요" : null;
+        String lock = p.getUser().isGuest() ? lang.pick("Google로 로그인하면 그림을 그릴 수 있어요", "Sign in with Google to draw")
+                : p.getUser().isUploadBanned(now) ? lang.pick("그림 저장이 정지된 계정이에요", "Saving drawings is suspended for this account") : null;
         Instant changeableAt = nextArtChange(mine);
         return new ProfileDtos.Box(slots, equippedSlot, p.getLevel() >= unlock, unlock, ProfileLooks.DEFAULT, PRESETS, NAME_STYLES,
                 lock == null, lock, changeableAt != null && now.isBefore(changeableAt) ? changeableAt : null, PixelArt.SIZE, PixelArt.MAX_COLORS,
-                effects.options(p, EffectType.TRAIL), effects.options(p, EffectType.BORDER));
+                effects.options(p, EffectType.TRAIL, lang), effects.options(p, EffectType.BORDER, lang));
     }
 
     @Override
     @Transactional
-    public ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req) {
+    public ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req, com.trendist.common.support.Lang lang) {
         checkSlot(slot);
         Player p = requireUnlocked(userId);
         Instant now = Instant.now(clock);
@@ -146,12 +146,12 @@ public class ProfileServiceImpl implements ProfileService {
         }
         profiles.flush();
         if (looks.equipped(p.getId()).map(x -> x.getSlot() == slot).orElse(slot == 1)) publish(p);
-        return box(p);
+        return box(p, lang);
     }
 
     @Override
     @Transactional
-    public ProfileDtos.Box equip(long userId, int slot) {
+    public ProfileDtos.Box equip(long userId, int slot, com.trendist.common.support.Lang lang) {
         checkSlot(slot);
         Player p = requireUnlocked(userId);
         lookRate(p);
@@ -162,7 +162,7 @@ public class ProfileServiceImpl implements ProfileService {
         target.setEquipped(true);
         profiles.flush();
         publish(p);
-        return box(p);
+        return box(p, lang);
     }
 
     @Override

@@ -54,3 +54,10 @@ trendist:
       - "탕후루:35"
       - "케이팝:70"
       - "말차라떼:41"
+    # GLOBAL(영어) 방용
+    global-keywords:
+      - "dubai chocolate:78"
+      - "labubu:66"
+      - "matcha latte:45"
+      - "taylor swift:72"
+      - "ai agents:58"

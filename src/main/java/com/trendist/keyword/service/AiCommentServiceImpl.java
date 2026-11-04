@@ -79,17 +79,38 @@ public class AiCommentServiceImpl implements AiCommentService {
         List<Long> ids = keywords.findIdsNeedingAiComment(codes.keywordStateId(CodeTables.KW_BANNED), MAX_ATTEMPTS,
                 PageRequest.of(0, settings.getInt(SettingKeys.AI_COMMENT_BATCH_SIZE)));
         if (ids.isEmpty()) return 0;
-        Map<Long, String> texts = new LinkedHashMap<>();
-        for (Long id : ids) keywords.findById(id).ifPresent(k -> texts.put(id, k.getText()));
-        if (texts.isEmpty()) return 0;
+        // 나라마다 설명 언어가 다르다(KR=한국어, GLOBAL=영어): 언어별로 묶어 요청 한 번씩 보낸다. 저장되는 설명도 그 언어다
+        Map<String, Map<Long, String>> byLang = new LinkedHashMap<>();
+        for (Long id : ids) {
+            tx.executeWithoutResult(s -> keywords.findById(id).ifPresent(k ->
+                    byLang.computeIfAbsent(langOf(k), l -> new LinkedHashMap<>()).put(id, k.getText())));
+        }
+        int made = 0;
+        for (var group : byLang.entrySet()) {
+            if (usedToday >= settings.getInt(SettingKeys.AI_COMMENT_DAILY_MAX)) break;
+            Integer r = generateGroup(group.getKey(), group.getValue(), grounding);
+            if (r == null) return made; // 한도(429): 쉰다
+            made += r;
+        }
+        return made;
+    }
+
+    /** 키워드가 속한 나라의 설명 언어: 나라 기본 언어가 영어면 en, 아니면 ko. 트랜잭션 안에서 불러야 한다. */
+    private static String langOf(Keyword k) {
+        String l = k.getCountry().getDefaultLocale();
+        return l != null && l.toLowerCase(Locale.ROOT).startsWith("en") ? "en" : "ko";
+    }
+
+    /** 한 언어 묶음을 요청해 저장한다. 만든 수를 돌려주고, 한도(429)에 걸려 쉬게 됐으면 null. */
+    private Integer generateGroup(String lang, Map<Long, String> texts, boolean grounding) {
         usedToday++;
         Map<String, Optional<String>> answers;
         try {
-            answers = gemini.describeAll(new ArrayList<>(texts.values()), newsOf(texts.values()), grounding);
+            answers = gemini.describeAll(new ArrayList<>(texts.values()), newsOf(texts.values(), lang), grounding, lang);
         } catch (GeminiClient.RateLimitedException e) {
             pausedUntil = Instant.now(clock).plus(COOL_DOWN);
             log.warn("gemini rate limited: pause auto comments until {}", pausedUntil);
-            return 0;
+            return null;
         } catch (Exception e) {
             log.warn("ai comments failed for {} keywords: {}", texts.size(), e.toString());
             tx.executeWithoutResult(s -> texts.keySet().forEach(id -> keywords.findById(id).ifPresent(k -> aiRow(k).incAttempts())));
@@ -108,17 +129,17 @@ public class AiCommentServiceImpl implements AiCommentService {
                 unknown++;
             }
         }
-        log.info("ai comments: {} made, {} unknown, {} requested in one request", made, unknown, texts.size());
+        log.info("ai comments [{}]: {} made, {} unknown, {} requested in one request", lang, made, unknown, texts.size());
         return made;
     }
 
-    private Map<String, List<String>> newsOf(Collection<String> texts) {
+    private Map<String, List<String>> newsOf(Collection<String> texts, String lang) {
         Map<String, List<String>> m = new HashMap<>();
         for (String t : texts) {
-            List<String> h = newsContext.get(t);
+            List<String> h = newsContext.get(lang, t);
             if (h.isEmpty()) { // RSS가 제목을 주지 않은 키워드(사용자가 등록한 유행어 등): 구글 뉴스에서 찾아 본다
-                h = newsSearch.search(t);
-                newsContext.put(t, h);
+                h = newsSearch.search(t, lang);
+                newsContext.put(lang, t, h);
             }
             if (!h.isEmpty()) m.put(t, h);
         }
@@ -181,8 +202,10 @@ public class AiCommentServiceImpl implements AiCommentService {
         if (!gemini.enabled()) throw ApiException.conflict("AI_DISABLED", "AI 연결(제미나이 API 키)이 설정되지 않았어요");
         Keyword k = keywords.findById(keywordId).orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
         Optional<String> text;
+        String lang = tx.execute(st -> langOf(keywords.findById(keywordId).orElseThrow())); // 키워드가 속한 나라의 언어로
         try {
-            Map<String, Optional<String>> r = gemini.describeAll(List.of(k.getText()), newsOf(List.of(k.getText())), settings.getInt(SettingKeys.AI_COMMENT_GROUNDING) == 1);
+            Map<String, Optional<String>> r = gemini.describeAll(List.of(k.getText()), newsOf(List.of(k.getText()), lang),
+                    settings.getInt(SettingKeys.AI_COMMENT_GROUNDING) == 1, lang);
             if (!r.containsKey(k.getText())) throw new IllegalStateException("AI 답에 이 키워드가 없어요");
             text = r.get(k.getText());
         } catch (GeminiClient.RateLimitedException e) {

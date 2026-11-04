@@ -1,6 +1,7 @@
 package com.trendist.effect.support;
 
 import com.trendist.common.exception.ApiException;
+import com.trendist.common.support.Lang;
 import com.trendist.effect.entity.Effect;
 import com.trendist.effect.repository.EffectRepository;
 import com.trendist.player.entity.Player;
@@ -26,10 +27,13 @@ public class EffectRules {
     /** 고를 수 있는 효과 하나: 잠겼으면 lockReason에 얻는 조건 */
     public record Option(long id, String code, String name, boolean unlocked, String lockReason) {}
 
-    public List<Option> options(Player p, String typeCode) {
+    public List<Option> options(Player p, String typeCode) { return options(p, typeCode, Lang.KO); }
+
+    /** 이름과 잠금 안내를 그 언어로(영어 이름이 비어 있으면 한국어) */
+    public List<Option> options(Player p, String typeCode, Lang lang) {
         return effects.findEnabled(typeCode).stream().map(e -> {
-            String lock = lockReason(p, e);
-            return new Option(e.getId(), e.getCode(), e.getName(), lock == null, lock);
+            String lock = lockReason(p, e, lang);
+            return new Option(e.getId(), e.getCode(), e.name(lang), lock == null, lock);
         }).toList();
     }
 
@@ -38,7 +42,7 @@ public class EffectRules {
         if (effectId == null) return null;
         Effect e = effects.findWithType(effectId).filter(x -> x.isEnabled() && x.isType(typeCode))
                 .orElseThrow(() -> ApiException.notFound("EFFECT_NOT_FOUND", "없는 효과예요"));
-        String lock = lockReason(p, e);
+        String lock = lockReason(p, e, Lang.KO); // 오류 메시지는 코드(EFFECT_LOCKED)로 프론트가 번역한다
         if (lock != null) throw ApiException.forbiddenCode("EFFECT_LOCKED", lock);
         return e.getId();
     }
@@ -53,18 +57,19 @@ public class EffectRules {
      * 아직 얻지 못했으면 조건 안내, 얻었으면 null. 효과는 꾸미기의 하나라 꾸미기 해금 레벨(기본 11)부터, Google로 로그인한 사용자만 쓴다.
      * 그 위에 효과마다 조건을 더 붙일 수 있다. 결제(PURCHASE)는 아직 없어서 고를 수 없다.
      */
-    private String lockReason(Player p, Effect e) {
+    private String lockReason(Player p, Effect e, Lang lang) {
         int unlock = settings.getInt(com.trendist.setting.support.SettingKeys.CUSTOMIZE_UNLOCK_LEVEL);
-        if (p.getLevel() < unlock) return unlock + "레벨부터 쓸 수 있어요";
-        if (p.getUser().isGuest()) return "Google로 로그인하면 쓸 수 있어요";
+        if (p.getLevel() < unlock) return lang.pick(unlock + "레벨부터 쓸 수 있어요", "Unlocks at level " + unlock);
+        if (p.getUser().isGuest()) return lang.pick("Google로 로그인하면 쓸 수 있어요", "Sign in with Google to use this");
         Long v = e.getUnlockValue();
         return switch (e.getUnlockType()) {
             case Effect.FREE -> null;
-            case Effect.LEVEL -> v == null || p.getLevel() >= v ? null : v + "레벨부터 쓸 수 있어요";
+            case Effect.LEVEL -> v == null || p.getLevel() >= v ? null : lang.pick(v + "레벨부터 쓸 수 있어요", "Unlocks at level " + v);
             case Effect.TITLE -> v == null || playerTitles.existsByPlayerIdAndTitleId(p.getId(), v) ? null
-                    : "칭호 '" + titles.findById(v).map(Title::getName).orElse("?") + "'을(를) 받으면 쓸 수 있어요";
-            case Effect.PURCHASE -> "구매하면 쓸 수 있어요(준비 중)";
-            default -> "아직 쓸 수 없어요";
+                    : lang.pick("칭호 '" + titles.findById(v).map(Title::getName).orElse("?") + "'을(를) 받으면 쓸 수 있어요",
+                            "Earn the title '" + titles.findById(v).map(t -> t.name(lang)).orElse("?") + "' to use this");
+            case Effect.PURCHASE -> lang.pick("구매하면 쓸 수 있어요(준비 중)", "Available for purchase (coming soon)");
+            default -> lang.pick("아직 쓸 수 없어요", "Not available yet");
         };
     }
 }

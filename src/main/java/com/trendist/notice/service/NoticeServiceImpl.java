@@ -1,6 +1,7 @@
 package com.trendist.notice.service;
 
 import com.trendist.common.exception.ApiException;
+import com.trendist.common.support.Lang;
 import com.trendist.notice.dto.AdminNoticeDtos;
 import com.trendist.notice.dto.NoticeItem;
 import com.trendist.notice.entity.Notice;
@@ -32,10 +33,10 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<NoticeItem> list() {
+    public List<NoticeItem> list(Lang lang) {
         Instant now = Instant.now(clock);
         return notices.findByDeletedAtIsNullOrderByPinnedDescCreatedAtDesc(PageRequest.of(0, LIMIT)).stream()
-                .map(n -> new NoticeItem(n.getId(), n.getTitle(), n.getBody(), n.isPinned(), n.getCreatedAt(),
+                .map(n -> new NoticeItem(n.getId(), n.title(lang), n.body(lang), n.isPinned(), n.getCreatedAt(),
                         n.getUpdatedAt().isAfter(n.getCreatedAt().plus(EDIT_GRACE)),
                         n.getCreatedAt().isAfter(now.minus(FRESH)),
                         n.isPopupEnabled() && n.getPopupUntil() != null && n.getPopupUntil().isAfter(now)))
@@ -53,7 +54,9 @@ public class NoticeServiceImpl implements NoticeService {
     public AdminNoticeDtos.Item create(long authorUserId, AdminNoticeDtos.Request req) {
         User author = users.findById(authorUserId).orElseThrow(() -> ApiException.unauthorized("NO_USER"));
         Instant now = Instant.now(clock);
-        Notice n = notices.save(new Notice(author, title(req), body(req), req.pinned(), req.popupEnabled(), popupUntil(req, now)));
+        Notice n = new Notice(author, title(req), body(req), req.pinned(), req.popupEnabled(), popupUntil(req, now));
+        n.change(n.getTitle(), titleEn(req), n.getBody(), bodyEn(req), n.isPinned(), n.isPopupEnabled(), n.getPopupUntil());
+        notices.save(n);
         notices.flush();
         return item(n);
     }
@@ -64,7 +67,7 @@ public class NoticeServiceImpl implements NoticeService {
         Notice n = notices.findById(id).filter(x -> x.getDeletedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("NOTICE_NOT_FOUND", "없는 공지예요"));
         // 팝업 기간은 등록 시각부터 센다(수정해도 기간이 새로 늘어나지 않는다)
-        n.change(title(req), body(req), req.pinned(), req.popupEnabled(), popupUntil(req, n.getCreatedAt()));
+        n.change(title(req), titleEn(req), body(req), bodyEn(req), req.pinned(), req.popupEnabled(), popupUntil(req, n.getCreatedAt()));
         notices.flush();
         return item(n);
     }
@@ -91,6 +94,18 @@ public class NoticeServiceImpl implements NoticeService {
         return b;
     }
 
+    /** 영어판은 비워 둘 수 있다(비면 null = 한국어로 대신) */
+    private static String titleEn(AdminNoticeDtos.Request req) { return optional(req.titleEn(), TITLE_MAX, "NOTICE_TITLE"); }
+
+    private static String bodyEn(AdminNoticeDtos.Request req) { return optional(req.bodyEn(), BODY_MAX, "NOTICE_BODY"); }
+
+    private static String optional(String raw, int max, String code) {
+        String t = raw == null ? "" : raw.strip();
+        if (t.isEmpty()) return null;
+        if (t.codePointCount(0, t.length()) > max) throw ApiException.badRequest(code, "영어 칸은 " + max + "자까지 쓸 수 있어요");
+        return t;
+    }
+
     private static Instant popupUntil(AdminNoticeDtos.Request req, Instant from) {
         if (!req.popupEnabled()) return null;
         int days = req.popupDays() == null ? POPUP_DAYS_DEFAULT : req.popupDays();
@@ -103,7 +118,7 @@ public class NoticeServiceImpl implements NoticeService {
     private AdminNoticeDtos.Item item(Notice n) {
         Integer days = n.getPopupUntil() == null ? null
                 : (int) Math.max(1, Math.round(Duration.between(n.getCreatedAt(), n.getPopupUntil()).toMinutes() / 1440.0)); // 저장 시각 차이(밀리초)는 반올림
-        return new AdminNoticeDtos.Item(n.getId(), n.getTitle(), n.getBody(), n.isPinned(), n.isPopupEnabled(), n.getPopupUntil(), days,
+        return new AdminNoticeDtos.Item(n.getId(), n.getTitle(), n.getTitleEn(), n.getBody(), n.getBodyEn(), n.isPinned(), n.isPopupEnabled(), n.getPopupUntil(), days,
                 n.getCreatedAt(), n.getUpdatedAt(),
                 n.getUpdatedAt().isAfter(n.getCreatedAt().plus(EDIT_GRACE)));
     }

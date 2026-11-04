@@ -32,9 +32,10 @@ public class CommentServiceImpl implements CommentService {
     private static final int TOP = 3;
     private static final int MIN_LENGTH = 1, MAX_LENGTH = 200; // 최소 글자 수 제한은 없다. 빈 댓글만 막는다
     private static final Duration EDIT_WINDOW = Duration.ofMinutes(5);
-    private static final String DELETED_TEXT = "삭제된 댓글이에요";
-    private static final String WITHDRAWN_TEXT = "탈퇴한 사용자의 댓글이에요";
-    private static final String WITHDRAWN_NAME = "탈퇴한 사용자";
+    // 안내 문구는 보는 사람의 나라 언어로 보낸다(댓글은 같은 나라 사람끼리만 본다)
+    private static final String[] DELETED_TEXT = {"삭제된 댓글이에요", "This comment was deleted"};
+    private static final String[] WITHDRAWN_TEXT = {"탈퇴한 사용자의 댓글이에요", "This comment is from a user who left"};
+    private static final String[] WITHDRAWN_NAME = {"탈퇴한 사용자", "Former user"};
 
     private final CommentRepository comments;
     private final CommentVoteRepository votes;
@@ -195,11 +196,13 @@ public class CommentServiceImpl implements CommentService {
     private CommentDtos.Item item(Player me, Comment c, String myVote) {
         boolean withdrawn = withdrawn(c.getPlayer());
         boolean mine = c.getPlayer().getId().equals(me.getId());
-        String body = c.isDeleted() ? DELETED_TEXT : withdrawn ? WITHDRAWN_TEXT : c.getBody();
+        var lang = com.trendist.common.support.Lang.ofLocale(me.getCountry().getDefaultLocale());
+        String body = c.isDeleted() ? lang.pick(DELETED_TEXT[0], DELETED_TEXT[1])
+                : withdrawn ? lang.pick(WITHDRAWN_TEXT[0], WITHDRAWN_TEXT[1]) : c.getBody();
         // 추천 수는 조건부 UPDATE라 updated_at이 바뀌지 않는다. 작성 뒤 1초 넘게 지나 바뀌었으면 고친 것이다
         boolean edited = !c.isDeleted() && c.getUpdatedAt() != null
                 && c.getUpdatedAt().isAfter(c.getCreatedAt().plusSeconds(1));
-        return new CommentDtos.Item(c.getId(), withdrawn ? WITHDRAWN_NAME : c.getPlayer().getNickname(), body,
+        return new CommentDtos.Item(c.getId(), withdrawn ? lang.pick(WITHDRAWN_NAME[0], WITHDRAWN_NAME[1]) : c.getPlayer().getNickname(), body,
                 c.getLikeCount(), c.getDislikeCount(), myVote, mine, mine && editable(c), c.isDeleted(), withdrawn, edited,
                 c.getCreatedAt());
     }

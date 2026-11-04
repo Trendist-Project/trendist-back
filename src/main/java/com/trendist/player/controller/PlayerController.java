@@ -16,9 +16,12 @@ public class PlayerController {
     private final PlayerService playerService;
 
     @GetMapping("/me")
-    @Transactional(readOnly = true)
-    public PlayerDtos.Me me(@AuthenticationPrincipal AuthUser user) {
-        var p = playerService.findCurrent(user.userId()).map(playerService::summary).orElse(null);
+    @Transactional
+    public PlayerDtos.Me me(@AuthenticationPrincipal AuthUser user, @RequestParam(required = false) String country) {
+        // country가 있으면 그 나라로 고르고(마지막 플레이 지역도 바뀐다), 없으면 지금처럼 마지막 지역
+        var found = country == null || country.isBlank() ? playerService.findCurrent(user.userId())
+                : playerService.selectCountry(user.userId(), country);
+        var p = found.map(playerService::summary).orElse(null);
         return new PlayerDtos.Me(user.userId(), playerService.isGuest(user.userId()), p);
     }
 

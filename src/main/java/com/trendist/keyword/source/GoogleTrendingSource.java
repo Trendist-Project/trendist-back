@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.xml.XMLConstants;
@@ -39,43 +40,50 @@ public class GoogleTrendingSource implements ExternalTrendSource {
             .followRedirects(HttpClient.Redirect.NORMAL).build();
     private final Clock clock;
     private final TrendNewsContext news;
-    private volatile Set<String> current = Set.of();
-    private volatile Instant fetchedAt;
+    /** 구글 트렌드 geo 코드. 여기에 있는 나라만 이 소스가 쓰인다: GLOBAL(영어)은 미국 목록을 쓴다 */
+    private static final Map<String, String> GEO = Map.of("KR", "KR", "GLOBAL", "US");
+    // 나라별로 따로 기억한다(나라마다 목록·읽은 시각이 다르다)
+    private final Map<String, Set<String>> current = new ConcurrentHashMap<>();
+    private final Map<String, Instant> fetchedAt = new ConcurrentHashMap<>();
 
     public GoogleTrendingSource(Clock clock, TrendNewsContext news) { this.clock = clock; this.news = news; }
 
-    @Override public boolean supports(String countryCode) { return "KR".equals(countryCode); }
+    @Override public boolean supports(String countryCode) { return GEO.containsKey(countryCode); }
     @Override public String sourceName() { return DataSource.GOOGLE; }
 
     /** 마지막 목록에 있으면 100, 없으면 값 없음. 목록이 오래됐으면 값 없음. */
     @Override
     public OptionalDouble heat(String countryCode, String normalized) {
-        Set<String> now = currentTitles();
+        Set<String> now = currentTitles(countryCode);
         return now != null && now.contains(normalized) ? OptionalDouble.of(100) : OptionalDouble.empty();
     }
 
     /** 마지막으로 목록을 읽은 시각(관리자 대시보드, 13.11). 아직 못 읽었으면 null. */
-    public Instant fetchedAt() { return fetchedAt; }
+    public Instant fetchedAt(String countryCode) { return fetchedAt.get(countryCode); }
 
     /** 마지막으로 읽은 목록의 정규화 키(오래됐어도 그대로). 아직 한 번도 못 읽었으면 빈 집합. 유지 기간 정리가 쓴다. */
-    public Set<String> lastTitles() { return current; }
+    public Set<String> lastTitles(String countryCode) { return current.getOrDefault(countryCode, Set.of()); }
 
     /** 최근(30분 안)에 읽은 목록의 정규화 키. 모르면 null. 외부 확인(heat)이 쓴다. */
-    public Set<String> currentTitles() {
-        Instant at = fetchedAt;
-        return at != null && at.plus(FRESH_FOR).isAfter(Instant.now(clock)) ? current : null;
+    public Set<String> currentTitles(String countryCode) {
+        Instant at = fetchedAt.get(countryCode);
+        return at != null && at.plus(FRESH_FOR).isAfter(Instant.now(clock)) ? current.get(countryCode) : null;
     }
 
-    /** RSS를 읽어 제목 목록(표기 그대로)을 돌려주고 현재 목록을 바꾼다. 실패하면 예외. */
+    /** RSS를 읽어 제목 목록(표기 그대로)을 돌려주고 그 나라의 현재 목록을 바꾼다. 지원하지 않는 나라이거나 실패하면 예외. */
     public List<String> refresh(String countryCode) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(RSS_URL + countryCode)).timeout(Duration.ofSeconds(15))
+        String geo = GEO.get(countryCode);
+        if (geo == null) throw new IllegalArgumentException("google trends: unsupported country " + countryCode);
+        HttpRequest req = HttpRequest.newBuilder(URI.create(RSS_URL + geo)).timeout(Duration.ofSeconds(15))
                 .header("User-Agent", "Mozilla/5.0 (compatible; Trendist/1.0)").GET().build();
         HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
         if (res.statusCode() != 200) throw new IllegalStateException("google trends rss HTTP " + res.statusCode());
         List<String> titles = parseTitles(res.body());
-        parseNews(res.body()).forEach(news::put); // 왜 유행인지 AI가 알 수 있게 관련 뉴스 제목을 기억한다
-        current = titles.stream().map(KeywordNormalizer::normalize).collect(Collectors.toUnmodifiableSet());
-        fetchedAt = Instant.now(clock);
+        // 뉴스는 그 나라의 설명 언어(KR=ko, 그 밖=en)로 기억한다: 같은 철자가 두 나라에 있어도 섞이지 않게
+        String lang = "KR".equals(countryCode) ? "ko" : "en";
+        parseNews(res.body()).forEach((k, h) -> news.put(lang, k, h)); // 왜 유행인지 AI가 알 수 있게 관련 뉴스 제목을 기억한다
+        current.put(countryCode, titles.stream().map(KeywordNormalizer::normalize).collect(Collectors.toUnmodifiableSet()));
+        fetchedAt.put(countryCode, Instant.now(clock));
         return titles;
     }
 

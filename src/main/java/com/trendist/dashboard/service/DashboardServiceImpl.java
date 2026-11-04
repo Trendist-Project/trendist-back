@@ -76,7 +76,7 @@ public class DashboardServiceImpl implements DashboardService {
         long sanctioned = sanctions.countActiveUsers(now);
         long ending = keywords.countExternalEnding(c.getId(), now, now.plus(Duration.ofHours(24)));
         GoogleTrendingSource g = google.getIfAvailable();
-        Instant fetched = g == null ? null : g.fetchedAt();
+        Instant fetched = g == null ? null : g.fetchedAt(c.getCode());
         List<DashboardDtos.Todo> todos = new ArrayList<>();
         todos.add(new DashboardDtos.Todo("reports", "처리 대기 신고", s.pendingReports(),
                 s.pendingReports() >= 10 ? "danger" : s.pendingReports() > 0 ? "warn" : "ok", "신고 탭에서 조치함·문제없음으로 처리", "reports", null));

@@ -25,9 +25,15 @@ public final class SharePage {
         return b.toString();
     }
 
-    public static String title(ShareDtos.CardData d) { return d.nickname() + "의 트렌드 성적표"; }
+    public static String title(ShareDtos.CardData d) {
+        return d.english() ? d.nickname() + "'s Trend Report" : d.nickname() + "의 트렌드 성적표";
+    }
 
     public static String description(ShareDtos.CardData d) {
+        if (d.english()) {
+            return String.format(java.util.Locale.ENGLISH, "Trend score %,d · Lv. %d%s. Know the trend. Grow bigger!", d.score(), d.level(),
+                    d.rank() != null ? " · Rank #" + d.rank() + " now" : "");
+        }
         return String.format("유행도 %,d · %d레벨%s. 트랜드를 아는 자, 커진다!", d.score(), d.level(),
                 d.rank() != null ? " · 지금 " + d.rank() + "위" : "");
     }
@@ -37,7 +43,7 @@ public final class SharePage {
         String t = escape(title(d)), desc = escape(description(d));
         return """
                 <!doctype html>
-                <html lang="ko">
+                <html lang="%6$s">
                 <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -70,11 +76,13 @@ public final class SharePage {
                 </head>
                 <body>
                 <img src="%4$s" width="1080" height="1350" alt="%1$s">
-                <a class="play" href="%5$s">플레이 하러 가기</a>
-                <p>트랜드를 아는 자, 커진다. Trendist</p>
+                <a class="play" href="%5$s">%7$s</a>
+                <p>%8$s</p>
                 </body>
                 </html>
-                """.formatted(t, desc, escape(url), escape(image), escape(play));
+                """.formatted(t, desc, escape(url), escape(image), escape(play), d.english() ? "en" : "ko",
+                        d.english() ? "Play now" : "플레이 하러 가기",
+                        d.english() ? "Know the trend. Grow bigger. Trendist" : "트랜드를 아는 자, 커진다. Trendist");
     }
 
     public static String notFound(String baseUrl) {
@@ -83,7 +91,7 @@ public final class SharePage {
                 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Trendist</title><meta name="robots" content="noindex"></head>
                 <body style="margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#0d1420;color:#e8eef6;font-family:system-ui,sans-serif">
-                <p>카드를 찾을 수 없어요</p><a href="%s/" style="color:#3fb68b">Trendist로 가기</a>
+                <p>카드를 찾을 수 없어요 · Card not found</p><a href="%s/" style="color:#3fb68b">Trendist</a>
                 </body></html>
                 """.formatted(escape(baseUrl));
     }

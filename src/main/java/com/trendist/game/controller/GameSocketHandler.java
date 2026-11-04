@@ -4,6 +4,7 @@ import com.trendist.auth.security.AccountGuard;
 import com.trendist.auth.service.JwtService;
 import com.trendist.chat.service.ChatService;
 import com.trendist.common.exception.ApiException;
+import com.trendist.common.support.Lang;
 import com.trendist.game.room.Room;
 import com.trendist.game.service.RoomManager;
 import com.trendist.keyword.service.KeywordService;
@@ -39,6 +40,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private static final String ATTR_SAFE = "safe";
     private static final String ATTR_INPUTS = "inputs";
     private static final String ATTR_SPECTATOR = "spectator";
+    private static final String ATTR_LANG = "lang"; // 인증 첫 메시지의 lang(ko|en). 이 연결에 보내는 문구의 언어
 
     private final JwtService jwt;
     private final AccountGuard guard;
@@ -84,7 +86,10 @@ public class GameSocketHandler extends TextWebSocketHandler {
             return;
         }
         if (member == null) {
-            if ("auth".equals(type)) authenticate(session, node.path("token").asString(""));
+            if ("auth".equals(type)) {
+                session.getAttributes().put(ATTR_LANG, Lang.parse(node.path("lang").asString("")));
+                authenticate(session, node.path("token").asString(""));
+            }
             else if ("spectate".equals(type)) spectate(session, node.path("token").asString(""), node.path("country").asString("KR"));
             return;
         }
@@ -185,15 +190,17 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     /** 채팅(4.13): 1초에 1회, 검사를 통과하면 저장한 뒤 방 전체에 보낸다. 거절하면 보낸 사람에게만 이유를 알린다. */
     private void chat(WebSocketSession session, Room.Member member, String raw) {
+        Lang lang = lang(session);
         if (!allowInput(session, "chat")) {
-            rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_TOO_FAST", "message", "채팅은 1초에 한 번 보낼 수 있어요"));
+            rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_TOO_FAST",
+                    "message", lang.pick("채팅은 1초에 한 번 보낼 수 있어요", "You can chat once per second")));
             return;
         }
         String text;
         try {
             text = chatService.validate(raw);
         } catch (ApiException e) {
-            rooms.sendText(member, Map.of("type", "chatError", "code", e.code(), "message", e.getMessage()));
+            rooms.sendText(member, Map.of("type", "chatError", "code", e.code(), "message", chatErrorText(e, lang)));
             return;
         }
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
@@ -201,17 +208,36 @@ public class GameSocketHandler extends TextWebSocketHandler {
             try {
                 java.time.Instant banned = sanctionService.chatBannedUntil(member.playerId); // 채팅 정지(13.5)
                 if (banned != null) {
+                    // until: 끝나는 시각(epoch 밀리초, 영구면 0). 프론트가 코드로 문구를 만들 때 쓴다
                     rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_BANNED",
-                            "message", "채팅이 정지된 계정이에요(" + sanctionService.untilText(banned) + ")"));
+                            "until", banned.equals(com.trendist.user.entity.Sanction.FOREVER) ? 0L : banned.toEpochMilli(),
+                            "message", lang.pick("채팅이 정지된 계정이에요(" + sanctionService.untilText(banned) + ")",
+                                    "Chat is suspended for this account (" + sanctionService.untilText(banned, lang) + ")")));
                     return;
                 }
                 ChatService.Saved saved = chatService.save(room.countryId(), member.playerId, text);
                 room.submit(r -> r.chat(member, saved.id(), text, saved.atMillis()));
             } catch (RuntimeException e) {
                 log.warn("chat save failed", e);
-                rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_FAILED", "message", "메시지를 보내지 못했어요"));
+                rooms.sendText(member, Map.of("type", "chatError", "code", "CHAT_FAILED",
+                        "message", lang.pick("메시지를 보내지 못했어요", "Couldn't send your message")));
             }
         });
+    }
+
+    private static Lang lang(WebSocketSession session) {
+        return session.getAttributes().get(ATTR_LANG) instanceof Lang l ? l : Lang.KO;
+    }
+
+    /** 채팅 검사 오류의 영어 문구(코드는 TextRules가 정한다). 모르는 코드는 서버 메시지 그대로 */
+    private static String chatErrorText(ApiException e, Lang lang) {
+        if (!lang.isEn()) return e.getMessage();
+        return switch (e.code()) {
+            case "CHAT_LENGTH" -> "Messages must be 1-100 characters";
+            case "CHAT_LINK" -> "Links are not allowed";
+            case "CHAT_PHONE" -> "Phone numbers are not allowed";
+            default -> e.getMessage();
+        };
     }
 
     /**

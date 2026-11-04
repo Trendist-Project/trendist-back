@@ -1,5 +1,6 @@
 package com.trendist.title.service;
 
+import com.trendist.common.support.Lang;
 import com.trendist.title.dto.TitleDtos;
 
 /**
@@ -8,14 +9,21 @@ import com.trendist.title.dto.TitleDtos;
  */
 public interface TitleService {
     /** 칭호함: 사용할 수 있는 칭호 전체와 보유 여부·획득 시각·진행도. */
-    TitleDtos.Box box(long userId);
+    default TitleDtos.Box box(long userId) { return box(userId, Lang.KO); }
+
+    /** 그 언어로(영어판이 비어 있으면 한국어) */
+    TitleDtos.Box box(long userId, Lang lang);
 
     /** 활성 칭호를 바꾼다. null이면 칭호를 숨긴다. 가진 칭호만, 5초에 1번. */
-    TitleDtos.Box activate(long userId, Long titleId);
+    default TitleDtos.Box activate(long userId, Long titleId) { return activate(userId, titleId, Lang.KO); }
+
+    TitleDtos.Box activate(long userId, Long titleId, Lang lang);
 
     /** 한 플레이어의 METRIC 칭호를 검사해서 새로 달성한 것을 준다. */
     void checkMetrics(long playerId);
 
     /** 활성 칭호의 이름(없거나 사용 안 함이면 null). 방 입장 때 이름표에 쓴다. */
-    String activeTitleName(Long titleId);
+    default String activeTitleName(Long titleId) { return activeTitleName(titleId, Lang.KO); }
+
+    String activeTitleName(Long titleId, Lang lang);
 }

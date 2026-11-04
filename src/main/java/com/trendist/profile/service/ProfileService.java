@@ -1,5 +1,6 @@
 package com.trendist.profile.service;
 
+import com.trendist.common.support.Lang;
 import com.trendist.profile.dto.ProfileDtos;
 import java.util.Optional;
 
@@ -8,13 +9,20 @@ import java.util.Optional;
  * 꾸미기는 해금 레벨(기본 11)부터이고, 그림과 효과는 그중에서도 Google로 로그인한 사용자만. 장착한 칸을 저장하면 방에 바로 반영된다.
  */
 public interface ProfileService {
-    ProfileDtos.Box box(long userId);
+    default ProfileDtos.Box box(long userId) { return box(userId, Lang.KO); }
+
+    /** 효과 이름·잠금 안내를 그 언어로 */
+    ProfileDtos.Box box(long userId, Lang lang);
 
     /** 한 칸 저장. 레벨·색·그림·효과를 검사하고 5초에 1번(그림은 설정 간격). */
-    ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req);
+    default ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req) { return save(userId, slot, req, Lang.KO); }
+
+    ProfileDtos.Box save(long userId, int slot, ProfileDtos.SaveRequest req, Lang lang);
 
     /** 장착할 칸을 고른다. 5초에 1번. */
-    ProfileDtos.Box equip(long userId, int slot);
+    default ProfileDtos.Box equip(long userId, int slot) { return equip(userId, slot, Lang.KO); }
+
+    ProfileDtos.Box equip(long userId, int slot, Lang lang);
 
     /** 장착한 칸의 모습(관리자 화면). */
     ProfileDtos.Look lookOf(long playerId);

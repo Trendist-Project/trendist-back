@@ -391,8 +391,19 @@ public class KeywordServiceImpl implements KeywordService {
     @Override
     public int expireExternal(String sourceName, Set<String> currentNormalized) {
         DataSource source = codes.dataSource(sourceName);
+        return expireStale(source, keywords.findByDataSourceIdAndExternalUntilBefore(source.getId(), Instant.now(clock)), currentNormalized);
+    }
+
+    @Override
+    public int expireExternal(String countryCode, String sourceName, Set<String> currentNormalized) {
+        DataSource source = codes.dataSource(sourceName);
+        return expireStale(source, keywords.findByDataSourceIdAndCountryCodeAndExternalUntilBefore(source.getId(), countryCode, Instant.now(clock)),
+                currentNormalized);
+    }
+
+    private int expireStale(DataSource source, List<Keyword> stales, Set<String> currentNormalized) {
         int dropped = 0;
-        for (Keyword stale : keywords.findByDataSourceIdAndExternalUntilBefore(source.getId(), Instant.now(clock))) {
+        for (Keyword stale : stales) {
             try {
                 Boolean r = tx.execute(st -> expireOneExternal(stale.getId(), source, currentNormalized));
                 if (Boolean.TRUE.equals(r)) dropped++;
@@ -428,9 +439,14 @@ public class KeywordServiceImpl implements KeywordService {
     @Override
     @Transactional(readOnly = true)
     public List<KeywordDtos.MyKeyword> myKeywords(long userId) {
-        Player p = playerService.requireCurrent(userId);
+        return myKeywordsOfPlayer(playerService.requireCurrent(userId).getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KeywordDtos.MyKeyword> myKeywordsOfPlayer(long playerId) {
         Instant now = Instant.now(clock);
-        return playerKeywords.findActiveByPlayer(p.getId(), now, codes.keywordStateId(CodeTables.KW_BANNED)).stream()
+        return playerKeywords.findActiveByPlayer(playerId, now, codes.keywordStateId(CodeTables.KW_BANNED)).stream()
                 .map(pk -> {
                     Keyword k = pk.getKeyword();
                     return new KeywordDtos.MyKeyword(k.getId(), k.getText(), k.getKeywordState().getName(),

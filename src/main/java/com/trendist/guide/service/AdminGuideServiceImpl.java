@@ -46,7 +46,7 @@ public class AdminGuideServiceImpl implements AdminGuideService {
         if (categories.existsByCode(code)) throw ApiException.conflict("GUIDE_CODE_EXISTS", "이미 있는 코드예요");
         long order = categories.findAllByOrderBySortOrderAscIdAsc().stream().mapToLong(GuideCategory::getSortOrder).max().orElse(0) + 1;
         GuideCategory c = new GuideCategory(code, name(req.name()), type(req.displayType()), Math.toIntExact(order));
-        if (Boolean.FALSE.equals(req.enabled())) c.edit(c.getName(), c.getDisplayType(), false);
+        c.edit(c.getName(), optional(req.nameEn(), NAME_MAX, "GUIDE_CATEGORY_NAME"), c.getDisplayType(), !Boolean.FALSE.equals(req.enabled()));
         categories.saveAndFlush(c);
         return category(c);
     }
@@ -55,7 +55,8 @@ public class AdminGuideServiceImpl implements AdminGuideService {
     @Transactional
     public AdminGuideDtos.Category updateCategory(long id, AdminGuideDtos.CategoryRequest req) {
         GuideCategory c = requireCategory(id);
-        c.edit(name(req.name()), type(req.displayType()), req.enabled() == null ? c.isEnabled() : req.enabled());
+        c.edit(name(req.name()), optional(req.nameEn(), NAME_MAX, "GUIDE_CATEGORY_NAME"), type(req.displayType()),
+                req.enabled() == null ? c.isEnabled() : req.enabled());
         categories.flush();
         return category(c);
     }
@@ -98,6 +99,8 @@ public class AdminGuideServiceImpl implements AdminGuideService {
         User author = users.findById(authorUserId).orElseThrow(() -> ApiException.unauthorized("NO_USER"));
         long order = live(categoryId).stream().mapToLong(Guide::getSortOrder).max().orElse(0) + 1;
         Guide g = guides.saveAndFlush(new Guide(c, author, title(req.title()), body(req.body()), Math.toIntExact(order)));
+        g.edit(g.getTitle(), optional(req.titleEn(), TITLE_MAX, "GUIDE_TITLE"), g.getBody(), optional(req.bodyEn(), BODY_MAX, "GUIDE_BODY"));
+        guides.flush();
         return article(g);
     }
 
@@ -105,7 +108,7 @@ public class AdminGuideServiceImpl implements AdminGuideService {
     @Transactional
     public AdminGuideDtos.Article updateArticle(long id, AdminGuideDtos.ArticleRequest req) {
         Guide g = requireArticle(id);
-        g.edit(title(req.title()), body(req.body()));
+        g.edit(title(req.title()), optional(req.titleEn(), TITLE_MAX, "GUIDE_TITLE"), body(req.body()), optional(req.bodyEn(), BODY_MAX, "GUIDE_BODY"));
         guides.flush();
         return article(g);
     }
@@ -162,18 +165,26 @@ public class AdminGuideServiceImpl implements AdminGuideService {
         return t;
     }
 
+    /** 영어판은 비워 둘 수 있다(비면 null = 한국어로 대신). 쓰면 글자 수만 본다 */
+    private static String optional(String raw, int max, String code) {
+        String t = raw == null ? "" : raw.strip();
+        if (t.isEmpty()) return null;
+        if (t.codePointCount(0, t.length()) > max) throw ApiException.badRequest(code, "영어 칸은 " + max + "자까지 쓸 수 있어요");
+        return t;
+    }
+
     private static String type(String raw) {
         if (raw == null || !TYPES.contains(raw)) throw ApiException.badRequest("GUIDE_DISPLAY_TYPE", "형식은 FAQ 또는 ARTICLE이에요");
         return raw;
     }
 
     private AdminGuideDtos.Category category(GuideCategory c) {
-        return new AdminGuideDtos.Category(c.getId(), c.getCode(), c.getName(), c.getDisplayType(), c.isEnabled(), c.getSortOrder(),
+        return new AdminGuideDtos.Category(c.getId(), c.getCode(), c.getName(), c.getNameEn(), c.getDisplayType(), c.isEnabled(), c.getSortOrder(),
                 live(c.getId()).size());
     }
 
     private AdminGuideDtos.Article article(Guide g) {
-        return new AdminGuideDtos.Article(g.getId(), g.getGuideCategory().getId(), g.getTitle(), g.getBody(), g.getSortOrder(),
+        return new AdminGuideDtos.Article(g.getId(), g.getGuideCategory().getId(), g.getTitle(), g.getTitleEn(), g.getBody(), g.getBodyEn(), g.getSortOrder(),
                 g.getCreatedAt(), g.getUpdatedAt());
     }
 }

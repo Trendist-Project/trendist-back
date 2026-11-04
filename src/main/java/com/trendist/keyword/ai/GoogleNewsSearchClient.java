@@ -26,7 +26,8 @@ import org.w3c.dom.NodeList;
 @Component
 public class GoogleNewsSearchClient implements NewsSearchClient {
     private static final Logger log = LoggerFactory.getLogger(GoogleNewsSearchClient.class);
-    private static final String URL = "https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko&q=";
+    private static final String URL_KO = "https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR:ko&q=";
+    private static final String URL_EN = "https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q=";
     static final int MAX_HEADLINES = 5;
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
@@ -36,11 +37,11 @@ public class GoogleNewsSearchClient implements NewsSearchClient {
     public GoogleNewsSearchClient(@Value("${trendist.news-search.enabled:true}") boolean enabled) { this.enabled = enabled; }
 
     @Override
-    public List<String> search(String keyword) {
+    public List<String> search(String keyword, String lang) {
         if (!enabled || keyword == null || keyword.isBlank()) return List.of();
         try {
             String q = URLEncoder.encode(keyword.strip() + " when:7d", StandardCharsets.UTF_8);
-            HttpRequest req = HttpRequest.newBuilder(URI.create(URL + q)).timeout(Duration.ofSeconds(10))
+            HttpRequest req = HttpRequest.newBuilder(URI.create(("en".equals(lang) ? URL_EN : URL_KO) + q)).timeout(Duration.ofSeconds(10))
                     .header("User-Agent", "Mozilla/5.0 (compatible; Trendist/1.0)").GET().build();
             HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
             if (res.statusCode() != 200) { log.warn("news search HTTP {}", res.statusCode()); return List.of(); }

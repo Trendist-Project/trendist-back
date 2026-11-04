@@ -12,6 +12,7 @@ import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.service.PlayerService;
 import com.trendist.setting.service.SettingService;
 import com.trendist.setting.support.SettingKeys;
+import com.trendist.common.support.Lang;
 import com.trendist.title.dto.TitleDtos;
 import com.trendist.title.entity.PlayerTitle;
 import com.trendist.title.entity.Title;
@@ -90,7 +91,7 @@ public class TitleServiceImpl implements TitleService {
 
     @Override
     @Transactional(readOnly = true)
-    public TitleDtos.Box box(long userId) {
+    public TitleDtos.Box box(long userId, Lang lang) {
         Player p = playerService.requireCurrent(userId);
         Map<Long, Instant> owned = new HashMap<>();
         for (PlayerTitle pt : playerTitles.findByPlayerId(p.getId())) owned.put(pt.getTitleId(), pt.getCreatedAt());
@@ -98,7 +99,7 @@ public class TitleServiceImpl implements TitleService {
         for (Cond c : conditions()) {
             long id = c.title().getId();
             long current = "METRIC".equals(c.type()) ? metric(p, c.metric()) : 0;
-            items.add(new TitleDtos.Item(id, c.title().getName(), c.title().getDescription(), c.type(), c.metric(),
+            items.add(new TitleDtos.Item(id, c.title().name(lang), c.title().description(lang), c.type(), c.metric(),
                     current, c.target(), owned.containsKey(id), owned.get(id), Objects.equals(p.getTitleId(), id)));
         }
         return new TitleDtos.Box(p.getTitleId(), items);
@@ -106,12 +107,13 @@ public class TitleServiceImpl implements TitleService {
 
     @Override
     @Transactional
-    public TitleDtos.Box activate(long userId, Long titleId) {
+    public TitleDtos.Box activate(long userId, Long titleId, Lang lang) {
         Player p = playerService.requireCurrent(userId);
         String name = null;
         if (titleId != null) {
             if (!playerTitles.existsByPlayerIdAndTitleId(p.getId(), titleId)) throw ApiException.badRequest("TITLE_NOT_OWNED", "아직 받지 않은 칭호예요");
-            name = activeTitleName(titleId);
+            // 방에 보내는 이름표는 그 나라 언어(방 안 모두에게 같은 글)
+            name = activeTitleName(titleId, Lang.ofLocale(p.getCountry().getDefaultLocale()));
         }
         // 거절된 요청은 세지 않는다(검사를 통과한 변경만 5초에 1번)
         if (!rateLimiter.tryAcquire("title:" + p.getId(), 1, Duration.ofSeconds(5))) {
@@ -119,14 +121,14 @@ public class TitleServiceImpl implements TitleService {
         }
         p.changeTitle(titleId);
         events.publishEvent(new GameEvents.TitleChanged(p.getCountry().getId(), p.getId(), name));
-        return box(userId);
+        return box(userId, lang);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public String activeTitleName(Long titleId) {
+    public String activeTitleName(Long titleId, Lang lang) {
         if (titleId == null) return null;
-        return titles.findById(titleId).filter(Title::isEnabled).map(Title::getName).orElse(null);
+        return titles.findById(titleId).filter(Title::isEnabled).map(t -> t.name(lang)).orElse(null);
     }
 
     /** 수치가 바뀐 트랜잭션이 끝난 뒤에 검사한다(커밋된 값으로). 칭호 검사가 실패해도 원래 요청에는 영향이 없다. */
@@ -189,7 +191,8 @@ public class TitleServiceImpl implements TitleService {
                 continue; // 동시에 두 번 검사했다. 이미 받았다
             }
             // 새로 얻어도 자동으로 활성화하지 않는다(4.10). 알림만 보낸다
-            events.publishEvent(new GameEvents.TitleGranted(p.getCountry().getId(), p.getId(), id, c.title().getName(), c.title().getDescription()));
+            events.publishEvent(new GameEvents.TitleGranted(p.getCountry().getId(), p.getId(), id,
+                    c.title().name(Lang.ofLocale(p.getCountry().getDefaultLocale())), c.title().description(Lang.ofLocale(p.getCountry().getDefaultLocale()))));
         }
     }
 }

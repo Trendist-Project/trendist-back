@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByUserIdAndCountryId(Long userId, Long countryId);
 
+    java.util.List<Player> findByUserId(Long userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Player p where p.id = :id")
     Optional<Player> findByIdForUpdate(@Param("id") Long id);

@@ -58,6 +58,9 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     /** 외부 유지 기간이 끝난 키워드(그 소스). */
     List<Keyword> findByDataSourceIdAndExternalUntilBefore(Long dataSourceId, Instant now);
 
+    /** 한 나라만(나라마다 외부 목록이 달라서 유지 기간 정리도 나라별로 한다) */
+    List<Keyword> findByDataSourceIdAndCountryCodeAndExternalUntilBefore(Long dataSourceId, String countryCode, Instant now);
+
     /**
      * 관리자 키워드 목록(13.6): 상태·반영 소스·검색어(정규화 키에 포함)로 거르고, 정렬은 Pageable로 받는다.
      * 비어 있는(null) 조건은 쓰지 않는다.

@@ -41,4 +41,26 @@ class GoogleTrendingSourceTest {
         String xml = "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><rss><channel><item><title>&x;</title></item></channel></rss>";
         assertThatThrownBy(() -> GoogleTrendingSource.parseTitles(xml.getBytes(StandardCharsets.UTF_8))).isInstanceOf(Exception.class);
     }
+
+    @Test
+    void supportsKrAndGlobalOnlyAndKeepsListsPerCountry() {
+        var src = new GoogleTrendingSource(java.time.Clock.systemUTC(), new com.trendist.keyword.ai.TrendNewsContext());
+        assertThat(src.supports("KR")).isTrue();
+        assertThat(src.supports("GLOBAL")).isTrue(); // GLOBAL은 미국(geo=US) 목록을 쓴다
+        assertThat(src.supports("JP")).isFalse();
+        assertThat(src.lastTitles("GLOBAL")).isEmpty();
+        assertThat(src.fetchedAt("KR")).isNull();
+        assertThatThrownBy(() -> src.refresh("JP")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void devSourceHasSeparateKoreanAndEnglishLists() {
+        var props = new com.trendist.config.AppProperties.DevTrends(true, java.util.List.of("탕후루:35"), java.util.List.of("Dubai Chocolate:78"));
+        var dev = new DevTrendSource(new com.trendist.config.AppProperties(null, null, null, props, null, null));
+        assertThat(dev.supports("GLOBAL")).isTrue();
+        assertThat(dev.heat("GLOBAL", "dubaichocolate")).hasValue(78); // 영어는 대소문자·공백 무시(정규화 키)
+        assertThat(dev.heat("KR", "dubaichocolate")).isEmpty();        // 다른 나라 목록은 섞이지 않는다
+        assertThat(dev.heat("KR", "탕후루")).hasValue(35);
+        assertThat(dev.heat("GLOBAL", "탕후루")).isEmpty();
+    }
 }

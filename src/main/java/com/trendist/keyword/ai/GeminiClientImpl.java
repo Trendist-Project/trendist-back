@@ -40,6 +40,19 @@ public class GeminiClientImpl implements GeminiClient {
             나쁜 예(뜻풀이만 있음): 방송인 장성규 씨를 가리키는 이름이에요.
             키워드 목록을 번호와 함께 줄 거야. 입력된 모든 번호에 대해 JSON 배열 [{"no": 번호, "comment": "설명 또는 UNKNOWN"}]로만 답해.""";
 
+    private static final String SYSTEM_EN = """
+            You are the explainer for 'Trendist', a real-time trending-topics game played in English.
+            For each search term (keyword) the user gives you, explain in ONE English sentence why it is trending right now.
+            Do not just define the term ("X is a ..."); say what happened that makes people search for it (an event, announcement, show, match, release, controversy, meme, etc.).
+            If related news headlines are attached to a keyword, base the reason only on those headlines. Do not invent anything that is not in them.
+            If there are no headlines, write only what you are sure about; recent events may not be in your knowledge, so if you are not sure, answer UNKNOWN.
+            Rules: one sentence per keyword, at most 140 characters, plain neutral tone, written in English only.
+            No unconfirmed speculation, rumors, defamation or private-life details about specific people, and no sexual or hateful language. For incidents and accidents, state only the facts neutrally.
+            No ads, links, emoji, quotation marks or markdown. Do not copy a headline verbatim; rephrase it.
+            Good example: keyword 'Dubai chocolate' + headline 'Dubai chocolate bars sell out as TikTok craze spreads' -> Dubai chocolate bars are selling out in stores because of a viral TikTok trend.
+            Bad example (definition only): Dubai chocolate is a type of chocolate bar.
+            I will give you a numbered keyword list. Answer ONLY with a JSON array [{"no": number, "comment": "explanation or UNKNOWN"}] covering every number.""";
+
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final ObjectMapper json;
     private final String apiKey;
@@ -58,19 +71,20 @@ public class GeminiClientImpl implements GeminiClient {
     public boolean enabled() { return !apiKey.isEmpty(); }
 
     @Override
-    public Map<String, Optional<String>> describeAll(List<String> keywords, Map<String, List<String>> news, boolean grounding) throws Exception {
+    public Map<String, Optional<String>> describeAll(List<String> keywords, Map<String, List<String>> news, boolean grounding, String lang) throws Exception {
         if (!enabled()) throw new IllegalStateException("제미나이 API 키(DEV_/PROD_GEMINI_API_KEY)가 설정되지 않았어요");
         if (keywords.isEmpty()) return Map.of();
-        StringBuilder list = new StringBuilder("키워드 목록:\n");
+        boolean en = "en".equals(lang);
+        StringBuilder list = new StringBuilder(en ? "Keyword list:\n" : "키워드 목록:\n");
         for (int i = 0; i < keywords.size(); i++) {
             list.append(i + 1).append(". ").append(keywords.get(i)).append('\n');
-            for (String h : news.getOrDefault(keywords.get(i), List.of())) list.append("   - 뉴스 제목: ").append(h).append('\n');
+            for (String h : news.getOrDefault(keywords.get(i), List.of())) list.append(en ? "   - Headline: " : "   - 뉴스 제목: ").append(h).append('\n');
         }
         Map<String, Object> schema = Map.of("type", "ARRAY", "items", Map.of("type", "OBJECT",
                 "properties", Map.of("no", Map.of("type", "INTEGER"), "comment", Map.of("type", "STRING")),
                 "required", List.of("no", "comment")));
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", SYSTEM))));
+        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", en ? SYSTEM_EN : SYSTEM))));
         body.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", list.toString())))));
         body.put("generationConfig", Map.of("temperature", 0.2, "maxOutputTokens", 4096,
                 "responseMimeType", "application/json", "responseSchema", schema));

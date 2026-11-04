@@ -16,18 +16,26 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(prefix = "trendist.dev-trends", name = "enabled", havingValue = "true")
 public class DevTrendSource implements ExternalTrendSource {
-    private final Map<String, Double> values = new HashMap<>();
+    // 나라마다 다른 목록: KR은 한국어, GLOBAL은 영어 개발 키워드
+    private final Map<String, Map<String, Double>> byCountry = new HashMap<>();
 
     public DevTrendSource(AppProperties props) {
-        props.devTrends().asMap().forEach((k, v) -> values.put(KeywordNormalizer.normalize(k), v.doubleValue()));
+        byCountry.put("KR", normalized(props.devTrends().asMap()));
+        byCountry.put("GLOBAL", normalized(props.devTrends().globalAsMap()));
     }
 
-    @Override public boolean supports(String countryCode) { return "KR".equals(countryCode); }
+    private static Map<String, Double> normalized(Map<String, Integer> raw) {
+        Map<String, Double> m = new HashMap<>();
+        raw.forEach((k, v) -> m.put(KeywordNormalizer.normalize(k), v.doubleValue()));
+        return m;
+    }
+
+    @Override public boolean supports(String countryCode) { return byCountry.containsKey(countryCode); }
     @Override public String sourceName() { return DataSource.GOOGLE; }
 
     @Override
     public OptionalDouble heat(String countryCode, String normalized) {
-        Double v = values.get(normalized);
+        Double v = byCountry.getOrDefault(countryCode, Map.of()).get(normalized);
         return v == null ? OptionalDouble.empty() : OptionalDouble.of(v);
     }
 }

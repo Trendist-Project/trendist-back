@@ -97,9 +97,13 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public AdminUserDtos.Detail detail(long userId) {
+    public AdminUserDtos.Detail detail(long userId) { return detail(userId, null); }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminUserDtos.Detail detail(long userId, String countryCode) {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "사용자가 없어요"));
-        Player p = playerService.findCurrent(userId).orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 정하지 않은 사용자예요"));
+        Player p = playerOf(userId, countryCode);
         Set<Long> online = onlineIds(p.getCountry().getId());
         long reportCount = reportCounts(List.of(p.getId())).getOrDefault(p.getId(), 0L);
         Double live = rooms.liveScore(p.getCountry().getId(), p.getId());
@@ -121,12 +125,16 @@ public class AdminUserServiceImpl implements AdminUserService {
                         s.getExpiresAt(), s.getReleasedAt(), s.isActive(now))).toList();
         return new AdminUserDtos.Detail(row(p, online, reportCount), u.getLastLoginAt(), u.getDeletedAt(), p.getNicknameChangedAt(),
                 p.getLastPlayedAt(), stats, profiles.lookOf(p.getId()), profiles.equippedArt(p.getId()).orElse(null),
-                keywords.myKeywords(userId), commentLines, chatLines, reportLines, sanctionLines);
+                keywords.myKeywordsOfPlayer(p.getId()), commentLines, chatLines, reportLines, sanctionLines);
     }
 
     @Override
     @Transactional
-    public AdminUserDtos.Detail sanction(long userId, AdminUserDtos.SanctionRequest req) {
+    public AdminUserDtos.Detail sanction(long userId, AdminUserDtos.SanctionRequest req) { return sanction(userId, req, null); }
+
+    @Override
+    @Transactional
+    public AdminUserDtos.Detail sanction(long userId, AdminUserDtos.SanctionRequest req, String countryCode) {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "사용자가 없어요"));
         String typeName = switch (req.type() == null ? "" : req.type()) {
             case "BAN" -> SanctionType.BAN;
@@ -152,14 +160,21 @@ public class AdminUserServiceImpl implements AdminUserService {
             // 토큰이 살아 있는 15분 동안도 막고(30초 캐시를 비움), 갱신 토큰을 모두 폐기하고, 접속 중이면 내보낸다(9.3)
             refreshTokens.revokeAll(userId, now);
             guard.evict(userId);
-            playerService.findCurrent(userId).ifPresent(p -> rooms.kick(p.getCountry().getId(), p.getId(), "운영 정책 위반으로 이용이 정지된 계정이에요"));
+            // 계정 금지는 모든 나라의 방에서 내보낸다(플레이어가 나라마다 따로 있다)
+            for (Player p : players.findByUserId(userId)) rooms.kick(p.getCountry().getId(), p.getId(), "운영 정책 위반으로 이용이 정지된 계정이에요");
         }
-        return detail(userId);
+        return detail(userId, countryCode);
     }
 
     @Override
     @Transactional
-    public AdminUserDtos.Detail release(long sanctionId) {
+    public AdminUserDtos.Detail release(long sanctionId, String countryCode) { return release0(sanctionId, countryCode); }
+
+    @Override
+    @Transactional
+    public AdminUserDtos.Detail release(long sanctionId) { return release0(sanctionId, null); }
+
+    private AdminUserDtos.Detail release0(long sanctionId, String countryCode) {
         Sanction s = sanctions.findById(sanctionId).orElseThrow(() -> ApiException.notFound("SANCTION_NOT_FOUND", "제재 기록이 없어요"));
         Instant now = Instant.now(clock);
         if (!s.isActive(now)) throw ApiException.conflict("SANCTION_NOT_ACTIVE", "이미 끝난 제재예요");
@@ -169,7 +184,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         syncUser(u, now);
         sanctionService.evictCache();
         guard.evict(u.getId());
-        return detail(u.getId());
+        return detail(u.getId(), countryCode);
     }
 
     /** users의 제재 칸을 sanctions에서 다시 정한다: 같은 종류의 제재 중 가장 늦게 끝나는 시각, 없으면 null(13.5). */
@@ -180,28 +195,40 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional
-    public AdminUserDtos.Detail rename(long userId, String nickname) {
-        Player p = playerService.findCurrent(userId).orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 정하지 않은 사용자예요"));
+    public AdminUserDtos.Detail rename(long userId, String nickname) { return rename(userId, nickname, null); }
+
+    @Override
+    @Transactional
+    public AdminUserDtos.Detail rename(long userId, String nickname, String countryCode) {
+        Player p = playerOf(userId, countryCode);
         String clean = NicknameValidator.clean(nickname);
         log.info("admin rename user {}: {} -> {}", userId, p.getNickname(), clean); // 조치 기록은 서버 로그에(13.10)
         p.adminRename(clean);
         players.flush();
         events.publishEvent(new GameEvents.NicknameChanged(p.getCountry().getId(), p.getId(), clean));
-        return detail(userId);
+        return detail(userId, countryCode);
     }
 
     @Override
     @Transactional
-    public AdminUserDtos.Detail resetLook(long userId) {
-        Player p = playerService.findCurrent(userId).orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 정하지 않은 사용자예요"));
+    public AdminUserDtos.Detail resetLook(long userId) { return resetLook(userId, null); }
+
+    @Override
+    @Transactional
+    public AdminUserDtos.Detail resetLook(long userId, String countryCode) {
+        Player p = playerOf(userId, countryCode);
         log.info("admin reset look of user {}", userId);
         profiles.adminReset(p.getId());
-        return detail(userId);
+        return detail(userId, countryCode);
     }
 
     @Override
     @Transactional
-    public AdminUserDtos.Detail setAdmin(long actorUserId, long userId, boolean admin) {
+    public AdminUserDtos.Detail setAdmin(long actorUserId, long userId, boolean admin) { return setAdmin(actorUserId, userId, admin, null); }
+
+    @Override
+    @Transactional
+    public AdminUserDtos.Detail setAdmin(long actorUserId, long userId, boolean admin, String countryCode) {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "사용자가 없어요"));
         if (u.isGuest()) throw ApiException.badRequest("ROLE_GUEST", "관리자 권한은 Google로 로그인한 계정에만 줄 수 있어요");
         if (!admin && actorUserId == userId) throw ApiException.badRequest("ROLE_SELF", "내 관리자 권한은 뺄 수 없어요");
@@ -209,13 +236,17 @@ public class AdminUserServiceImpl implements AdminUserService {
         u.changeRole(admin ? User.ROLE_ADMIN : "USER");
         users.flush();
         guard.evict(userId);
-        return detail(userId);
+        return detail(userId, countryCode);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public void kick(long userId) {
-        Player p = playerService.findCurrent(userId).orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 정하지 않은 사용자예요"));
+    public void kick(long userId) { kick(userId, null); }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void kick(long userId, String countryCode) {
+        Player p = playerOf(userId, countryCode);
         if (!onlineIds(p.getCountry().getId()).contains(p.getId())) throw ApiException.conflict("NOT_ONLINE", "지금 접속 중이 아니에요");
         log.info("admin kick user {}", userId);
         rooms.kick(p.getCountry().getId(), p.getId(), "관리자가 접속을 끊었어요");
@@ -252,6 +283,13 @@ public class AdminUserServiceImpl implements AdminUserService {
             default -> null;
         };
         return new AdminUserDtos.ReportLine(r.getId(), type, r.getReason(), r.getStatus(), r.getPlayer().getNickname(), content, r.getCreatedAt());
+    }
+
+    /** 관리자가 고른 나라의 플레이어. 나라를 안 주면 사용자가 마지막으로 플레이한 나라. */
+    private Player playerOf(long userId, String countryCode) {
+        Optional<Player> p = countryCode == null ? playerService.findCurrent(userId)
+                : players.findByUserIdAndCountryId(userId, countries.requireOpen(countryCode).getId());
+        return p.orElseThrow(() -> ApiException.notFound("NO_PLAYER", "닉네임을 정하지 않은 사용자예요"));
     }
 
     private Set<Long> onlineIds(long countryId) {

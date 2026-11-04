@@ -1,6 +1,7 @@
 package com.trendist.guide.service;
 
 import com.trendist.common.exception.ApiException;
+import com.trendist.common.support.Lang;
 import com.trendist.guide.dto.GuideDtos;
 import com.trendist.guide.entity.GuideCategory;
 import com.trendist.guide.repository.GuideCategoryRepository;
@@ -18,17 +19,17 @@ public class GuideServiceImpl implements GuideService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<GuideDtos.Category> categories() {
+    public List<GuideDtos.Category> categories(Lang lang) {
         return categories.findByEnabledTrueOrderBySortOrderAscIdAsc().stream()
-                .map(c -> new GuideDtos.Category(c.getCode(), c.getName(), c.getDisplayType())).toList();
+                .map(c -> new GuideDtos.Category(c.getCode(), c.name(lang), c.getDisplayType())).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<GuideDtos.Article> articles(String categoryCode) {
+    public List<GuideDtos.Article> articles(String categoryCode, Lang lang) {
         GuideCategory c = categories.findByCodeAndEnabledTrue(categoryCode)
                 .orElseThrow(() -> ApiException.notFound("GUIDE_CATEGORY_NOT_FOUND", "가이드 카테고리를 찾을 수 없어요"));
         return guides.findByGuideCategoryIdAndDeletedAtIsNullOrderBySortOrderAscIdAsc(c.getId()).stream()
-                .map(g -> new GuideDtos.Article(g.getId(), g.getTitle(), g.getBody(), g.getUpdatedAt())).toList();
+                .map(g -> new GuideDtos.Article(g.getId(), g.title(lang), g.body(lang), g.getUpdatedAt())).toList();
     }
 }

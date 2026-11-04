@@ -1,11 +1,13 @@
 package com.trendist.guide.controller;
 
+import com.trendist.common.support.Lang;
 import com.trendist.guide.dto.GuideDtos;
 import com.trendist.guide.service.GuideService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,12 +19,13 @@ public class GuideController {
     private final GuideService guideService;
 
     @GetMapping("/categories")
-    public List<GuideDtos.Category> categories() {
-        return guideService.categories();
+    public List<GuideDtos.Category> categories(@RequestHeader(value = "Accept-Language", required = false) String lang) {
+        return guideService.categories(Lang.parse(lang));
     }
 
     @GetMapping("/categories/{code}/articles")
-    public List<GuideDtos.Article> articles(@PathVariable String code) {
-        return guideService.articles(code);
+    public List<GuideDtos.Article> articles(@PathVariable String code,
+                                            @RequestHeader(value = "Accept-Language", required = false) String lang) {
+        return guideService.articles(code, Lang.parse(lang));
     }
 }

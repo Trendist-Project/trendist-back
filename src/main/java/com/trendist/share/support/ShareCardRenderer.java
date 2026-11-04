@@ -110,6 +110,7 @@ public class ShareCardRenderer {
     }
 
     private void draw(Graphics2D g, ShareDtos.CardData d, String site) {
+        boolean en = d.english(); // GLOBAL 카드는 영어 문구(글꼴은 같은 나눔스퀘어 ac: 라틴 글자 포함)
         // 바탕: 어두운 그라데이션 + 떠다니는 원 + 원 뒤의 빛
         g.setPaint(new GradientPaint(0, 0, Color.decode("#0d1420"), W, H, Color.decode("#122433")));
         g.fillRect(0, 0, W, H);
@@ -127,7 +128,7 @@ public class ShareCardRenderer {
         g.setColor(TEXT); g.setFont(f(800, 44));
         text(g, "Trendist", logo != null ? 156 : 64, 92, Align.LEFT);
         g.setColor(MUTED); g.setFont(f(500, 28));
-        text(g, "내 트렌드 성적표", W - 64, 92, Align.RIGHT);
+        text(g, en ? "My Trend Report" : "내 트렌드 성적표", W - 64, 92, Align.RIGHT);
 
         circle(g, d, W / 2.0, 345, 140);
 
@@ -135,7 +136,8 @@ public class ShareCardRenderer {
         g.setColor(TEXT); g.setFont(f(800, 68));
         text(g, fit(g, d.nickname(), W - 160), W / 2.0, 570, Align.CENTER);
         g.setFont(f(600, 30));
-        String sub = (d.title() != null ? "「" + d.title() + "」  " : "") + "Lv." + d.level();
+        String sub = en ? (d.title() != null ? d.title() + "  ·  " : "") + "Lv." + d.level()
+                : (d.title() != null ? "「" + d.title() + "」  " : "") + "Lv." + d.level();
         double sw = g.getFontMetrics().stringWidth(sub) + 48;
         Shape pill = round((W - sw) / 2, 616, sw, 52, 26);
         g.setColor(new Color(63, 182, 139, 36)); g.fill(pill);
@@ -150,15 +152,15 @@ public class ShareCardRenderer {
         g.setColor(PANEL_LINE); g.draw(box);
         double half = (W - 128) / 2.0;
         g.setColor(MUTED); g.setFont(f(600, 28));
-        text(g, "현재 유행도", 64 + half / 2, boxY + 48, Align.CENTER);
-        text(g, d.rank() != null ? "지금 순위" : "최근 7일", 64 + half * 1.5, boxY + 48, Align.CENTER);
+        text(g, en ? "Trend score" : "현재 유행도", 64 + half / 2, boxY + 48, Align.CENTER);
+        text(g, d.rank() != null ? (en ? "Rank now" : "지금 순위") : (en ? "Last 7 days" : "최근 7일"), 64 + half * 1.5, boxY + 48, Align.CENTER);
         g.setColor(TEXT); g.setFont(f(800, 84));
-        text(g, String.format("%,d", d.score()), 64 + half / 2, boxY + 128, Align.CENTER);
+        text(g, String.format(en ? java.util.Locale.ENGLISH : java.util.Locale.getDefault(), "%,d", d.score()), 64 + half / 2, boxY + 128, Align.CENTER);
         if (d.rank() != null) {
             g.setColor(d.rank() <= 3 ? Color.decode("#ffd27a") : TEXT);
-            text(g, d.rank() + "위", 64 + half * 1.5, boxY + 128, Align.CENTER);
+            text(g, en ? "#" + d.rank() : d.rank() + "위", 64 + half * 1.5, boxY + 128, Align.CENTER);
             g.setColor(MUTED); g.setFont(f(500, 24));
-            text(g, "리더보드 TOP 10", 64 + half * 1.5, boxY + 190, Align.CENTER);
+            text(g, en ? "Leaderboard TOP 10" : "리더보드 TOP 10", 64 + half * 1.5, boxY + 190, Align.CENTER);
             sparkline(g, d.scores(), 64 + 60, boxY + 176, half - 120, 40);
         } else {
             sparkline(g, d.scores(), 64 + half + 40, boxY + 86, half - 80, 120);
@@ -171,7 +173,7 @@ public class ShareCardRenderer {
         if (!d.keywords().isEmpty()) {
             g.setColor(new Color(255, 140, 80)); g.fill(new Ellipse2D.Double(64, y - 8, 16, 16));
             g.setColor(MUTED); g.setFont(f(600, 26));
-            text(g, "지금 가진 키워드", 92, y, Align.LEFT);
+            text(g, en ? "Keywords I hold now" : "지금 가진 키워드", 92, y, Align.LEFT);
             y += 52;
             g.setFont(f(700, 30));
             double x = 64, maxEach = (W - 128 - 16.0 * (d.keywords().size() - 1)) / d.keywords().size();
@@ -205,9 +207,9 @@ public class ShareCardRenderer {
 
         // 바닥: 한 줄 홍보 + 주소
         g.setColor(ACCENT); g.setFont(f(800, 34));
-        text(g, "트랜드를 아는 자, 커진다.", W / 2.0, H - 96, Align.CENTER);
+        text(g, en ? "Know the trend. Grow bigger." : "트랜드를 아는 자, 커진다.", W / 2.0, H - 96, Align.CENTER);
         g.setColor(MUTED); g.setFont(f(500, 26));
-        text(g, site + " 에서 나랑 겨뤄 봐!", W / 2.0, H - 50, Align.CENTER);
+        text(g, en ? "Challenge me at " + site + "!" : site + " 에서 나랑 겨뤄 봐!", W / 2.0, H - 50, Align.CENTER);
     }
 
     /** 원 + 이동 효과 + 거북이 + 테두리. 효과가 있으면 왼쪽 아래에서 따라온 모습이다 */

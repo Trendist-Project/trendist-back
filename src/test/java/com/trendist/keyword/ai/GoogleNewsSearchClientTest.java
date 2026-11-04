@@ -20,5 +20,5 @@ class GoogleNewsSearchClientTest {
     }
 
     @Test
-    void disabledReturnsEmpty() { assertThat(new GoogleNewsSearchClient(false).search("아무거나")).isEmpty(); }
+    void disabledReturnsEmpty() { assertThat(new GoogleNewsSearchClient(false).search("아무거나", "ko")).isEmpty(); }
 }

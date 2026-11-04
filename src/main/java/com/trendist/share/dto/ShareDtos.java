@@ -1,5 +1,6 @@
 package com.trendist.share.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 public final class ShareDtos {
@@ -14,12 +15,23 @@ public final class ShareDtos {
      */
     public record CardData(String nickname, long level, String title, long score, Integer rank, List<Long> scores,
                            List<String> keywords, List<Record> records, String background, String borderColor,
-                           Integer borderWidth, String trail, String artPalette, String artPixels) {
+                           Integer borderWidth, String trail, String artPalette, String artPixels,
+                           @JsonInclude(JsonInclude.Include.NON_NULL) String lang) {
+        /** lang: "en"이면 영어 카드(GLOBAL 나라). 한국어 카드는 null이라 JSON에 쓰지 않는다(기존 카드의 해시가 그대로 유지된다) */
+        public boolean english() { return "en".equals(lang); }
+
+        /** lang 없이(한국어 카드) */
+        public CardData(String nickname, long level, String title, long score, Integer rank, List<Long> scores,
+                        List<String> keywords, List<Record> records, String background, String borderColor,
+                        Integer borderWidth, String trail, String artPalette, String artPixels) {
+            this(nickname, level, title, score, rank, scores, keywords, records, background, borderColor, borderWidth, trail, artPalette, artPixels, null);
+        }
+
         /** 픽셀 그림이 없는 카드 */
         public CardData(String nickname, long level, String title, long score, Integer rank, List<Long> scores,
                         List<String> keywords, List<Record> records, String background, String borderColor,
                         Integer borderWidth, String trail) {
-            this(nickname, level, title, score, rank, scores, keywords, records, background, borderColor, borderWidth, trail, null, null);
+            this(nickname, level, title, score, rank, scores, keywords, records, background, borderColor, borderWidth, trail, null, null, null);
         }
     }
 

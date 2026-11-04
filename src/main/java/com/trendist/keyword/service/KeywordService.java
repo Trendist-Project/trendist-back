@@ -14,6 +14,9 @@ public interface KeywordService {
 
     List<KeywordDtos.MyKeyword> myKeywords(long userId);
 
+    /** 특정 플레이어의 보관함(관리자 사용자 상세가 나라를 골라 볼 때). */
+    List<KeywordDtos.MyKeyword> myKeywordsOfPlayer(long playerId);
+
     /** 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 볼 수 없다. */
     KeywordDtos.KeywordCard detail(long userId, long keywordId);
 
@@ -86,6 +89,9 @@ public interface KeywordService {
      * internal로 내린 뒤 가진 사람이 활성 조건(3명) 미만이면 💤로 바꾼다. 내린 수를 돌려준다.
      */
     int expireExternal(String sourceName, Set<String> currentNormalized);
+
+    /** 위와 같되 그 나라의 키워드만(나라별 목록을 쓰는 소스용: 다른 나라 키워드가 엉뚱하게 내려가지 않게). */
+    int expireExternal(String countryCode, String sourceName, Set<String> currentNormalized);
 
     /**
      * 구슬 보상(4.20): 설정 확률(기본 33%)로 그 나라 🔥 키워드 중 완전 무작위 하나를 보관함에 넣고, 나머지는 꽝이다.

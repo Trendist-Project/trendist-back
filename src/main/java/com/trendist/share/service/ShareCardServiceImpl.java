@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
+import com.trendist.common.support.Lang;
 import com.trendist.common.support.RateLimiter;
 import com.trendist.config.AppProperties;
 import com.trendist.keyword.dto.KeywordDtos;
@@ -119,7 +120,14 @@ public class ShareCardServiceImpl implements ShareCardService {
                 .filter(k -> CodeTables.KW_ACTIVE.equals(k.state()))
                 .sorted(Comparator.comparingLong(KeywordDtos.MyKeyword::trendValue).reversed())
                 .limit(3).map(KeywordDtos.MyKeyword::text).toList();
-        List<ShareDtos.Record> records = List.of(
+        // GLOBAL 나라(영어) 플레이어의 카드는 영어로 만든다. 한국어 카드는 lang을 비워 기존 해시를 유지한다
+        boolean en = Lang.ofLocale(p.getCountry().getDefaultLocale()).isEn();
+        List<ShareDtos.Record> records = en ? List.of(
+                new ShareDtos.Record("Added", String.format(java.util.Locale.ENGLISH, "%,d", s.totalPlusCount())),
+                new ShareDtos.Record("Steals", String.format(java.util.Locale.ENGLISH, "%,d", s.stealCount())),
+                new ShareDtos.Record("Bot wins", String.format(java.util.Locale.ENGLISH, "%,d", s.botWinCount())),
+                new ShareDtos.Record("Days active", String.format(java.util.Locale.ENGLISH, "%,d", s.activeDays())))
+                : List.of(
                 new ShareDtos.Record("누적 추가", String.format("%,d회", s.totalPlusCount())),
                 new ShareDtos.Record("빼앗기", String.format("%,d회", s.stealCount())),
                 new ShareDtos.Record("봇 사냥", String.format("%,d회", s.botWinCount())),
@@ -128,7 +136,8 @@ public class ShareCardServiceImpl implements ShareCardService {
         Optional<ProfileDtos.Art> art = profiles.equippedArt(p.getId()); // 픽셀 그림(4.9)
         return new ShareDtos.CardData(info.nickname(), info.level(), info.title(), score, mine == null ? null : mine.rank(),
                 week, hot, records, info.skin().background(), info.skin().borderColor(), info.skin().borderWidth(), info.trail(),
-                art.map(a -> String.join(",", a.palette())).orElse(null), art.map(ProfileDtos.Art::pixels).orElse(null));
+                art.map(a -> String.join(",", a.palette())).orElse(null), art.map(ProfileDtos.Art::pixels).orElse(null),
+                en ? "en" : null);
     }
 
     /** 순위·점수 추이는 카드의 한 칸이라 실패해도 그 칸만 비운다(닫힌 나라 등) */

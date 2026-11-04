@@ -1,6 +1,7 @@
 package com.trendist.profile.controller;
 
 import com.trendist.auth.security.AuthUser;
+import com.trendist.common.support.Lang;
 import com.trendist.profile.dto.ProfileDtos;
 import com.trendist.profile.service.ProfileService;
 import java.time.Duration;
@@ -18,16 +19,21 @@ public class ProfileController {
     private final ProfileService profiles;
 
     @GetMapping("/api/me/profiles")
-    public ProfileDtos.Box box(@AuthenticationPrincipal AuthUser user) { return profiles.box(user.userId()); }
+    public ProfileDtos.Box box(@AuthenticationPrincipal AuthUser user,
+                               @RequestHeader(value = "Accept-Language", required = false) String lang) {
+        return profiles.box(user.userId(), Lang.parse(lang));
+    }
 
     @PutMapping("/api/me/profiles/{slot}")
-    public ProfileDtos.Box save(@AuthenticationPrincipal AuthUser user, @PathVariable int slot, @RequestBody ProfileDtos.SaveRequest req) {
-        return profiles.save(user.userId(), slot, req);
+    public ProfileDtos.Box save(@AuthenticationPrincipal AuthUser user, @PathVariable int slot, @RequestBody ProfileDtos.SaveRequest req,
+                                   @RequestHeader(value = "Accept-Language", required = false) String lang) {
+        return profiles.save(user.userId(), slot, req, Lang.parse(lang));
     }
 
     @PutMapping("/api/me/profiles/equipped")
-    public ProfileDtos.Box equip(@AuthenticationPrincipal AuthUser user, @RequestBody ProfileDtos.EquipRequest req) {
-        return profiles.equip(user.userId(), req.slot());
+    public ProfileDtos.Box equip(@AuthenticationPrincipal AuthUser user, @RequestBody ProfileDtos.EquipRequest req,
+                                    @RequestHeader(value = "Accept-Language", required = false) String lang) {
+        return profiles.equip(user.userId(), req.slot(), Lang.parse(lang));
     }
 
     /** 픽셀 그림 PNG(로그인 없음). 주소에 바꾼 시각(?v=)이 붙어 같은 주소의 그림은 바뀌지 않으므로 오래 캐시해도 된다. */

@@ -24,32 +24,41 @@ public class AdminUserController {
     }
 
     @GetMapping("/{userId}")
-    public AdminUserDtos.Detail detail(@PathVariable long userId) { return service.detail(userId); }
+    public AdminUserDtos.Detail detail(@PathVariable long userId, @RequestParam(required = false) String country) {
+        return service.detail(userId, country);
+    }
 
     @PostMapping("/{userId}/sanctions")
-    public AdminUserDtos.Detail sanction(@PathVariable long userId, @RequestBody AdminUserDtos.SanctionRequest req) {
-        return service.sanction(userId, req);
+    public AdminUserDtos.Detail sanction(@PathVariable long userId, @RequestBody AdminUserDtos.SanctionRequest req,
+                                         @RequestParam(required = false) String country) {
+        return service.sanction(userId, req, country);
     }
 
     @PostMapping("/sanctions/{sanctionId}/release")
-    public AdminUserDtos.Detail release(@PathVariable long sanctionId) { return service.release(sanctionId); }
+    public AdminUserDtos.Detail release(@PathVariable long sanctionId, @RequestParam(required = false) String country) {
+        return service.release(sanctionId, country);
+    }
 
     @PatchMapping("/{userId}/nickname")
-    public AdminUserDtos.Detail rename(@PathVariable long userId, @RequestBody AdminUserDtos.NicknameRequest req) {
-        return service.rename(userId, req.nickname());
+    public AdminUserDtos.Detail rename(@PathVariable long userId, @RequestBody AdminUserDtos.NicknameRequest req,
+                                       @RequestParam(required = false) String country) {
+        return service.rename(userId, req.nickname(), country);
     }
 
     @PostMapping("/{userId}/look/reset")
-    public AdminUserDtos.Detail resetLook(@PathVariable long userId) { return service.resetLook(userId); }
+    public AdminUserDtos.Detail resetLook(@PathVariable long userId, @RequestParam(required = false) String country) {
+        return service.resetLook(userId, country);
+    }
 
     @PatchMapping("/{userId}/role")
-    public AdminUserDtos.Detail role(@AuthenticationPrincipal AuthUser actor, @PathVariable long userId, @RequestBody AdminUserDtos.RoleRequest req) {
-        return service.setAdmin(actor.userId(), userId, req.admin());
+    public AdminUserDtos.Detail role(@AuthenticationPrincipal AuthUser actor, @PathVariable long userId, @RequestBody AdminUserDtos.RoleRequest req,
+                                     @RequestParam(required = false) String country) {
+        return service.setAdmin(actor.userId(), userId, req.admin(), country);
     }
 
     @PostMapping("/{userId}/kick")
-    public ResponseEntity<Void> kick(@PathVariable long userId) {
-        service.kick(userId);
+    public ResponseEntity<Void> kick(@PathVariable long userId, @RequestParam(required = false) String country) {
+        service.kick(userId, country);
         return ResponseEntity.noContent().build();
     }
 }

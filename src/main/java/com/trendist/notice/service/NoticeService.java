@@ -2,12 +2,16 @@ package com.trendist.notice.service;
 
 import com.trendist.notice.dto.AdminNoticeDtos;
 import com.trendist.notice.dto.NoticeItem;
+import com.trendist.common.support.Lang;
 import java.util.List;
 
 /** 공지사항(4.16): 조회와 관리자 작성·수정·삭제. 팝업으로 띄우는 것은 아직 없다(설정만 저장한다). */
 public interface NoticeService {
     /** 게시 중인 공지. 고정 공지 먼저, 그다음 최신순(최대 50개). */
-    List<NoticeItem> list();
+    default List<NoticeItem> list() { return list(Lang.KO); }
+
+    /** 그 언어로(영어판이 비어 있으면 한국어) */
+    List<NoticeItem> list(Lang lang);
 
     /** 관리자 목록: 지우지 않은 공지 전부(고정 먼저, 최신순), 팝업 설정 포함. */
     List<AdminNoticeDtos.Item> adminList();

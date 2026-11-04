@@ -48,7 +48,7 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
                 .map(pk -> new PlayerDtos.KeywordTag(pk.getKeyword().getId(), pk.getKeyword().getText(),
                         pk.getKeyword().getKeywordState().getName()))
                 .toList();
-        String title = p.getTitleId() == null ? null : titles.findById(p.getTitleId()).map(t -> t.getName()).orElse(null);
+        String title = p.getTitleId() == null ? null : titles.findById(p.getTitleId()).map(t -> t.name(com.trendist.common.support.Lang.ofLocale(p.getCountry().getDefaultLocale()))).orElse(null);
         // 점수·레벨·닉네임은 방의 실시간 값으로 보여 준다(DB는 몇 초 늦을 수 있다)
         return new PlayerDtos.PlayerCard(entityNo, live.nickname(), User.ROLE_ADMIN.equals(p.getUser().getRole()), title,
                 live.level(), Math.round(live.score()), p.getCommentScore(), top);

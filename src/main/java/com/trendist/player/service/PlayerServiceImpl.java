@@ -55,11 +55,20 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    @Transactional
+    public Optional<Player> selectCountry(long userId, String countryCode) {
+        Country c = countries.requireOpen(countryCode);
+        User u = users.findById(userId).orElseThrow(() -> ApiException.unauthorized("NO_USER"));
+        if (u.getCountry() == null || !u.getCountry().getId().equals(c.getId())) u.setCountry(c); // 마지막으로 플레이한 지역
+        return players.findByUserIdAndCountryId(userId, c.getId());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<JoinInfo> joinInfo(long userId) {
         return findCurrent(userId).map(p -> {
             String title = p.getTitleId() == null ? null
-                    : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(Title::getName).orElse(null);
+                    : titles.findById(p.getTitleId()).filter(Title::isEnabled).map(t -> t.name(com.trendist.common.support.Lang.ofLocale(p.getCountry().getDefaultLocale()))).orElse(null);
             // 장착한 꾸미기 프로필(4.9). 효과·그림은 로그인 사용자만 그린다
             var look = looks.equippedLook(p);
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),

@@ -1,6 +1,7 @@
 package com.trendist.effect.entity;
 
 import com.trendist.common.entity.BaseTimeEntity;
+import com.trendist.common.support.Lang;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,6 +17,13 @@ public class EffectType extends BaseTimeEntity {
 
     @Column(nullable = false, length = 20) private String code;
     @Column(nullable = false, length = 50) private String name;
+
+    @Column(name = "name_en", length = 50) private String nameEn;
+
+    public String name(Lang lang) { return lang.pick(name, nameEn); }
+
+    /** 영어판 채우기(EnglishBackfill) */
+    public void changeNameEn(String nameEn) { this.nameEn = nameEn; }
 
     public EffectType(String code, String name) { this.code = code; this.name = name; }
 }

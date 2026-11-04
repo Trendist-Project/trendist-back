@@ -48,6 +48,14 @@ public class SanctionServiceImpl implements SanctionService {
         return until.equals(Sanction.FOREVER) ? "영구" : UNTIL.format(until) + "까지";
     }
 
+    private static final DateTimeFormatter UNTIL_EN = DateTimeFormatter.ofPattern("MMM d, HH:mm 'UTC'", java.util.Locale.ENGLISH).withZone(ZoneId.of("UTC"));
+
+    @Override
+    public String untilText(Instant until, com.trendist.common.support.Lang lang) {
+        if (!lang.isEn()) return untilText(until);
+        return until.equals(Sanction.FOREVER) ? "permanent" : "until " + UNTIL_EN.format(until);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public void requireCanComment(long userId) {

@@ -25,6 +25,12 @@ public interface PlayerService {
     Player requireCurrent(long userId);
 
     /** 닉네임 정하기(그 나라 첫 입장). */
+    /**
+     * 사용자가 고른 나라로 마지막 플레이 지역을 맞추고 그 나라의 플레이어를 돌려준다(없으면 비어 있음: 닉네임 만들기).
+     * 없거나 닫힌 나라면 400.
+     */
+    Optional<Player> selectCountry(long userId, String countryCode);
+
     Player create(long userId, String rawNickname, String countryCode);
 
     /** 현재 나라 닉네임 바꾸기. 마지막 변경 후 설정 간격(기본 1시간)이 지나야 한다(4.1). */

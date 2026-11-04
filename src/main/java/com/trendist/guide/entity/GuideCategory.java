@@ -1,6 +1,7 @@
 package com.trendist.guide.entity;
 
 import com.trendist.common.entity.BaseTimeEntity;
+import com.trendist.common.support.Lang;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,6 +18,7 @@ public class GuideCategory extends BaseTimeEntity {
 
     @Column(nullable = false, length = 50) private String code;
     @Column(nullable = false, length = 100) private String name;
+    @Column(name = "name_en", length = 100) private String nameEn;
     @Column(name = "display_type", nullable = false, length = 20) private String displayType;
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
@@ -25,6 +27,16 @@ public class GuideCategory extends BaseTimeEntity {
     public void edit(String name, String displayType, boolean enabled) {
         this.name = name; this.displayType = displayType; this.enabled = enabled;
     }
+
+    /** 관리자 수정(영어 이름 포함) */
+    public void edit(String name, String nameEn, String displayType, boolean enabled) {
+        edit(name, displayType, enabled); this.nameEn = nameEn;
+    }
+
+    public String name(Lang lang) { return lang.pick(name, nameEn); }
+
+    /** 영어판 채우기(EnglishBackfill) */
+    public void changeNameEn(String nameEn) { this.nameEn = nameEn; }
 
     public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
 

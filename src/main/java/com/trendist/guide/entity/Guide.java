@@ -2,6 +2,7 @@ package com.trendist.guide.entity;
 
 import com.trendist.common.entity.BaseTimeEntity;
 import com.trendist.user.entity.User;
+import com.trendist.common.support.Lang;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -18,6 +19,8 @@ public class Guide extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id", nullable = false) private User user;
     @Column(nullable = false, length = 100) private String title;
     @Column(nullable = false, columnDefinition = "MEDIUMTEXT") private String body;
+    @Column(name = "title_en", length = 100) private String titleEn;
+    @Column(name = "body_en", columnDefinition = "MEDIUMTEXT") private String bodyEn;
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
 
@@ -27,6 +30,14 @@ public class Guide extends BaseTimeEntity {
     public void changeBody(String body) { this.body = body; }
     /** 관리자 수정(13.4) */
     public void edit(String title, String body) { this.title = title; this.body = body; }
+    /** 관리자 수정(영어판 포함) */
+    public void edit(String title, String titleEn, String body, String bodyEn) {
+        edit(title, body); this.titleEn = titleEn; this.bodyEn = bodyEn;
+    }
+    public String title(Lang lang) { return lang.pick(title, titleEn); }
+    public String body(Lang lang) { return lang.pick(body, bodyEn); }
+    /** 영어판 채우기(EnglishBackfill) */
+    public void changeEnglish(String titleEn, String bodyEn) { this.titleEn = titleEn; this.bodyEn = bodyEn; }
     public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
 
     public Guide(GuideCategory category, User author, String title, String body, int sortOrder) {

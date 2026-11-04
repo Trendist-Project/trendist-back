@@ -87,7 +87,7 @@ public class DataSeeder implements ApplicationRunner {
         record C(String code, String name, String locale, String tz, boolean enabled, int order) {}
         for (C c : List.of(
                 new C("KR", "한국", "ko", "Asia/Seoul", true, 1),
-                new C("GLOBAL", "글로벌", "en", "UTC", false, 2),
+                new C("GLOBAL", "글로벌", "en", "UTC", true, 2),
                 new C("JP", "일본", "ja", "Asia/Tokyo", false, 3),
                 new C("IN", "인도", "hi", "Asia/Kolkata", false, 4),
                 new C("CN", "중국", "zh-CN", "Asia/Shanghai", false, 5))) {

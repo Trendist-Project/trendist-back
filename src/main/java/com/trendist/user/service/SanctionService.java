@@ -18,4 +18,7 @@ public interface SanctionService {
 
     /** 끝나는 시각을 "M월 d일 HH:mm까지" 또는 "영구"로 */
     String untilText(Instant until);
+
+    /** 영어판: "permanent" 또는 "until Nov 4, 12:00 UTC" */
+    String untilText(Instant until, com.trendist.common.support.Lang lang);
 }
