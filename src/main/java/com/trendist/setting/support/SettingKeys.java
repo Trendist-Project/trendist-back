@@ -83,7 +83,7 @@ public final class SettingKeys {
             new Def(MAX_DIAMETER_RATIO, "0.025", 0.01, 0.20, "최대 지름 비율(기준 맵 한 변 대비)"),
             new Def(SCORE_CAP, "2000", 1, 1000000, "크기 상한 점수(S_cap)"),
             new Def(MAX_SPEED, "480", 50, 1000, "최대 속도(px/s, 모든 플레이어 동일)"),
-            new Def(ZOOM_FACTOR, "170", 1, 10000, "줌 계수"),
+            new Def(ZOOM_FACTOR, "280", 1, 10000, "줌 계수"),
             new Def(BIG_RATIO, "1.15", 1, 5, "큰 쪽 판정 비율"),
             new Def(KNOCKBACK_CAP, "3", 1, 10, "튕김 세기 상한(배). 작은 쪽은 크기 비율만큼 더 멀리 튕긴다"),
             new Def(KNOCKBACK_SECONDS, "0.5", 0.05, 5, "튕김이 멈출 때까지 걸리는 시간(초). 처음에 빠르고 점점 느려진다"),
