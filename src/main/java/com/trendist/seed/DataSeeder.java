@@ -103,6 +103,10 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
+        // 더 이상 쓰지 않는 설정(콤보 궤도 위성, 4.25)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
+        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max")) {
+            settings.findByName(old).ifPresent(settings::delete);
+        }
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
             if (settings.findByName(d.name()).isEmpty()) {
                 String type = d.value().contains(".") ? "DECIMAL" : "INT";
