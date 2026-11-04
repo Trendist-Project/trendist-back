@@ -102,7 +102,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         double world = settings.getDouble(SettingKeys.WORLD_SIZE);
         return new Room.Tuning(world,
                 settings.getDouble(SettingKeys.MIN_RADIUS),
-                world * settings.getDouble(SettingKeys.MAX_DIAMETER_RATIO) / 2,
+                settings.getDouble(SettingKeys.MAX_DIAMETER) / 2,
                 settings.getDouble(SettingKeys.SCORE_CAP),
                 settings.getDouble(SettingKeys.MAX_SPEED),
                 settings.getDouble(SettingKeys.ZOOM_FACTOR),

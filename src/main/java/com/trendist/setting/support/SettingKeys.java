@@ -20,7 +20,7 @@ public final class SettingKeys {
     public static final String EXP_PER_PLUS = "exp_per_plus";
     public static final String WORLD_SIZE = "world_size";
     public static final String MIN_RADIUS = "min_radius";
-    public static final String MAX_DIAMETER_RATIO = "max_diameter_ratio";
+    public static final String MAX_DIAMETER = "max_diameter";
     public static final String AREA_SHRINK_SPEED = "area_shrink_speed";
     public static final String SCORE_CAP = "score_cap";
     public static final String MAX_SPEED = "max_speed";
@@ -80,7 +80,7 @@ public final class SettingKeys {
             new Def(WORLD_SIZE, "48000", 1000, 50000, "기준 맵 한 변(px)"),
             new Def(MIN_RADIUS, "16", 4, 100, "최소 반지름(px)"),
             new Def(AREA_SHRINK_SPEED, "60", 0, 10000, "활동 영역이 줄어드는 속도: 한 변이 1초에 이만큼(px)씩만 줄어든다(0이면 바로 줄어듦). 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀리지 않게 한다"),
-            new Def(MAX_DIAMETER_RATIO, "0.025", 0.01, 0.20, "최대 지름 비율(기준 맵 한 변 대비)"),
+            new Def(MAX_DIAMETER, "600", 40, 5000, "최대 지름(px, 고정값. 맵 크기와 관계없다)"),
             new Def(SCORE_CAP, "2000", 1, 1000000, "크기 상한 점수(S_cap)"),
             new Def(MAX_SPEED, "480", 50, 1000, "최대 속도(px/s, 모든 플레이어 동일)"),
             new Def(ZOOM_FACTOR, "280", 1, 10000, "줌 계수"),
