@@ -22,6 +22,9 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 169판 (2026-11-04)
+- 접속 분석용 Google 태그(GTM-WRFP5PLN)를 메인 `index.html`에 추가(8절). 관리자·공유 페이지는 제외. 쿠키 동의·개인정보 안내 필요 여부는 16.2에 열린 항목으로 남김.
+
 ### 168판 (2026-11-04)
 - 뉴스 제목 기억(`TrendNewsContext`)의 키에 설명 언어를 넣어 KR·GLOBAL이 같은 철자의 키워드에서 서로 덮어쓰지 않게 함(10.4).
 - GLOBAL(영어) 방 오픈(4.18, 5.1, 10.1~10.4, 16.1~16.2): 나라 = UI 언어(KR=ko, GLOBAL=en), 메인 화면 카드 맨 아래의 작은 '서버' 목록에서 선택(기본은 브라우저 언어로 자동, localStorage `trendist.country`, 바꾸면 새로고침, 3.1). GLOBAL 외부 소스는 구글 트렌드 `geo=US`로 결정, 나라별 수집 루프, GLOBAL AI 설명은 영어 프롬프트·미국 영어 뉴스 RSS. 기존 DB는 `UPDATE countries SET enabled = true WHERE code = 'GLOBAL';`을 직접 실행. RSS 상업적 이용은 여전히 미확인(출처 표기 요구, 2026-11-04 확인)
