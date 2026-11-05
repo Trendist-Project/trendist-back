@@ -213,6 +213,7 @@ CREATE TABLE keywords (
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '누적 검색 수(매시 메모리 카운터를 더함)',
   total_plus_count BIGINT NOT NULL DEFAULT 0 COMMENT '누적 + 수(삭제·잃기로 줄지 않음)',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진 사람 수(player_keywords 행 수 캐시)',
+  view_count       BIGINT NOT NULL DEFAULT 0 COMMENT '공개 키워드 페이지 조회 수(같은 방문자 키워드마다 하루 1번, 크롤러 제외, 4.28). 마이그레이션 V2',
   activated_at     DATETIME(6) NULL COMMENT '처음 🔥활성이 된 시각(NULL이면 한 번도 활성 전)',
   inactive_at      DATETIME(6) NULL COMMENT '비활성 전환 시각',
   banned_at        DATETIME(6) NULL COMMENT '금지 시각',

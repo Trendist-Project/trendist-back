@@ -114,4 +114,25 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     /** 관리자 대시보드(13.11): 외부 유지 기간이 (now, until] 안에 끝나는 키워드 수. */
     @Query("select count(k) from Keyword k where k.country.id = :countryId and k.externalUntil > :now and k.externalUntil <= :until")
     long countExternalEnding(@Param("countryId") Long countryId, @Param("now") Instant now, @Param("until") Instant until);
+
+    /** 공개 키워드 페이지(4.28): 나라 코드와 정규화 키로 한 번에(상태·나라·반영 소스·AI 설명 포함). */
+    @Query("""
+            select k from Keyword k join fetch k.country c join fetch k.keywordState join fetch k.dataSource
+            left join fetch k.aiComment
+            where c.code = :countryCode and k.normalized = :normalized""")
+    Optional<Keyword> findForPage(@Param("countryCode") String countryCode, @Param("normalized") String normalized);
+
+    /** 공개 페이지가 캐시를 쓰더라도 금지 여부는 매 요청마다 새로 확인한다(4.28). 키워드 상태 번호만 읽는다. */
+    @Query("select k.keywordState.id from Keyword k where k.id = :id")
+    Optional<Long> findStateId(@Param("id") Long id);
+
+    /** 공개 페이지 방문 수 더하기(메모리 카운터가 1분마다 모아서). */
+    @Modifying
+    @Query("update Keyword k set k.viewCount = k.viewCount + :n where k.id = :id")
+    int addViewCount(@Param("id") Long id, @Param("n") long n);
+
+    /** 사이트맵(4.28): 그 나라에서 금지가 아닌 키워드의 [정규화 키, 수정 시각]. 최근에 만든 키워드부터(상한을 넘으면 오래된 것이 빠진다). */
+    @Query("select k.normalized, k.updatedAt from Keyword k where k.country.id = :countryId and k.keywordState.id <> :bannedId order by k.id desc")
+    List<Object[]> findSitemapRows(@Param("countryId") Long countryId, @Param("bannedId") Long bannedId,
+                                   org.springframework.data.domain.Pageable pageable);
 }

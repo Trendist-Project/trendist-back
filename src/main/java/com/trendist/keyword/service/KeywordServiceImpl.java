@@ -58,6 +58,7 @@ public class KeywordServiceImpl implements KeywordService {
     private final CodeTables codes;
     private final List<ExternalTrendSource> sources;
     private final SearchCounter searchCounter;
+    private final com.trendist.keyword.support.KeywordViewCounter viewCounter;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
     private final CountryService countries;
@@ -98,7 +99,7 @@ public class KeywordServiceImpl implements KeywordService {
             return new KeywordDtos.SearchResult("FOUND", card(k, p, now));
         }
         var preview = new KeywordDtos.KeywordCard(null, text, CodeTables.KW_INACTIVE, 0,
-                0, 0, 0, false, null, null, false);
+                0, 0, 0, 0, false, null, null, false);
         return new KeywordDtos.SearchResult("NEW", preview);
     }
 
@@ -373,6 +374,7 @@ public class KeywordServiceImpl implements KeywordService {
         else k.unban(codes.keywordState(CodeTables.KW_INACTIVE), now);
         long nw = updateTrend(k); // 금지·💤면 0
         keywords.flush();
+        events.publishEvent(new com.trendist.keyword.support.KeywordPageEvents.Changed(k.getCountry().getCode(), k.getNormalized())); // 공개 페이지·사이트맵 캐시를 커밋 뒤 비운다(4.28)
         publishTrendChange(k, old, nw, null); // 접속 중인 보유자는 바로, 아닌 보유자는 1분 재합산에서 점수가 빠진다
         return adminRow(k);
     }
@@ -690,7 +692,8 @@ public class KeywordServiceImpl implements KeywordService {
         String ai = k.getAiComment() == null ? null : k.getAiComment().getComment();
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
                 k.getHolderCount(), k.getTotalPlusCount(),
-                k.getSearchCount() + searchCounter.pending(k.getId()), mine.isPresent(),
+                k.getSearchCount() + searchCounter.pending(k.getId()),
+                k.getViewCount() + viewCounter.pendingOf(k.getId()), mine.isPresent(),
                 mine.map(PlayerKeyword::getExpiresAt).orElse(null),
                 ai, ai != null && aiRequests.existsByKeywordIdAndPlayerIdAndHandledAtIsNull(k.getId(), p.getId()));
     }

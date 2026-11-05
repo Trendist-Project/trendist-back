@@ -9,7 +9,7 @@
 | 프론트엔드 | React + TypeScript, Vite. 아레나는 Canvas 2D(부족하면 PixiJS) |
 | 백엔드 | Spring Boot 4.1.2, Java 25, Gradle 9.8.2(Kotlin DSL). REST API, WebSocket 게임 서버, 배치를 한 애플리케이션으로 시작 |
 | 실시간 통신 | Spring WebSocket(순수 WebSocket, 바이너리 프레임), 서버 권위. 20Hz 시뮬레이션, 10~15Hz 스냅샷. STOMP 미사용 |
-| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 개발·테스트는 JPA가 스키마를 자동 반영하고(11.3), 운영은 Flyway. 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB |
+| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 스키마는 Flyway가 바꾼다(로컬 개발·운영, 11.3). 자동 테스트는 H2에 JPA가 스키마를 만든다. 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB |
 | 캐시 | Caffeine(서버 1대). 여러 대가 되면 Redis |
 | 배치 | Spring `@Scheduled` + ShedLock |
 | 이미지 | S3 호환 객체 저장소(초기에는 로컬 디스크 가능), 자동 검열은 ONNX Runtime(Java) |
@@ -174,7 +174,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5). 목록 한 줄에 `targetUserId`(신고된 사람), `contentDeleted`, `targetSanctions`(지금 걸린 제재) |
 | `POST /api/admin/reports/{id}/act` | 신고에서 바로 조치(13.5) `{ "sanction": "CHAT" \| "COMMENT" \| "UPLOAD" \| "BAN" \| null, "days": 1, "reason": "", "deleteContent": true, "sameTarget": true }`. 제재를 걸고(사유를 비우면 신고 번호·사유로), 댓글이면 지우고, 그 신고(와 같은 대상의 접수 신고)를 조치함으로. 응답 `{ changed, report }`. 대상 사용자가 없으면 400 `REPORT_NO_USER`, 댓글이 아닌데 지우기면 400 `REPORT_DELETE_TYPE` |
 | `GET /api/admin/settings`, `PATCH /api/admin/settings/{name}` | 설정 목록과 값 변경 `{ "value": "12" }`. 숫자·정수·허용 범위 검사, 저장하면 캐시를 비워 바로 반영(13.3) |
-| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404. `aiComment`(AI 한 줄 설명, 없으면 null)와 `aiCommentRequested`(내가 갱신 요청을 해 둔 상태)를 함께 준다 |
+| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404. `aiComment`(AI 한 줄 설명, 없으면 null)와 `aiCommentRequested`(내가 갱신 요청을 해 둔 상태), `viewCount`(공개 키워드 페이지 조회수, 저장 전 값 포함, 4.28)를 함께 준다 |
 | `POST /api/keywords/{id}/ai-comment/request` | AI 설명 갱신 요청(4.12). 설명이 있는 키워드에만(409 `AI_COMMENT_NONE`), 같은 사람의 열린 요청은 하나(다시 눌러도 그대로), 1시간 10회(429 `AI_REQUEST_RATE`) |
 | `GET /api/admin/ai-comments?filter=requests\|missing\|all&page=`, `POST /{keywordId}/regenerate`, `PUT /{keywordId}` `{ "comment": "…" }`, `POST /{keywordId}/dismiss` | 관리자 AI 설명(13.12). 갱신 요청 목록·설명 없는 키워드·설명 있는 키워드, AI 재요청(저장하고 열린 요청을 닫음. 키 없음 409 `AI_DISABLED`, 한도 429 `AI_RATE_LIMITED`, 실패 409 `AI_FAILED`, 모른다고 함 409 `AI_UNKNOWN`), 직접 수정(1~200자, 요청을 닫음), 요청 닫기 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
@@ -198,6 +198,8 @@ WHERE p.id IN (/* 500명 */)
 | `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [플레이 하러 가기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
 | `GET /share/{code}/play` | [플레이 하러 가기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
 | `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
+| `GET /{kr\|global}/keywords/{slug}` | 공개 키워드 페이지 HTML(로그인 없음, 4.28). 금지·없는 키워드는 404. 열 때마다 조회수를 세므로 `no-cache` |
+| `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소와 금지가 아닌 모든 키워드 페이지를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
@@ -353,7 +355,7 @@ record TrendBox(
 - 정수 컬럼은 확장에 대비해 모두 `BIGINT`로 둔다(점수, 인원, 횟수, 순서, 레벨 등). 참/거짓은 `TINYINT(1)`, 0~23 시간 칸 같은 작은 번호는 `TINYINT`로 둔다. JPA 엔티티 필드도 `long`이다.
 - 코드값은 `ENUM` 대신 `VARCHAR` 대문자 코드(`countries`, `users.role` 등) 또는 이름만 있는 코드 테이블(`user_states`, `keyword_states`, `report_types`, `sanction_types`)로 둔다. 허용 값 검증은 `CHECK` 없이 애플리케이션에서 한다.
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
-- JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 개발·테스트에서는 시작할 때 JPA가 스키마를 반영하고 시더가 초기 데이터를 넣는다(11.3). 운영은 17절 SQL(`4-schema.sql`)을 기준으로 Flyway를 쓴다.
+- JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 스키마는 Flyway 마이그레이션(`src/main/resources/db/migration`)으로 바꾸고, 시더가 초기 데이터를 넣는다(11.3). 자동 테스트만 시작할 때 JPA가 H2에 스키마를 만든다.
 
 ### 11.2 테이블 (38개, 컬럼은 `4-schema.sql`)
 
@@ -369,7 +371,7 @@ record TrendBox(
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
-| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수 |
+| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수, 공개 페이지 조회수(`view_count`) |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
 | | `player_positions`, `room_states` | 방 메모리 상태 저장(9.2): 플레이어의 마지막 위치와 저장 시각(플레이어당 한 행), 나라의 활동 영역과 저장 시각(나라당 한 행). 서버를 다시 켜도 5분 안이면 이어 간다 |
 | | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). |
@@ -391,14 +393,17 @@ record TrendBox(
 - `player_keywords.player_id`의 나라와 키워드의 나라가 같은지, `chat_messages.country_id`와 `player_id`의 나라가 같은지, 댓글·투표의 `player_id`가 그 댓글 키워드의 나라인지는 애플리케이션에서 검사한다. `keywords.data_source_id`(반영 소스)는 항상 값이 있고, 외부에서 확인되지 않은 키워드(사용자가 만든 것, 관리자가 넣은 시드 포함)는 `internal`을 가리킨다. `reports.target_id`는 대상이 여러 테이블이라 외래 키가 없다.
 - 계속 쌓이는 테이블은 `keyword_log_dailies`(180일), `player_score_dailies`(영구), `share_cards`(영구, 행당 1KB 안팎), `site_hourly_stats`(나라당 하루 24행, 영구), `site_daily_stats`(나라당 하루 1행, 영구)다. 커지면 월 파티션으로 나누고 기본 키를 각각 `(id, record_date)`로 바꾼다. `player_score_24h`는 플레이어당, `keyword_log_24h`는 키워드당 최대 24칸을 덮어써서 항상 24시간치만 남는다. `player_keywords`는 하루치만 남는다.
 
-### 11.3 스키마 자동 반영과 초기 데이터 (개발·테스트)
-스키마
-- 애플리케이션이 시작할 때마다 JPA(Hibernate)가 엔티티를 보고 DB 스키마를 맞춘다(`spring.jpa.hibernate.ddl-auto=update`). 엔티티에 테이블·컬럼·인덱스를 추가하면 다음 실행에 반영된다. 이 환경에서는 Flyway를 끈다. `update`는 컬럼·테이블을 지우거나 이름을 바꾸지 않으므로, 그런 변경을 하면 아래 빠른 초기화로 DB를 다시 만든다(옛 데이터를 옮기는 코드는 두지 않는다).
-- `update`는 새 테이블·컬럼·인덱스를 추가하지만 컬럼 이름 변경, 타입 변경, 컬럼·테이블 삭제는 하지 않는다. 그런 변경을 했거나 스키마가 꼬였을 때는 아래 빠른 초기화를 쓴다.
-- 엔티티가 만드는 스키마가 17절(`4-schema.sql`)과 같아지도록 `columnDefinition`, `@Table(indexes, uniqueConstraints)`, `@Comment`로 맞춘다. JPA로 표현하기 어려운 것(`utf8mb4_bin` 콜레이션, `DEFAULT CURRENT_TIMESTAMP(6)`, `guides`의 ngram FULLTEXT 인덱스)은 `columnDefinition`이나 시작 시 보조 SQL로 처리한다(없을 때만 만든다).
+### 11.3 스키마 마이그레이션(Flyway)과 초기 데이터
+스키마 (Flyway)
+- 스키마는 Flyway가 바꾼다. 마이그레이션 파일은 `src/main/resources/db/migration/V{번호}__{설명}.sql`이고, 애플리케이션이 시작할 때 아직 안 한 것만 번호 순서로 실행한다(이력은 DB의 `flyway_schema_history`). 로컬 개발(dev)과 운영(prod)이 켜고, 자동 테스트는 끈다(H2에 JPA가 스키마를 만든다).
+- **DB를 바꾸는 방법**: 엔티티에 컬럼·테이블·인덱스를 추가하거나 바꾸면 같은 작업에서 새 파일 `V{다음 번호}__설명.sql`을 만든다(예: `V2__keyword_view_count.sql`). 이미 적용된 파일(V1, V2 …)은 고치지 않는다. 컬럼 이름·타입 변경, 삭제, 데이터 옮기기도 새 파일에 SQL로 쓴다. 파일 내용을 바꾸면 체크섬 불일치로 시작이 거부된다.
+- `V1__baseline.sql`은 Flyway 도입 시점(2026-11-05)의 엔티티가 만드는 스키마(37개 테이블)다. **Flyway 도입 전부터 있던 DB(운영·로컬)는 V1을 실행하지 않는다.** 스키마는 있는데 이력 테이블이 없으면 V1로 기준선만 찍고(`baseline-on-migrate=true`, `baseline-version=1`) V2부터 적용한다. 빈 DB는 V1부터 모두 실행해 처음부터 만든다.
+- 로컬 개발은 `ddl-auto=validate`다. 엔티티와 DB가 다르면(마이그레이션을 빠뜨리면) 시작할 때 오류로 알려 준다. 운영은 `ddl-auto=none`이다(운영 DB가 엔티티와 같다고 확인되면 `validate`로 올린다, 16.1).
+- 엔티티가 만드는 스키마와 마이그레이션 결과가 같은지는 빈 DB로 확인한다: 새 스키마에서 시작해 V1~V최신이 실행되고 `validate`를 통과해야 한다(2026-11-05 로컬 MariaDB 10.11로 확인, MySQL 8은 미확인, 16.2). `4-schema.sql`(17절)은 사람이 읽는 참고용 전체 스키마이므로 마이그레이션을 추가하면 같이 고친다.
+- 자동 테스트는 H2 메모리 DB에 JPA(`ddl-auto`)로 스키마를 만들어서 마이그레이션 SQL은 테스트하지 않는다. H2에서 실행되지 않는 SQL이 들어가도 테스트로는 잡히지 않는다.
 
 빠른 초기화
-- `reset` 프로필(또는 환경 변수 `TRENDIST_DB_RESET=true`)로 실행하면 스키마의 모든 테이블을 지우고 엔티티로 다시 만든 뒤 초기 데이터를 넣는다. 엔티티에 없는 옛 테이블까지 지우려고 `information_schema`의 테이블 목록을 읽어 외래 키 검사를 끄고 지운다. Hibernate가 스키마를 만들기 전에 실행되는 초기화 빈이 맡는다.
+- `reset` 프로필(또는 환경 변수 `TRENDIST_DB_RESET=true`)로 실행하면 스키마의 모든 테이블(`flyway_schema_history` 포함)을 지우고 Flyway가 V1부터 다시 만든 뒤 초기 데이터를 넣는다. 엔티티에 없는 옛 테이블까지 지우려고 `information_schema`의 테이블 목록을 읽어 외래 키 검사를 끄고 지운다. Flyway·Hibernate가 스키마를 다루기 전에 실행되는 초기화 빈이 맡는다.
 - 안전장치: DB 주소가 로컬(localhost 등)이고 `reset` 프로필일 때만 동작한다. 운영 프로필과 같이 켜져 있으면 시작을 거부한다. 지우기 전에 대상 스키마 이름을 로그에 남긴다.
 
 초기 데이터
@@ -444,10 +449,12 @@ java {
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
 - 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
-- 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 운영은 Flyway 전환 전까지 `ddl-auto=update`다(16.1).
+- 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 스키마는 Flyway가 바꾸므로 로컬은 `ddl-auto=validate`, 운영은 `ddl-auto=none`이다(11.3, 16.1).
 - 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 운영 환경 변수는 GitHub 시크릿 `ENV_FILE`을 배포 때 서버 `/home/ubuntu/trendist/.env`로 보내고(WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`, 기본 `https://trendist.kr`), 실행 설정(포트 4001, 네트워크)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
 - 카카오톡 공유(4.24): 카카오 앱의 JavaScript 키(공개 키, 브라우저에 그대로 실린다)는 `trendist-front/src/kakaoShare.ts`에 기본값으로 둔다. 다른 키를 쓰려면 빌드 환경 변수 `VITE_KAKAO_JS_KEY`로 덮어쓴다(로컬은 git 제외 파일 `.env.local`). GitHub 저장소 변수는 쓰지 않는다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
 - 검색엔진 최적화: 메인 `index.html`의 description·canonical·`og:`·twitter 메타(이미지는 절대 주소), `public/robots.txt`(`/admin/`·`/api/` 제외, `/share/`는 미리보기 수집기를 위해 막지 않음), `public/sitemap.xml`(메인 주소), `<noscript>` 소개 본문. 관리자 화면 `admin/index.html`은 `noindex, nofollow`. 공유 카드 페이지는 카드별 `og:` 태그와 `noindex`를 백엔드가 만든다(4.24). 서버 렌더링은 쓰지 않는다(로그인 없는 캔버스 게임이라 검색 노출 대상이 메인 화면뿐).
+- 공개 키워드 페이지·사이트맵(4.28): `/kr/keywords/**`, `/global/keywords/**`, `/sitemap.xml`은 백엔드가 준다. **운영 nginx에 `location ~ ^/(kr|global)/keywords/ { proxy_pass http://trendist-back:4001; }`와 `location = /sitemap.xml { proxy_pass http://trendist-back:4001; }`를 `/share/`와 같은 헤더(Host·X-Forwarded)로 추가해야 한다.** `location =`가 정적 파일(`root`)보다 먼저 맞으므로 남은 정적 `sitemap.xml`보다 우선하지만, 혼란을 막으려고 프론트의 `public/sitemap.xml`은 지웠다. 로컬은 Vite가 같은 주소를 백엔드로 넘긴다(`vite.config.ts`). 사이트 주소는 `trendist.share.base-url`을 쓴다. 이미 제출한 `https://trendist.kr/sitemap.xml`은 그대로 쓰면 되고, 새로 제출할 주소는 없다.
+- DB 마이그레이션(Flyway, 11.3): 의존성 `spring-boot-starter-flyway`·`flyway-mysql`. 운영 배포 전에 **DB를 백업**한다(처음 Flyway가 켜지면 `flyway_schema_history`가 새로 생기고 V2가 운영 DB에 적용된다). 마이그레이션이 실패하면 애플리케이션이 시작하지 않는다(단일 컨테이너 중단 배포라 이전 컨테이너가 이미 내려가 있다).
 - 접속 분석: 메인 `index.html`의 `<head>` 바로 다음에 Google 태그(GTM-WRFP5PLN)를 한 번 둔다. 관리자 화면(`admin/`)과 백엔드가 그리는 공유 카드 페이지(`/share/`)에는 넣지 않는다(운영자 접속이 수치에 섞이지 않게 하고, 공유 유입 분석은 자체 공유 통계로 본다, 13.8).
 - 자랑하기 카드 공유 주소(4.24): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).

@@ -96,6 +96,19 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
                 .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()))
                 .filter(x -> !CodeTables.KW_BANNED.equals(x.getKeywordState().getName()))
                 .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
+        return build(k, range);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public KeywordDtos.Activity publicActivity(long keywordId, String range) {
+        Keyword k = keywords.findById(keywordId)
+                .filter(x -> !CodeTables.KW_BANNED.equals(x.getKeywordState().getName()))
+                .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
+        return build(k, range);
+    }
+
+    private KeywordDtos.Activity build(Keyword k, String range) {
         ZoneId zone = ZoneId.of(k.getCountry().getTimezone());
         Instant now = Instant.now(clock);
         Instant thisHour = now.truncatedTo(ChronoUnit.HOURS);

@@ -24,6 +24,8 @@ public class Keyword extends BaseTimeEntity {
     @Column(name = "search_count", nullable = false) private long searchCount;
     @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
     @Column(name = "holder_count", nullable = false) private long holderCount;
+    /** 공개 키워드 페이지(4.28)의 방문 수. 같은 방문자는 하루 1번, 크롤러는 제외. 메모리에 모았다가 1분마다 더한다. */
+    @Column(name = "view_count", nullable = false) private long viewCount;
     @Column(name = "activated_at", columnDefinition = "DATETIME(6)") private Instant activatedAt;
     @Column(name = "inactive_at", columnDefinition = "DATETIME(6)") private Instant inactiveAt;
     @Column(name = "banned_at", columnDefinition = "DATETIME(6)") private Instant bannedAt;

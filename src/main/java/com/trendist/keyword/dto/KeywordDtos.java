@@ -10,7 +10,7 @@ public final class KeywordDtos {
     /** 결과 카드(4.4). id가 null이면 아직 DB에 없는 새 단어(💤 카드). */
     public record KeywordCard(Long id, String text, String state, long trendValue,
                               long holderCount, long totalPlusCount, long searchCount,
-                              boolean plusedByMe, Instant myExpiresAt, String aiComment, boolean aiCommentRequested) {}
+                              long viewCount, boolean plusedByMe, Instant myExpiresAt, String aiComment, boolean aiCommentRequested) {}
 
     public record SearchResult(String status, KeywordCard keyword) {}
 
