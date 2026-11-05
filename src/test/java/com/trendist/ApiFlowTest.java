@@ -800,6 +800,16 @@ class ApiFlowTest {
         report(b, "CHAT", chatId, 201);
         report(b, "CHAT", chatId, 409);
         report(b, "PLAYER", 1, 404);      // 플레이어 신고는 같은 방에 있을 때만(정보 팝업, 4.11)
+        // 키워드 신고(키워드 상세 팝업, 4.12): 누구나(보유자도) 한 번만, 없는 키워드는 404
+        report(a, "KEYWORD", kid, 201);
+        report(a, "KEYWORD", kid, 409);
+        report(b, "KEYWORD", kid, 201);
+        report(b, "KEYWORD", 99999999, 404);
+        var kwRow = reportService.adminList(Report.RECEIVED, 0, 50).items().stream()
+                .filter(r -> r.targetId() == kid && ReportType.KEYWORD.equals(r.type())).findFirst().orElseThrow();
+        assertThat(kwRow.targetNickname()).isEqualTo("신고 키워드");
+        assertThat(kwRow.sameTargetCount()).isEqualTo(2);
+        assertThat(kwRow.targetUserId()).isNull();
 
         // 관리자 검토(13.5): 목록에 대상 내용이 붙고, 처리 결과를 바꿀 수 있다
         var page = reportService.adminList(Report.RECEIVED, 0, 50);

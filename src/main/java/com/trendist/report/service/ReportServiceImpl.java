@@ -4,6 +4,7 @@ import com.trendist.chat.entity.ChatMessage;
 import com.trendist.chat.repository.ChatMessageRepository;
 import com.trendist.comment.entity.Comment;
 import com.trendist.comment.repository.CommentRepository;
+import com.trendist.common.code.CodeTables;
 import com.trendist.common.exception.ApiException;
 import com.trendist.common.support.TextRules;
 import com.trendist.player.entity.Player;
@@ -32,6 +33,9 @@ public class ReportServiceImpl implements ReportService {
     private final ReportTypeRepository types;
     private final CommentRepository comments;
     private final ChatMessageRepository chats;
+    private final com.trendist.keyword.repository.KeywordRepository keywordRepo;
+    private final com.trendist.keyword.support.BannedWordFilter bannedWords;
+    private final CodeTables codes;
     private final PlayerService playerService;
     private final PlayerRepository players;
     private final RoomManager rooms;
@@ -52,6 +56,15 @@ public class ReportServiceImpl implements ReportService {
                 typeName = ReportType.COMMENT;
                 countryId = c.getKeyword().getCountry().getId();
                 ownerId = c.getPlayer().getId();
+            }
+            case "KEYWORD" -> {
+                // 키워드 상세 팝업(4.12)에서 신고한다. 볼 수 없는 키워드(금지·금지어 포함)는 신고할 수도 없다
+                var k = keywordRepo.findById(targetId).orElseThrow(ReportServiceImpl::notFound);
+                if (k.getKeywordState().getId().equals(codes.keywordStateId(CodeTables.KW_BANNED))
+                        || bannedWords.contains(k.getCountry().getCode(), k.getNormalized())) throw notFound();
+                typeName = ReportType.KEYWORD;
+                countryId = k.getCountry().getId();
+                ownerId = -1; // 키워드에는 주인이 없어 "내 것 신고" 검사를 건너뛴다
             }
             case "CHAT" -> {
                 ChatMessage m = chats.findById(targetId).orElseThrow(ReportServiceImpl::notFound);
@@ -111,6 +124,10 @@ public class ReportServiceImpl implements ReportService {
                     target = c.getPlayer().getNickname(); content = c.getBody(); keyword = c.getKeyword().getText();
                     userId = c.getPlayer().getUser().getId(); deleted = c.getDeletedAt() != null;
                 }
+            }
+            case ReportType.KEYWORD -> {
+                var k = keywordRepo.findById(r.getTargetId()).orElse(null);
+                if (k != null) target = k.getText(); // 관리자 목록 제목에 키워드를 보여 준다
             }
             case ReportType.CHAT -> {
                 var m = chats.findById(r.getTargetId()).orElse(null);
