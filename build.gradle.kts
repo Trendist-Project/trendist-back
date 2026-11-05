@@ -23,6 +23,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-flyway") // DB 마이그레이션(src/main/resources/db/migration). 테스트(H2)에서는 꺼 둔다
+    implementation("org.flywaydb:flyway-mysql")                          // MySQL 8·MariaDB 지원
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("org.springframework.security:spring-security-oauth2-jose") // 구글 ID 토큰(JWT) 서명 검증(9.3)
 

@@ -16,7 +16,10 @@ spring:
     open-in-view: false
     show-sql: false    # Hibernate 가 생성하는 SQL 쿼리를 콘솔에 출력
     hibernate:
-      ddl-auto: update # Flyway 전환 전까지 update(16.1)
+      ddl-auto: none # 스키마는 Flyway만 바꾼다. 운영 DB가 엔티티와 같다고 확인되면 validate로 올린다(16.1)
+
+  flyway:
+    enabled: true
 
 trendist:
   cookie:
