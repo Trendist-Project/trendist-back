@@ -66,6 +66,7 @@
 - 관리자 관전(13.13): 클라이언트가 `auth` 대신 `spectate{token, country}`를 보내면 관리자 토큰(`AccountGuard.isAdmin`)인지 확인하고 `Room.addSpectator`로 받는다. 관전자는 `members`에 넣지 않아 방 크기·활동 영역·충돌·봇 수·랭킹(`liveView`)·접속 인원에 영향이 없고, 방이 모두에게 보내는 스냅샷(`me` 표시 0)·미니맵·`roster`·`orbs`·`orbSpawn`·`orbEaten`·`safeZones`·`chat`·`emote`·`combo`·`dashFx`·`shield`·`tuning`만 받는다. 입장할 때 `roster`·`orbs`·`safeZones`·`chatHistory`를 받고 서버는 `spectating{country, spectators}`로 알린다. 받은 입력(`input`·`move`·`chat`·`emote`)은 모두 버리고 `ping`·`bye`만 받는다. 90초 동안 신호가 없으면 정리하고(`dropSilent`), 방마다 10명까지다. 관리자가 아니거나 토큰이 틀리면 `1008 AUTH_FAILED`로 닫고, 가득 차면 `1008 SPECTATORS_FULL`이다.
 - 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
 - 대시(4.27): 클라이언트가 `dash`를 보내면 방(`Room.dash`)이 쿨타임(`Member.dashReadyAt`)과 움직이는 중인지를 보고, 되면 `dashUntil`까지 `advance`의 최대 속도에 `Room.DashTuning.multiplier`를 곱하고 본인에게 `dash{ms, cooldownMs, mult}`를 보낸다. 클라이언트 예측(`Arena.startDash`)은 같은 배수로 가고, 보정 허용 오차도 배수를 곱한다. 설정은 1초마다 다시 읽는다(`RoomManagerImpl.dashTuning`).
+- 긴급 안내(4.29): 관리자가 올리거나 끝내면 `EmergencyEvents.Changed`를 내보내고, 커밋된 뒤 `RoomManagerImpl`이 모든 나라 방의 큐에 `Room.announce`를 넣어 접속 중인 모두(관전 포함)에게 `{type: "emergency", notice: {…}|null}`를 보낸다(notice가 null이면 걷는다). 서버를 다시 켜도 DB에서 읽으므로 진행 중인 안내가 이어진다.
 - 연속 빼앗기 콤보(4.25): 작업 스레드가 빼앗기·잃기를 끝내면 방 큐에 결과를 넣고, 틱 스레드가 이긴 사람의 콤보 +1, 잃은 사람의 콤보 0을 하고 `combo{e, nickname, combo, event, flameAt, by, byE}`를 방 전체에 보낸다. 불꽃은 클라이언트가 `combo >= flameAt`일 때 그린다(명단 `roster`에도 `flameAt`). 설정은 1초마다 다시 읽는다(`Room.ComboTuning`). 불꽃인 사람이 불꽃 없는 사람과 부딪히면 방이 `Outbox.requestWipe`로 작업 스레드에 넘기고(`KeywordService.loseAll`), 끝나면 방 큐에서 `fightResult`와 `dropPrizeOrbs`로 ! 구슬을 떨어뜨린다. ! 구슬은 `orbSpawn{prize:true}`로 알리고 `orbs` 목록 항목의 마지막 값이 1이다.
 - 채팅(4.13)도 게임 WebSocket으로 받는다(`chat{text}`). 검사는 받는 스레드에서, 저장은 작업 스레드에서 하고, 저장이 끝나면 방에 넣어 틱 스레드가 방 전체에 `chat{id, e, nickname, text, at}`을 보낸다. 방은 최근 50개를 메모리에 두고 들어오는 사람에게 `chatHistory`로 보낸다. 보낸 사람은 세션 엔티티 번호(`e`)로만 가리킨다.
 
@@ -136,7 +137,7 @@ WHERE p.id IN (/* 500명 */)
 | 댓글 투표 | 사용자당 분당 20회, 같은 댓글 분당 5회(`vote:comment:{user}:{comment}`) |
 | 색·칭호 변경 | 5초에 1회 |
 | 꾸미기 프로필 저장·장착 | 5초에 1회 |
-| 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 10분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
+| 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 1분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
 | 외부 온디맨드 조회, 새 키워드 생성 | 사용자·IP 단위 분당 제한 |
 | 트렌드 상자 열기 | 초당 2회 |
 | 토큰 발급·갱신·게스트 시작(`/api/auth/*`) | IP 단위 분당 10회 |
@@ -159,6 +160,7 @@ WHERE p.id IN (/* 500명 */)
 | (공통) `Accept-Language: ko\|en` | 없으면 ko. 칭호·가이드·가이드 카테고리·공지·이동/테두리 효과 이름·잠금 사유는 기존 필드에 그 언어 값을 담아 보내고, 영어 값이 비어 있으면 한국어로 대체한다. 서버 오류 메시지는 한국어 그대로이며 화면이 오류 코드로 번역한다(8) |
 | `PATCH /api/me/nickname` | `{ "nickname": "..." }`. 현재 나라 닉네임을 바꾼다(4.1). 규칙 위반 400, 지금과 같으면 400 `NICKNAME_SAME`, 변경 간격 전이면 409 `NICKNAME_TOO_SOON`. 응답은 플레이어 요약이고 `nicknameChangeableAt`(다음 변경 가능 시각, 없으면 바로 가능)을 담는다 |
 | `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
+| `GET /api/emergency` | 지금 보여 줄 긴급 안내(로그인 없음, 4.29). `{notice: {id, message, messageEn, endsAt, remainingSeconds} \| null}`. `remainingSeconds`는 서버 시계 기준 남은 초라 클라이언트가 끝나는 때를 시계 차이 없이 정한다 |
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW), `popup`(팝업 기간 안, 4.16). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 서버에 남기는 팝업 본 기록(`user_notices`). 아직 없음(지금은 `popup`과 브라우저 저장으로 판단, 4.16) |
 | `GET /api/admin/guide/categories`, `POST /categories`, `PUT /categories/{id}`, `POST /categories/{id}/move`, `DELETE /categories/{id}`, `GET`·`POST /categories/{id}/articles`, `PUT`·`DELETE /articles/{id}`, `POST /articles/{id}/move` | 관리자 가이드 관리(13.4). 카테고리 `{ "code", "name", "nameEn", "displayType": "ARTICLE"\|"FAQ", "enabled" }`(code는 만들 때만, 400 `GUIDE_CODE`, 409 `GUIDE_CODE_EXISTS`), 글이 있는 카테고리 삭제 409 `GUIDE_CATEGORY_NOT_EMPTY`. 글 `{ "title", "body", "titleEn", "bodyEn" }`(영어 칸은 선택, 제목 1~100자, 본문 1~20,000자, 400 `GUIDE_TITLE`·`GUIDE_BODY`), 삭제는 소프트. 순서 `{ "direction": -1\|1 }`는 한 칸 옮기고 전체를 1부터 다시 매긴 목록을 돌려준다 |
@@ -170,13 +172,15 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/me/admin` | 관리자인지만(`{ "admin": true }`). 관리자 화면과 게임의 [🛠 관리자] 버튼이 부른다 |
 | `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
 | `GET /api/admin/keywords/lookup?country=&text=` | 키워드 한 개 조회(13.6). `{text, normalized, valid, reason, keyword}`: 규칙에 맞지 않으면 `valid=false`와 이유, 등록 전이면 `keyword=null`. 목록 행(`AdminKeywordRow`)은 `normalized`·`viewCount`를 포함 |
+| `GET /api/admin/emergency`, `POST /api/admin/emergency`, `POST /api/admin/emergency/{id}/cancel` | 관리자 긴급 안내(13.14, 4.29). 목록은 최근 20개와 상태(ACTIVE/ENDED/CANCELED), 올리기는 `{message(≤200자), messageEn(선택), minutes(1~720)}`, 새로 올리면 켜져 있던 것은 취소되고 접속 중인 모두에게 WebSocket으로 알린다 |
+| `GET /api/admin/integrations`, `PATCH /api/admin/integrations/{code}` | 관리자 연동 바로가기(13.15). 목록 `[{code, label, url}]`, 수정은 `{url}`(http(s)만, ≤500자) |
 | `POST /api/admin/keywords` | `{ "text": "...", "country": "KR" }`. 🔥활성 키워드 추가(반영 소스 admin, 7일, 13.7) |
 | `POST /api/admin/keywords/ban-text` | `{ "text": "...", "country": "KR" }`. 글자로 바로 금지(13.1): 없는 단어면 금지 상태로 새로 등록(소스 internal), 있으면 금지. 공개 페이지·사이트맵 캐시도 비운다(4.28) |
 | `POST /api/admin/keywords/{id}/ban`, `/unban` | 금지·해제(13.1). 금지하면 트렌드 값 0, 보유자 점수에서 바로 빠짐 |
 | `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5). 목록 한 줄에 `targetUserId`(신고된 사람), `contentDeleted`, `targetSanctions`(지금 걸린 제재) |
 | `POST /api/admin/reports/{id}/act` | 신고에서 바로 조치(13.5) `{ "sanction": "CHAT" \| "COMMENT" \| "UPLOAD" \| "BAN" \| null, "days": 1, "reason": "", "deleteContent": true, "sameTarget": true }`. 제재를 걸고(사유를 비우면 신고 번호·사유로), 댓글이면 지우고, 그 신고(와 같은 대상의 접수 신고)를 조치함으로. 응답 `{ changed, report }`. 대상 사용자가 없으면 400 `REPORT_NO_USER`, 댓글이 아닌데 지우기면 400 `REPORT_DELETE_TYPE` |
 | `GET /api/admin/settings`, `PATCH /api/admin/settings/{name}` | 설정 목록과 값 변경 `{ "value": "12" }`. 숫자·정수·허용 범위 검사, 저장하면 캐시를 비워 바로 반영(13.3) |
-| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404. `aiComment`(AI 한 줄 설명, 없으면 null)와 `aiCommentRequested`(내가 갱신 요청을 해 둔 상태), `viewCount`(공개 키워드 페이지 조회수, 저장 전 값 포함, 4.28)를 함께 준다 |
+| `GET /api/keywords/{id}` | 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 404. `aiComment`(AI 한 줄 설명, 없으면 null)와 `aiCommentRequested`(내가 갱신 요청을 해 둔 상태), `viewCount`(공개 페이지·팝업 조회수, 저장 전 값과 이번 조회 포함, 4.28)를 함께 준다. 이 요청을 부르면(팝업 열기) 조회수에 센다(같은 방문자 하루 1번, 크롤러·User-Agent 없는 요청 제외) |
 | `POST /api/keywords/{id}/ai-comment/request` | AI 설명 갱신 요청(4.12). 설명이 있는 키워드에만(409 `AI_COMMENT_NONE`), 같은 사람의 열린 요청은 하나(다시 눌러도 그대로), 1시간 10회(429 `AI_REQUEST_RATE`) |
 | `GET /api/admin/ai-comments?filter=requests\|missing\|all&page=`, `POST /{keywordId}/regenerate`, `PUT /{keywordId}` `{ "comment": "…" }`, `POST /{keywordId}/dismiss` | 관리자 AI 설명(13.12). 갱신 요청 목록·설명 없는 키워드·설명 있는 키워드, AI 재요청(저장하고 열린 요청을 닫음. 키 없음 409 `AI_DISABLED`, 한도 429 `AI_RATE_LIMITED`, 실패 409 `AI_FAILED`, 모른다고 함 409 `AI_UNKNOWN`), 직접 수정(1~200자, 요청을 닫음), 요청 닫기 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
@@ -359,7 +363,7 @@ record TrendBox(
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 스키마는 Flyway 마이그레이션(`src/main/resources/db/migration`)으로 바꾸고, 시더가 초기 데이터를 넣는다(11.3). 자동 테스트만 시작할 때 JPA가 H2에 스키마를 만든다.
 
-### 11.2 테이블 (38개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (39개, 컬럼은 `4-schema.sql`)
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
@@ -385,6 +389,8 @@ record TrendBox(
 | | `share_cards` | 자랑하기 카드 공유 주소(4.24). 공개 코드와 공유한 순간의 카드 값(JSON, 고치지 않음), 누적 조회·클릭 수, 영구 보관 |
 | | `report_types`, `reports` | 신고 대상 유형과 신고(대상 유형 + ID) |
 | 운영 | `notices`, `user_notices` | 공지(영어 `title_en`·`body_en`)와 팝업 열람 기록 |
+| 운영 | `emergency_notices` | 긴급 안내(4.29): 만든 사람, 내용·영어, 끝 시각, 취소 시각. 마이그레이션 V3 |
+| 운영 | `integration_links` | 관리자 연동 바로가기(13.15): code·이름·주소·순서. 기본 3개는 서버가 채움. 마이그레이션 V4 |
 | | `guide_categories`, `guides` | 게임 가이드(영어 `name_en` / `title_en`·`body_en`) |
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
 | | `settings`, `setting_histories` | 밸런스 설정과 변경 이력 |

@@ -213,7 +213,7 @@ CREATE TABLE keywords (
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '누적 검색 수(매시 메모리 카운터를 더함)',
   total_plus_count BIGINT NOT NULL DEFAULT 0 COMMENT '누적 + 수(삭제·잃기로 줄지 않음)',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진 사람 수(player_keywords 행 수 캐시)',
-  view_count       BIGINT NOT NULL DEFAULT 0 COMMENT '공개 키워드 페이지 조회 수(같은 방문자 키워드마다 하루 1번, 크롤러 제외, 4.28). 마이그레이션 V2',
+  view_count       BIGINT NOT NULL DEFAULT 0 COMMENT '키워드 조회 수: 공개 키워드 페이지와 게임 안 상세 팝업을 연 횟수(같은 방문자 키워드마다 하루 1번, 크롤러 제외, 4.28). 마이그레이션 V2',
   activated_at     DATETIME(6) NULL COMMENT '처음 🔥활성이 된 시각(NULL이면 한 번도 활성 전)',
   inactive_at      DATETIME(6) NULL COMMENT '비활성 전환 시각',
   banned_at        DATETIME(6) NULL COMMENT '금지 시각',
@@ -344,6 +344,32 @@ CREATE TABLE notices (
   KEY idx_notices_popup (deleted_at, popup_enabled, popup_until),
   CONSTRAINT fk_notices_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='공지사항';
+
+CREATE TABLE emergency_notices (
+  id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '긴급 안내 ID',
+  user_id     BIGINT NOT NULL COMMENT '올린 관리자(users.id)',
+  message     VARCHAR(200) NOT NULL COMMENT '안내 내용(한 줄, 최대 200자)',
+  message_en  VARCHAR(200) NULL COMMENT '영어 안내(없으면 영어 화면에도 message를 보여 준다)',
+  ends_at     DATETIME(6) NOT NULL COMMENT '보여 주는 것이 끝나는 시각(만든 시각 + 분)',
+  canceled_at DATETIME(6) NULL COMMENT '관리자가 끝낸 시각(새로 올려서 대체된 경우도 포함). NULL이면 취소되지 않음',
+  created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '올린 시각(보이기 시작한 시각)',
+  updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  KEY idx_emergency_active (canceled_at, ends_at),
+  CONSTRAINT fk_emergency_notices_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='긴급 안내(4.29): 모든 사용자의 게임 화면 맨 위에 정해진 시간 동안 흐르는 한 줄. 마이그레이션 V3';
+
+CREATE TABLE integration_links (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '연동 항목 ID',
+  code       VARCHAR(30) NOT NULL COMMENT '항목 코드(NAVER_SEARCH_ADVISOR, GOOGLE_SEARCH_CONSOLE, GOOGLE_ANALYTICS). 화면이 아이콘을 고르는 기준',
+  label      VARCHAR(50) NOT NULL COMMENT '표시 이름',
+  url        VARCHAR(500) NOT NULL COMMENT '바로가기 주소(관리자가 고침, http/https만)',
+  sort_order INT NOT NULL COMMENT '화면 순서',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '최초 등록 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_integration_links_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 [연동] 바로가기(13.15). 기본 3개는 서버가 켜질 때 없으면 채운다. 마이그레이션 V4';
 
 CREATE TABLE user_notices (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '열람 기록 ID',
