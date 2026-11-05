@@ -169,7 +169,9 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/users`·사용자 조치 API | 사용자 관리(13.10)는 선택 쿼리 `?country=KR\|GLOBAL`을 받는다(없으면 KR). 대시보드·통계·AI 설명도 같다 |
 | `GET /api/me/admin` | 관리자인지만(`{ "admin": true }`). 관리자 화면과 게임의 [🛠 관리자] 버튼이 부른다 |
 | `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
+| `GET /api/admin/keywords/lookup?country=&text=` | 키워드 한 개 조회(13.6). `{text, normalized, valid, reason, keyword}`: 규칙에 맞지 않으면 `valid=false`와 이유, 등록 전이면 `keyword=null`. 목록 행(`AdminKeywordRow`)은 `normalized`·`viewCount`를 포함 |
 | `POST /api/admin/keywords` | `{ "text": "...", "country": "KR" }`. 🔥활성 키워드 추가(반영 소스 admin, 7일, 13.7) |
+| `POST /api/admin/keywords/ban-text` | `{ "text": "...", "country": "KR" }`. 글자로 바로 금지(13.1): 없는 단어면 금지 상태로 새로 등록(소스 internal), 있으면 금지. 공개 페이지·사이트맵 캐시도 비운다(4.28) |
 | `POST /api/admin/keywords/{id}/ban`, `/unban` | 금지·해제(13.1). 금지하면 트렌드 값 0, 보유자 점수에서 바로 빠짐 |
 | `GET /api/admin/reports?status=&page=`, `PATCH /api/admin/reports/{id}` | 신고 목록(대상 원문 포함, 30건씩)과 처리 상태 변경 `{ "status": "RESOLVED", "sameTarget": true }`(13.5). 목록 한 줄에 `targetUserId`(신고된 사람), `contentDeleted`, `targetSanctions`(지금 걸린 제재) |
 | `POST /api/admin/reports/{id}/act` | 신고에서 바로 조치(13.5) `{ "sanction": "CHAT" \| "COMMENT" \| "UPLOAD" \| "BAN" \| null, "days": 1, "reason": "", "deleteContent": true, "sameTarget": true }`. 제재를 걸고(사유를 비우면 신고 번호·사유로), 댓글이면 지우고, 그 신고(와 같은 대상의 접수 신고)를 조치함으로. 응답 `{ changed, report }`. 대상 사용자가 없으면 400 `REPORT_NO_USER`, 댓글이 아닌데 지우기면 400 `REPORT_DELETE_TYPE` |

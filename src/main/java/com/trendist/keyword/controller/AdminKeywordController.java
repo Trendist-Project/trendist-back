@@ -19,11 +19,25 @@ public class AdminKeywordController {
                                                 @RequestParam(required = false) String state,
                                                 @RequestParam(required = false) String source,
                                                 @RequestParam(required = false) String q,
-                                                @RequestParam(defaultValue = "trendValue") String sort,
+                                                @RequestParam(defaultValue = "createdAt") String sort,
                                                 @RequestParam(defaultValue = "desc") String dir,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "50") int size) {
         return keywordService.adminSearch(country, state, source, q, sort, dir, page, size);
+    }
+
+    /** 한 키워드 조회: 등록 전이어도 규칙에 맞는지와 기존 행을 돌려준다. 화면이 [바로 추가]·[바로 금지] 카드를 그린다(13.6). */
+    @GetMapping("/lookup")
+    public KeywordService.AdminKeywordLookup lookup(@RequestParam(defaultValue = "KR") String country, @RequestParam(defaultValue = "") String text) {
+        return keywordService.adminLookup(country, text);
+    }
+
+    public record BanTextRequest(String text, String country) {}
+
+    /** 등록 전 단어도 바로 금지한다(없으면 금지 상태로 새로 등록). */
+    @PostMapping("/ban-text")
+    public KeywordService.AdminKeywordRow banText(@RequestBody BanTextRequest req) {
+        return keywordService.adminBanText(req.country() == null ? "KR" : req.country(), req.text() == null ? "" : req.text());
     }
 
     @PostMapping("/{id}/ban")

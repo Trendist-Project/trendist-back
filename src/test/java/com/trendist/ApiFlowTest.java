@@ -328,10 +328,9 @@ class ApiFlowTest {
         assertThat(again.created()).isFalse();
         assertThat(again.id()).isEqualTo(added.id());
         assertThat(again.state()).isEqualTo(CodeTables.KW_ACTIVE);
-        // 금지한 키워드도 상태 전체 목록에 나오고, 점수가 0이라 묻히지 않게 맨 위에 모은다(13.6)
+        // 금지한 키워드도 상태 전체 목록에 나온다(금지만 맨 위에 모으지는 않는다, 13.6). 기본 정렬은 등록 시간 최신순
         keywordService.adminBan(added.id(), true);
-        var all = keywordService.adminSearch("KR", null, null, null, "trendValue", "desc", 0, 100);
-        assertThat(all.items().getFirst().state()).isEqualTo(CodeTables.KW_BANNED);
+        var all = keywordService.adminSearch("KR", null, null, null, "createdAt", "desc", 0, 100);
         assertThat(all.items()).anyMatch(k -> k.id() == added.id());
         assertThat(all.stateCounts().get(CodeTables.KW_BANNED)).isGreaterThanOrEqualTo(1L);
         assertThat(keywordService.adminSearch("KR", "", "", "", "trendValue", "desc", 0, 100).items())

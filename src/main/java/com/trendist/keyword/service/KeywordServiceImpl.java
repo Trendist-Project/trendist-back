@@ -37,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -327,8 +326,36 @@ public class KeywordServiceImpl implements KeywordService {
         return adminView(k, false);
     }
 
-    private static final Set<String> ADMIN_SORTS = Set.of("trendValue", "holderCount", "totalPlusCount", "searchCount",
+    private static final Set<String> ADMIN_SORTS = Set.of("trendValue", "holderCount", "totalPlusCount", "searchCount", "viewCount",
             "createdAt", "activatedAt", "externalUntil");
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminKeywordLookup adminLookup(String countryCode, String text) {
+        Country country = countryOf(countryCode);
+        String display = KeywordNormalizer.display(text);
+        String normalized;
+        try {
+            normalized = KeywordNormalizer.validate(display);
+        } catch (ApiException e) {
+            return new AdminKeywordLookup(display, "", false, e.getMessage(), null);
+        }
+        AdminKeywordRow row = keywords.findByCountryIdAndNormalized(country.getId(), normalized).map(this::adminRow).orElse(null);
+        return new AdminKeywordLookup(display, normalized, true, null, row);
+    }
+
+    @Override
+    @Transactional
+    public AdminKeywordRow adminBanText(String countryCode, String text) {
+        String display = KeywordNormalizer.display(text);
+        String normalized = KeywordNormalizer.validate(display);
+        Country country = countryOf(countryCode);
+        Instant now = Instant.now(clock);
+        // 등록 전이면 💤비활성으로 만든 뒤 같은 트랜잭션에서 금지한다(공개 페이지·사이트맵 캐시도 adminBan이 비운다)
+        Keyword k = keywords.findByCountryIdAndNormalized(country.getId(), normalized)
+                .orElseGet(() -> createKeyword(country, display, normalized, Optional.empty(), now));
+        return adminBan(k.getId(), true);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -339,15 +366,10 @@ public class KeywordServiceImpl implements KeywordService {
         List<Long> stateIds = csv(state).stream().map(codes::keywordStateId).toList();
         List<Long> sourceIds = csv(source).stream().map(n -> codes.dataSource(n).getId()).toList();
         String like = q == null || q.isBlank() ? null : "%" + KeywordNormalizer.normalize(q) + "%";
-        String by = ADMIN_SORTS.contains(sort) ? sort : "trendValue";
+        String by = ADMIN_SORTS.contains(sort) ? sort : "createdAt";
         Sort.Direction d = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
         int sz = Math.max(1, Math.min(size, 100));
         Sort order = Sort.by(d, by).and(Sort.by(Sort.Direction.DESC, "id"));
-        if (stateIds.size() != 1) {
-            // 상태 전체나 여러 개: 금지 키워드는 트렌드 값이 0이라 점수순으로는 마지막 쪽에 묻힌다. 놓치지 않게 맨 위에 모아 보여 준다(13.6)
-            long bannedId = codes.keywordStateId(CodeTables.KW_BANNED);
-            order = JpaSort.unsafe(Sort.Direction.ASC, "(case when k.keywordState.id = " + bannedId + " then 0 else 1 end)").and(order);
-        }
         var result = keywords.searchForAdmin(country.getId(), stateIds.isEmpty(), stateIds.isEmpty() ? List.of(-1L) : stateIds,
                 sourceIds.isEmpty(), sourceIds.isEmpty() ? List.of(-1L) : sourceIds, like, PageRequest.of(Math.max(0, page), sz, order));
         Map<String, Long> counts = new LinkedHashMap<>();
@@ -380,9 +402,9 @@ public class KeywordServiceImpl implements KeywordService {
     }
 
     private AdminKeywordRow adminRow(Keyword k) {
-        return new AdminKeywordRow(k.getId(), k.getText(), k.getKeywordState().getName(), k.getDataSource().getName(),
+        return new AdminKeywordRow(k.getId(), k.getText(), k.getNormalized(), k.getKeywordState().getName(), k.getDataSource().getName(),
                 k.getTrendValue(), k.getHolderCount(), k.getTotalPlusCount(), k.getSearchCount() + searchCounter.pending(k.getId()),
-                k.getExternalUntil(), k.getActivatedAt(), k.getBannedAt(), k.getCreatedAt());
+                k.getViewCount() + viewCounter.pendingOf(k.getId()), k.getExternalUntil(), k.getActivatedAt(), k.getBannedAt(), k.getCreatedAt());
     }
 
     private AdminKeyword adminView(Keyword k, boolean created) {

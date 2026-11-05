@@ -53,9 +53,23 @@ public interface KeywordService {
     AdminKeyword adminAdd(String countryCode, String text);
 
     /** 관리자 키워드 목록의 한 줄(13.6). */
-    record AdminKeywordRow(long id, String text, String state, String source, long trendValue, long holderCount,
-                           long totalPlusCount, long searchCount, Instant externalUntil, Instant activatedAt,
+    record AdminKeywordRow(long id, String text, String normalized, String state, String source, long trendValue, long holderCount,
+                           long totalPlusCount, long searchCount, long viewCount, Instant externalUntil, Instant activatedAt,
                            Instant bannedAt, Instant createdAt) {}
+
+    /**
+     * 키워드 한 개 조회(13.6): 입력한 단어가 등록 규칙(4.6)에 맞는지와, 이미 등록돼 있으면 그 행. 등록 전이라도 관리자가
+     * 바로 추가·금지할 수 있게 화면이 이 결과로 카드를 그린다. valid=false면 reason에 이유, keyword=null이면 등록 전이다.
+     */
+    record AdminKeywordLookup(String text, String normalized, boolean valid, String reason, AdminKeywordRow keyword) {}
+
+    AdminKeywordLookup adminLookup(String countryCode, String text);
+
+    /**
+     * 글자로 바로 금지(13.1): 이미 있으면 금지하고, 아직 등록되지 않은 단어면 금지 상태로 새로 등록한다.
+     * 누군가 `+`하거나 검색해도 열리지 않고 공개 페이지(4.28)도 404다. 금지를 풀면 💤비활성이다.
+     */
+    AdminKeywordRow adminBanText(String countryCode, String text);
 
     /** stateCounts: 상태 필터를 빼고(소스·검색어는 적용) 센 상태별 개수. 필터 칩에 보여 준다. */
     record AdminKeywordPage(List<AdminKeywordRow> items, long total, int page, int size, java.util.Map<String, Long> stateCounts) {}
