@@ -360,25 +360,36 @@ public class Room {
     }
 
     /**
-     * 싸움 결과(4.3, 4.25): 이긴 사람(winnerId, 봇이면 null)의 콤보를 +1 하고, 키워드를 잃은 사람(loserId, 봇이면 null)의 콤보를
-     * 0으로 만든다(불꽃이 있었으면 꺼진다). vsBot이면 상대가 봇이다(설정에 따라 콤보에 넣지 않는다). 키워드가 실제로 오간 뒤에만 부른다.
+     * 싸움 결과(4.3, 4.25): 이긴 쪽(winnerId)의 콤보를 +1 하고, 키워드를 잃은 쪽(loserId)의 콤보를 0으로 만든다(불꽃이 있었으면 꺼진다).
+     * 사람과 봇이 같은 규칙이다. 봇은 byPlayer에 없으므로 봇이 낀 싸움은 아래 멤버 버전으로 부른다(여기서 null은 "처리할 쪽 없음").
+     * vsBot이면 진 쪽이 봇이다(설정 combo_bot_counts가 꺼져 있으면 봇을 이겨도 콤보에 넣지 않는다). 키워드가 실제로 오간 뒤에만 부른다.
      */
     public void fightResult(Long winnerId, Long loserId, boolean vsBot) {
-        ComboTuning ct = comboTuning;
-        Member w = winnerId == null ? null : byPlayer.get(winnerId);
-        Member l = loserId == null ? null : byPlayer.get(loserId);
-        if (l != null && !l.bot && l.combo > 0) {
-            boolean broken = l.combo >= ct.flameAt();
-            l.combo = 0;
-            Map<String, Object> msg = comboMessage(l, broken ? "broken" : "reset");
-            msg.put("by", w != null ? w.nickname : "Bot");
-            if (w != null) msg.put("byE", w.entityNo);
-            broadcast(msg);
-        }
-        if (w != null && !w.bot && (!vsBot || ct.countBots())) {
-            w.combo++;
-            broadcast(comboMessage(w, w.combo == ct.flameAt() ? "start" : "up")); // start: 이번에 불꽃이 붙었다
-        }
+        fightResult(winnerId == null ? null : byPlayer.get(winnerId), loserId == null ? null : byPlayer.get(loserId), vsBot);
+    }
+
+    /** 멤버 버전: 이긴 쪽과 진 쪽이 사람이든 봇이든 같은 규칙이다(4.25). null인 쪽은 건너뛴다. */
+    public void fightResult(Member winner, Member loser, boolean vsBot) {
+        comboLose(loser, winner);
+        comboWin(winner, vsBot);
+    }
+
+    /** 키워드를 잃으면 콤보가 0이 되고(불꽃이 있었으면 꺼짐) 방 전체에 알린다. */
+    private void comboLose(Member loser, Member by) {
+        if (loser == null || loser.combo <= 0) return;
+        boolean broken = loser.combo >= comboTuning.flameAt();
+        loser.combo = 0;
+        Map<String, Object> msg = comboMessage(loser, broken ? "broken" : "reset");
+        msg.put("by", by != null ? by.nickname : "Bot");
+        if (by != null) msg.put("byE", by.entityNo);
+        broadcast(msg);
+    }
+
+    /** 키워드를 빼앗으면 콤보 +1. 봇을 이긴 경우는 설정(combo_bot_counts)에 따른다. */
+    private void comboWin(Member winner, boolean vsBot) {
+        if (winner == null || (vsBot && !comboTuning.countBots())) return;
+        winner.combo++;
+        broadcast(comboMessage(winner, winner.combo == comboTuning.flameAt() ? "start" : "up")); // start: 이번에 불꽃이 붙었다
     }
 
     private Map<String, Object> comboMessage(Member m, String event) {
@@ -730,8 +741,10 @@ public class Room {
      * 불꽃에게 키워드를 모두 잃은 사람 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25). 개수 = 잃은 🔥활성 키워드 수 × wipeOrbPercent%(올림, 활성이 하나라도 있었으면 최소 1개).
      * 원 가장자리 바깥으로 흩어지고, 활동 영역 안·세이프존 밖에만 놓는다. 방 전체 상한을 넘으면 더 만들지 않는다.
      */
-    public void dropPrizeOrbs(long playerId, int lostActiveCount) {
-        Member m = byPlayer.get(playerId);
+    public void dropPrizeOrbs(long playerId, int lostActiveCount) { dropPrizeOrbs(byPlayer.get(playerId), lostActiveCount); }
+
+    /** 멤버 버전(봇은 byPlayer에 없다) */
+    public void dropPrizeOrbs(Member m, int lostActiveCount) {
         if (m == null || lostActiveCount <= 0) return;
         int count = (int) Math.ceil(lostActiveCount * comboTuning.wipeOrbPercent() / 100.0);
         if (comboTuning.wipeOrbPercent() > 0) count = Math.max(1, count);
@@ -870,13 +883,15 @@ public class Room {
                 if (fresh) {
                     pairCooldown.put(key, clockSeconds + tu.cooldownSeconds());
                     boolean aFlame = isFlame(a), bFlame = isFlame(b);
-                    if (aFlame != bFlame && !(aFlame ? b : a).bot) {
-                        // 불꽃인 사람이 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25). 봇은 예전 규칙대로
+                    if (aFlame != bFlame) {
+                        // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)
                         Member hot = aFlame ? a : b, cold = hot == a ? b : a;
-                        if (cold.protectUntil <= clockSeconds && !cold.keywords.isEmpty()) {
+                        if (cold.protectUntil <= clockSeconds && cold.bot && !cold.botKeywords.isEmpty()) {
+                            botWipe(cold, hot, tu); // 봇의 (메모리) 키워드 점수를 모두 잃는다
+                        } else if (cold.protectUntil <= clockSeconds && !cold.bot && !cold.keywords.isEmpty()) {
                             cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
                             shield(cold, tu);
-                            outbox.requestWipe(this, cold, hot);
+                            outbox.requestWipe(this, cold, hot); // 이긴 쪽이 봇이어도 모두 잃는다
                         }
                     // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음. 둘 다 불꽃이어도 이 규칙이다
                     } else if (a.score != b.score) {
@@ -885,8 +900,10 @@ public class Room {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                             botLose(loser, tu); // 봇도 사람처럼 (메모리의) 키워드 하나를 잃는다(4.21)
                             shield(loser, tu);
-                            // 봇의 키워드는 이름이 없으므로, 이긴 사람은 대신 내 보관함에 없는 무작위 🔥 키워드를 얻는다
+                            comboLose(loser, winner); // 잃으면 봇의 콤보와 불꽃도 사라진다(4.25)
+                            // 봇의 키워드는 이름이 없으므로, 이긴 사람은 대신 내 보관함에 없는 무작위 🔥 키워드를 얻는다. 이긴 쪽이 봇이면 콤보만 쌓는다
                             if (!winner.bot) outbox.requestBotWin(this, winner, loser);
+                            else comboWin(winner, true);
                         } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
                             loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                             shield(loser, tu);
@@ -914,8 +931,8 @@ public class Room {
         broadcast(Map.of("type", "dashFx", "e", m.entityNo, "ms", Math.round(d.seconds() * 1000))); // 모두의 화면에 대시 강조 효과(4.27)
     }
 
-    /** 콤보 불꽃이 붙은 사람인지(봇은 불꽃이 없다, 4.25) */
-    private boolean isFlame(Member m) { return !m.bot && m.combo >= comboTuning.flameAt(); }
+    /** 콤보 불꽃이 붙었는지(사람과 봇 모두, 4.25) */
+    private boolean isFlame(Member m) { return m.combo >= comboTuning.flameAt(); }
 
     /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
     private void shield(Member m, Tuning tu) {
@@ -1142,6 +1159,22 @@ public class Room {
         int lost = b.botKeywords.remove(ThreadLocalRandom.current().nextInt(b.botKeywords.size()));
         botRecompute(b, tu);
         return lost;
+    }
+
+    /**
+     * 불꽃에 맞은 봇은 가진 키워드 점수를 모두 잃는다(4.25). 사람과 같이 3초 무적, 이긴 쪽 콤보 +1, 진 쪽 콤보·불꽃 없앰,
+     * 잃은 개수의 일부만큼 ! 구슬이 떨어진다. 이긴 쪽이 사람이면 알림을 보낸다(봇의 키워드는 이름이 없어 개수와 점수만 알린다).
+     */
+    private void botWipe(Member cold, Member hot, Tuning tu) {
+        int n = cold.botKeywords.size();
+        int score = cold.botKeywords.stream().mapToInt(Integer::intValue).sum();
+        cold.botKeywords.clear();
+        botRecompute(cold, tu);
+        cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
+        shield(cold, tu);
+        fightResult(hot, cold, true);
+        dropPrizeOrbs(cold, n); // 봇의 키워드는 모두 🔥로 본다
+        if (!hot.bot) outbox.sendText(hot, Map.of("type", "hit", "target", cold.nickname, "wiped", n, "score", score));
     }
 
     /** 봇이 ? 구슬을 먹으면 사람과 같은 확률로 "추가"하고, 나머지는 가진 키워드 점수 하나를 잃는다(없으면 꽝). */

@@ -256,7 +256,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 if (winnerId == null) {
                     // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
-                        r.fightResult(null, loserId, true); // 잃으면 콤보와 불꽃이 사라진다(4.25)
+                        r.fightResult(winner, r.byPlayer(loserId), false); // 진 사람 콤보·불꽃은 사라지고, 이긴 봇의 콤보는 +1(4.25)
                         Room.Member m = r.byPlayer(loserId);
                         if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
                     }));
@@ -285,11 +285,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         workers.submit(() -> {
             try {
                 keywordService.loseAll(loserId).ifPresent(lost -> room.submit(r -> {
-                    r.fightResult(winnerId, loserId, false); // 이긴 쪽 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
+                    r.fightResult(winner, r.byPlayer(loserId), false); // 이긴 쪽(사람·봇) 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
                     r.dropPrizeOrbs(loserId, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
                     Room.Member m = r.byPlayer(loserId);
                     if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "wiped", lost.count(), "score", lost.score()));
-                    Room.Member w = r.byPlayer(winnerId);
+                    Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
                     if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score()));
                 }));
             } catch (RuntimeException e) {

@@ -202,22 +202,102 @@ class RoomTest {
         assertThat(out.loses).hasSize(1);
     }
 
-    @Test
-    void flameVsBotKeepsOldRule() {
-        // 봇은 예전 규칙: 불꽃이어도 봇에게는 점수 비교(작으면 키워드 하나 잃음), 키워드를 모두 잃게 하지 않는다
-        Out out = new Out();
-        Room r = new Room(1, withBots(2), out);
+    /** 사람 1명 + 봇 n명을 만들고, 봇들이 채워진 뒤 돌려준다. 사람은 멀리 두어 싸움에 끼지 않는다. */
+    private static Room botRoom(Out out, int bots, Room.Member[] humanOut) {
+        Room r = new Room(1, withBots(1 + bots), out);
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member human = r.join(1, "s1", "사람", 1, 100, List.of(11L));
-        for (int i = 0; i < 25; i++) r.tick();
-        Room.Member bot = r.members().stream().filter(m -> m.bot).findFirst().orElseThrow();
-        bot.protectUntil = 0; human.protectUntil = 0;
+        for (int i = 0; i < 25 * bots; i++) r.tick();
+        humanOut[0] = human;
+        human.protectUntil = 0;
+        return r;
+    }
+
+    private static List<Room.Member> botsOf(Room r) { return r.members().stream().filter(m -> m.bot).toList(); }
+
+    @Test
+    void humanFlameWipesBotKeywordsLikeAnyoneElse() {
+        // 4.25: 봇도 사람과 같은 규칙이다. 불꽃인 사람이 불꽃 없는 봇과 부딪히면 점수와 상관없이 이기고 봇은 키워드 점수를 모두 잃는다
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member human = h[0], bot = botsOf(r).getFirst();
+        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(30); bot.botKeywords.add(40);
+        bot.combo = 3;
         human.combo = 5;
         bot.score = 900; human.score = 100;
         bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
         r.tick();
-        assertThat(out.wipes).isEmpty();
-        assertThat(out.loses).containsExactly(new long[]{1L, bot.playerId}); // 불꽃이어도 큰 봇에게 지면 하나 잃는다
+        assertThat(bot.botKeywords).isEmpty();
+        assertThat(out.wipes).isEmpty(); // 봇은 DB 키워드가 없어 방 안에서 처리한다
+        assertThat(human.combo).isEqualTo(6); // 봇을 이긴 것도 콤보(combo_bot_counts 기본 켜짐)
+        assertThat(bot.combo).isZero();       // 잃은 봇의 콤보는 사라진다
+        assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(2).equals(m.get("wiped")));
+        assertThat(r.prizeOrbCount()).isGreaterThanOrEqualTo(1); // 잃은 개수의 일부만큼 ! 구슬
+    }
+
+    @Test
+    void botFlameWipesHumanKeywords() {
+        // 불꽃이 붙은 봇이 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고 사람은 키워드를 모두 잃는다(이긴 쪽이 봇이어도)
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member human = h[0], bot = botsOf(r).getFirst();
+        bot.protectUntil = 0;
+        bot.combo = 5;
+        bot.score = 1; human.score = 500;
+        bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
+        r.tick();
+        assertThat(out.wipes).hasSize(1);
+        assertThat(out.wipes.get(0)).containsExactly(1L, bot.playerId);
+        assertThat(out.loses).isEmpty();
+    }
+
+    @Test
+    void botLosingToAHumanLosesItsCombo() {
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member human = h[0], bot = botsOf(r).getFirst();
+        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(30);
+        bot.combo = 4; human.combo = 0; // 불꽃 전(4)이라 점수 싸움이다. 지면 봇의 콤보가 사라진다
+        bot.score = 10; human.score = 900;
+        bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
+        r.tick();
+        assertThat(bot.combo).isZero();
+        assertThat(out.botWinners).containsExactly(1L);
+        assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "reset".equals(m.get("event")) && "Bot".equals(m.get("nickname")));
+    }
+
+    @Test
+    void botBeatingBotBuildsComboAndLoserResets() {
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 2, h);
+        Room.Member human = h[0];
+        List<Room.Member> bots = botsOf(r);
+        Room.Member win = bots.get(0), lose = bots.get(1);
+        human.x = 5000; human.y = 5000;
+        win.protectUntil = 0; lose.protectUntil = 0;
+        lose.botKeywords.clear(); lose.botKeywords.add(30);
+        win.combo = 4; lose.combo = 3;
+        win.score = 900; lose.score = 10;
+        win.x = 800; win.y = 800; lose.x = 810; lose.y = 800;
+        r.tick();
+        assertThat(win.combo).isEqualTo(5); // 봇이 봇을 이겨도 콤보 +1(설정 켜짐), 불꽃이 붙는다
+        assertThat(lose.combo).isZero();
+        assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "start".equals(m.get("event")) && "Bot".equals(m.get("nickname")));
+    }
+
+    @Test
+    void botRosterCarriesComboSoFlamesShowToNewcomers() {
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        botsOf(r).getFirst().combo = 7;
+        Room.Member late = r.join(2, "s2", "늦게", 1, 0, List.of());
+        assertThat(late).isNotNull();
+        assertThat(out.texts).anyMatch(m -> "roster".equals(m.get("type")) && m.get("players").toString().contains("combo=7"));
     }
 
     @Test
