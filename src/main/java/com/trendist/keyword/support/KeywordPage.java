@@ -257,8 +257,8 @@ public final class KeywordPage {
                 + "<g class=\"a\"><circle cx=\"130\" cy=\"80\" r=\"52\" fill=\"url(#g1)\"/><circle cx=\"130\" cy=\"80\" r=\"52\" fill=\"none\" stroke=\"#ffffff\" stroke-opacity=\".35\" stroke-width=\"2\"/>"
                 + "<text x=\"130\" y=\"101\" text-anchor=\"middle\" font-size=\"64\" font-weight=\"800\" fill=\"#062014\">?</text></g></svg>";
         String[] hints = en
-                ? new String[]{"Check the spelling. Spaces and capitals don't matter.", "Nobody has added this keyword on this server yet.", "Keywords on the other server (KR / Global) have different addresses."}
-                : new String[]{"철자를 확인해 주세요. 띄어쓰기와 대소문자는 달라도 괜찮아요.", "이 서버에서 아직 아무도 추가하지 않은 키워드일 수 있어요.", "다른 서버(KR / Global)의 키워드는 주소가 달라요."};
+                ? new String[]{"Check the spelling. Spaces and capitals don't matter.", "Nobody has added this keyword on this server yet."}
+                : new String[]{"철자를 확인해 주세요. 띄어쓰기와 대소문자는 달라도 괜찮아요.", "이 서버에서 아직 아무도 추가하지 않은 키워드일 수 있어요."};
         StringBuilder li = new StringBuilder();
         for (String h : hints) li.append("<li>").append(h).append("</li>");
         return """
@@ -291,7 +291,7 @@ public final class KeywordPage {
                 """
                 .replace("@@CSS@@", NF_CSS).replace("@@LANG@@", en ? "en" : "ko").replace("@@BASE@@", base).replace("@@ART@@", art)
                 .replace("@@TITLE@@", en ? "We couldn't find that keyword" : "키워드를 찾을 수 없어요")
-                .replace("@@LEAD@@", en ? "The keyword may not exist yet, or it can't be opened. Find a rising keyword in the game and add it first." : "아직 없는 키워드이거나 열 수 없는 키워드예요. 게임에서 뜨는 키워드를 찾아 먼저 추가해 보세요.")
+                .replace("@@LEAD@@", en ? "The keyword may not exist yet, or it can't be opened.<br>Find a rising keyword in the game and add it first." : "아직 없는 키워드이거나 열 수 없는 키워드예요.<br>게임에서 뜨는 키워드를 찾아 먼저 추가해 보세요.")
                 .replace("@@CHIP@@", chip).replace("@@PLAY@@", en ? "Play Trendist" : "Trendist 플레이하기").replace("@@HOME@@", en ? "Home" : "메인으로")
                 .replace("@@HINTS@@", li).replace("@@FOOT@@", en ? "Know the trend. Grow bigger. Trendist" : "트랜드를 아는 자, 커진다. Trendist");
     }
