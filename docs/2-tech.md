@@ -37,6 +37,7 @@
 - 날짜·숫자는 `Intl` API, 폰트는 Noto Sans(KR·JP·SC·Devanagari)를 필요한 것만 불러온다. 가이드 본문의 그림 토큰은 한국어 토큰이 기준이고 영어 별칭(`[[controls]]` 등)도 받는다(4.17).
 - 키워드 활동 그래프(4.12): SVG로 직접 그리거나 가벼운 차트 라이브러리(후보 uPlot·Recharts, 버전 고정)를 쓴다. 응답은 TanStack Query로 1분 캐시한다.
 - 성공 알림(토스트): 저장·수정·삭제·복사·신고처럼 요청이 잘 끝나면 화면 위 가운데에 초록 알림을 약 2.4초 띄운다(창 위에 겹쳐 보임, 최대 3개, 같은 문구는 하나만). 어느 화면에서든 `successToast('저장했어요')`를 부르고, 알림 영역(`<Toaster />`)은 게임·관리자 페이지에 하나씩 둔다. 오류는 그 입력 칸·창 안에 보여 준다(무엇을 고쳐야 하는지 그 자리에서 보이게). 아레나의 게임 알림(키워드 잃기·빼앗기 등)은 따로다.
+- 확인 토스트(2026-11-05): 브라우저 기본 확인 창(`window.confirm`)은 쓰지 않는다. `await confirmToast('…할까요?')`(관리자 화면은 `adminConfirm`)이 화면 위 가운데에 노란 토스트로 질문과 **[예]·[아니오]** 버튼을 띄우고 고를 때까지 남아 있다(Esc = 아니오, 새 확인이 뜨면 이전 것은 아니오, 한 번에 하나). 예를 누르면 true. 저장하지 않은 채 프로필 칸·화면을 옮길 때, 꾸미기 [취소], 댓글 삭제, 관리자 제재·권한·닉네임·꾸미기 초기화·강제 퇴장·신고 처리·가이드 편집 버리기가 이것을 쓴다. 링크 주소 입력(`window.prompt`, 관리자 글 편집기)은 입력 칸이 필요해 그대로다.
 - 접근성: 키보드 포커스, 화면 낭독기 라벨(예: "거북이 아이콘 5단계"), 그래프 요약 문장.
 
 ## 9. 백엔드
@@ -185,7 +186,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/ai-comments?filter=requests\|missing\|all&page=`, `POST /{keywordId}/regenerate`, `PUT /{keywordId}` `{ "comment": "…" }`, `POST /{keywordId}/dismiss` | 관리자 AI 설명(13.12). 갱신 요청 목록·설명 없는 키워드·설명 있는 키워드, AI 재요청(저장하고 열린 요청을 닫음. 키 없음 409 `AI_DISABLED`, 한도 429 `AI_RATE_LIMITED`, 실패 409 `AI_FAILED`, 모른다고 함 409 `AI_UNKNOWN`), 직접 수정(1~200자, 요청을 닫음), 요청 닫기 |
 | `POST /api/keywords/{id}/comments` | `{ "body": "..." }`. 댓글 쓰기(1~200자, 최소 글자 수 제한 없음, 링크·전화번호 불가). 작성자 댓글 점수 +1 |
 | `PATCH /api/comments/{id}`, `DELETE /api/comments/{id}` | 내 댓글 고치기(작성 후 5분 안, 지나면 409 `COMMENT_EDIT_EXPIRED`), 지우기(소프트 삭제, 댓글 점수 −1) |
-| `POST /api/reports` | `{ "target": "COMMENT" \| "CHAT" \| "PLAYER", "targetId": 1, "reason": "..." }`(PLAYER는 같은 방의 세션 엔티티 번호). 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
+| `POST /api/reports` | `{ "target": "KEYWORD" \| "COMMENT" \| "CHAT" \| "PLAYER", "targetId": 1, "reason": "..." }`(PLAYER는 같은 방의 세션 엔티티 번호). 신고(13.5). 내 나라 대상만, 내 글은 400 `REPORT_OWN`, 같은 대상 두 번은 409 `REPORT_DUPLICATE` |
 | `GET /api/rankings?country=` | 리더보드: 그 나라 방에 접속 중인 사람의 현재 유행도 TOP 10(4.14) |
 | `POST /api/auth/withdraw` | `{ "phrase": "탈퇴 합니다." }`. 탈퇴(4.1): 문구가 다르면 400 `WITHDRAW_PHRASE`, 게스트면 400 `WITHDRAW_GUEST`. 갱신 토큰 폐기, 쿠키 삭제(204) |
 | `GET /api/levels/badges` | 레벨 표시 옆 성장 아이콘의 바탕(레벨별 색·진하기·무지개 여부, `levels`에서 읽음, 4.9) |
