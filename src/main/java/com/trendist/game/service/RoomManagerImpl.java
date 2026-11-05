@@ -238,6 +238,15 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         });
     }
 
+    /** 긴급 안내가 올라오거나 끝나면(4.29) 모든 나라의 방에 접속 중인 모두에게 바로 알린다. notice가 null이면 걷는다. */
+    @TransactionalEventListener(fallbackExecution = true)
+    public void on(com.trendist.emergency.event.EmergencyEvents.Changed e) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "emergency");
+        msg.put("notice", e.active());
+        rooms.values().forEach(r -> r.submit(room -> room.announce(msg)));
+    }
+
     @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.HoldingChanged e) {
         Room r = rooms.get(e.countryId());

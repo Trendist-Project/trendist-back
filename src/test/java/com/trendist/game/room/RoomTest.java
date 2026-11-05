@@ -290,6 +290,18 @@ class RoomTest {
     }
 
     @Test
+    void announceReachesEveryoneInTheRoom() {
+        // 긴급 안내(4.29): 서버 전체 알림은 방의 모두에게 간다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.join(1, "s1", "a", 1, 0, List.of());
+        r.join(2, "s2", "b", 1, 0, List.of());
+        out.texts.clear();
+        r.announce(Map.of("type", "emergency", "notice", "공지"));
+        assertThat(out.texts.stream().filter(m -> "emergency".equals(m.get("type")))).hasSize(2);
+    }
+
+    @Test
     void botRosterCarriesComboSoFlamesShowToNewcomers() {
         Out out = new Out();
         Room.Member[] h = new Room.Member[1];

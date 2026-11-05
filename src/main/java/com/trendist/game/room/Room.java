@@ -838,6 +838,9 @@ public class Room {
         return id;
     }
 
+    /** 방의 모두(관전 포함)에게 글 메시지를 보낸다. 방 스레드에서 부른다(긴급 안내처럼 서버 전체 알림, 4.29). */
+    public void announce(Map<String, Object> msg) { broadcast(msg); }
+
     private void broadcast(Map<String, Object> msg) {
         for (Member m : members.values()) outbox.sendText(m, msg);
         for (Member sp : spectators) outbox.sendText(sp, msg);
