@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 공개 키워드 페이지 방문 수(4.28). 요청마다 DB에 쓰지 않고 메모리에 모았다가 1분마다 키워드별 UPDATE 한 번으로 더한다.
+ * 키워드 조회수(4.28): 공개 키워드 페이지와 게임 안 상세 팝업을 연 횟수. 요청마다 DB에 쓰지 않고 메모리에 모았다가 1분마다 키워드별 UPDATE 한 번으로 더한다.
  * 같은 방문자(IP + User-Agent)는 키워드마다 하루(한국 시간) 1번만 센다. 방문자 값은 해시로만, 메모리에만 둔다.
  * 검색엔진·메신저 크롤러는 세지 않는다(판별은 자랑하기 카드와 같은 {@link ShareViewCounter#isCrawler}).
  * 서버가 갑자기 꺼지면 저장 전 최대 1분치가 사라진다(정상 종료 때는 저장한다).

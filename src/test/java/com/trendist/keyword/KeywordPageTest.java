@@ -86,10 +86,20 @@ class KeywordPageTest {
         counter.flush();
         Long views = jdbc.queryForObject("select view_count from keywords where normalized = '조회수키워드'", Long.class);
         assertThat(views).isEqualTo(2L); // 같은 방문자 중복·검색 크롤러는 센 값에 없다
-        // 게임 안 키워드 팝업(4.12)에도 같은 조회수가 내려간다
+        // 게임 안 키워드 팝업(4.12)에도 같은 조회수가 내려가고, User-Agent가 없는 요청(크롤러·도구)은 세지 않는다
         Long id = jdbc.queryForObject("select id from keywords where normalized = '조회수키워드'", Long.class);
         mvc.perform(get("/api/keywords/{id}", id).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.viewCount").value(2));
+        // 팝업을 연 것도 조회수에 센다: 새 방문자가 열면 +1(카드에도 바로 반영), 같은 방문자가 다시 열면 그대로
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(get("/api/keywords/{id}", id).header("Authorization", "Bearer " + token).header("User-Agent", CHROME)
+                            .with(r -> { r.setRemoteAddr("9.9.9.9"); return r; }))
+                    .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.viewCount").value(3));
+        }
+        // 같은 방문자가 공개 페이지를 열어도 하루 1번이라 더 늘지 않는다
+        mvc.perform(get("/kr/keywords/{k}", "조회수키워드").header("User-Agent", CHROME).with(r -> { r.setRemoteAddr("9.9.9.9"); return r; }));
+        counter.flush();
+        assertThat(jdbc.queryForObject("select view_count from keywords where normalized = '조회수키워드'", Long.class)).isEqualTo(3L);
     }
 
     @Test

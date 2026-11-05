@@ -5,7 +5,9 @@ import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.service.AiCommentService;
 import com.trendist.keyword.service.KeywordActivityService;
 import com.trendist.keyword.service.KeywordService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,8 +32,8 @@ public class KeywordController {
     }
 
     @GetMapping("/keywords/{id}")
-    public KeywordDtos.KeywordCard detail(@AuthenticationPrincipal AuthUser user, @PathVariable long id) {
-        return service.detail(user.userId(), id);
+    public KeywordDtos.KeywordCard detail(@AuthenticationPrincipal AuthUser user, @PathVariable long id, HttpServletRequest req) {
+        return service.detail(user.userId(), id, req.getRemoteAddr(), req.getHeader(HttpHeaders.USER_AGENT));
     }
 
     /** 활동 그래프(4.12, 9.9). range: 24h / 7d / 30d / 180d. */

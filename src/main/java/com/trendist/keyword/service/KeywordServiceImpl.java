@@ -701,11 +701,12 @@ public class KeywordServiceImpl implements KeywordService {
 
     @Override
     @Transactional(readOnly = true)
-    public KeywordDtos.KeywordCard detail(long userId, long keywordId) {
+    public KeywordDtos.KeywordCard detail(long userId, long keywordId, String ip, String userAgent) {
         Player p = playerService.requireCurrent(userId);
         Keyword k = keywords.findWithAiById(keywordId)
                 .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !isBanned(x))
                 .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
+        viewCounter.hit(k.getId(), ip, userAgent); // 볼 수 있는 키워드일 때만 센다(없거나 금지면 위에서 이미 404)
         return card(k, p, Instant.now(clock));
     }
 

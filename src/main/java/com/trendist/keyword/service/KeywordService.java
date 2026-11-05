@@ -17,8 +17,11 @@ public interface KeywordService {
     /** 특정 플레이어의 보관함(관리자 사용자 상세가 나라를 골라 볼 때). */
     List<KeywordDtos.MyKeyword> myKeywordsOfPlayer(long playerId);
 
-    /** 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 볼 수 없다. */
-    KeywordDtos.KeywordCard detail(long userId, long keywordId);
+    /**
+     * 키워드 상세 카드(4.12). 내 나라 키워드만, 금지 키워드는 볼 수 없다. 팝업을 연 것도 조회수에 센다(4.28):
+     * 공개 페이지와 같은 규칙이라 같은 방문자(ip + userAgent)는 키워드마다 하루 1번이고 크롤러는 세지 않는다. 돌려주는 카드의 조회수에는 이번 조회도 들어 있다.
+     */
+    KeywordDtos.KeywordCard detail(long userId, long keywordId, String ip, String userAgent);
 
     /** 방 입장 때 보유 색인에 넣을 키워드 번호(만료 전, 금지 아님). */
     List<Long> activeKeywordIds(long playerId);
