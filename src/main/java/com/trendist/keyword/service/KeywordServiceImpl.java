@@ -14,6 +14,7 @@ import com.trendist.keyword.repository.KeywordRepository;
 import com.trendist.keyword.repository.PlayerKeywordRepository;
 import com.trendist.keyword.source.ExternalTrendSource;
 import com.trendist.keyword.support.ActivePopulation;
+import com.trendist.keyword.support.BannedWordFilter;
 import com.trendist.keyword.support.KeywordNormalizer;
 import com.trendist.keyword.support.SearchCounter;
 import com.trendist.keyword.support.TrendFormula;
@@ -47,6 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class KeywordServiceImpl implements KeywordService {
     private static final Logger log = LoggerFactory.getLogger(KeywordServiceImpl.class);
     private final KeywordRepository keywords;
+    private final BannedWordFilter bannedWords;
     private final KeywordAiRequestRepository aiRequests;
     private final PlayerKeywordRepository playerKeywords;
     private final PlayerRepository players;
@@ -82,6 +84,7 @@ public class KeywordServiceImpl implements KeywordService {
         Country country = p.getCountry();
         Instant now = Instant.now(clock);
 
+        if (bannedWords.contains(country.getCode(), normalized)) return new KeywordDtos.SearchResult("BANNED", null); // 금지어가 들어 있으면 막는다(4.6)
         Optional<Keyword> found = keywords.findByCountryIdAndNormalized(country.getId(), normalized);
         if (found.isPresent()) {
             Keyword k = found.get();
@@ -113,6 +116,7 @@ public class KeywordServiceImpl implements KeywordService {
         String normalized = KeywordNormalizer.validate(text);
         Instant now = Instant.now(clock);
         Country country = p.getCountry();
+        if (bannedWords.contains(country.getCode(), normalized)) throw ApiException.badRequest("KEYWORD_BANNED", "검색할 수 없는 키워드예요"); // 금지어가 들어 있으면 만들지도 않는다
 
         Keyword k = keywords.findByCountryIdAndNormalized(country.getId(), normalized)
                 .orElseGet(() -> createKeyword(country, text, normalized, externalConfirm(country.getCode(), normalized), now));
@@ -280,6 +284,7 @@ public class KeywordServiceImpl implements KeywordService {
         Instant now = Instant.now(clock);
         DataSource source = codes.dataSource(sourceName);
         if (source.getWeight().signum() == 0) return false; // 가중치 0이면 쓰지 않는다
+        if (bannedWords.contains(countryCode, normalized)) return false; // 금지어가 들어 있는 외부 제목은 버린다
         Optional<Keyword> found = keywords.findByCountryIdAndNormalized(countryOf(countryCode).getId(), normalized);
         if (found.isEmpty()) {
             createKeyword(countryOf(countryCode), text, normalized, Optional.of(new Confirmed(source, 100)), now);
@@ -310,6 +315,8 @@ public class KeywordServiceImpl implements KeywordService {
         if (source.getWeight().signum() == 0) throw ApiException.badRequest("SOURCE_DISABLED", "admin 소스의 가중치가 0이라 쓸 수 없어요");
         Instant now = Instant.now(clock);
         Optional<Keyword> found = keywords.findByCountryIdAndNormalized(country.getId(), normalized);
+        if (found.map(k -> !isBanned(k)).orElse(true) && bannedWords.contains(country.getCode(), normalized))
+            throw ApiException.conflict("KEYWORD_BANNED", "금지된 키워드가 들어 있어요. 금지를 먼저 풀어 주세요");
         if (found.isEmpty()) {
             // 새 키워드: 🔥활성, 반영 소스 admin, 지금부터 유지 기간(createKeyword가 유지 기간형 소스로 처리)
             Keyword k = createKeyword(country, display, normalized, Optional.of(new Confirmed(source, 100)), now);
@@ -397,6 +404,7 @@ public class KeywordServiceImpl implements KeywordService {
         long nw = updateTrend(k); // 금지·💤면 0
         keywords.flush();
         events.publishEvent(new com.trendist.keyword.support.KeywordPageEvents.Changed(k.getCountry().getCode(), k.getNormalized())); // 공개 페이지·사이트맵 캐시를 커밋 뒤 비운다(4.28)
+        if (banned) events.publishEvent(new com.trendist.keyword.support.KeywordPageEvents.Banned(k.getCountry().getCode(), k.getNormalized())); // 커밋 뒤 모든 플레이어의 보관함에서 지운다
         publishTrendChange(k, old, nw, null); // 접속 중인 보유자는 바로, 아닌 보유자는 1분 재합산에서 점수가 빠진다
         return adminRow(k);
     }
@@ -581,6 +589,39 @@ public class KeywordServiceImpl implements KeywordService {
         return Optional.of(new StolenKeyword(text, score, "ADDED", r.gained(), r.keyword().myExpiresAt()));
     }
 
+    /**
+     * 금지가 커밋되면 모든 플레이어의 보관함에서 그 키워드와 금지어가 들어 있는 키워드를 바로 지운다(4.7).
+     * 금지 트랜잭션이 끝난 뒤에, 보관함 행마다 따로 새 트랜잭션으로 한다(플레이어 → 키워드 잠금 순서를 지키고, 한 건이 실패해도 나머지는 계속한다).
+     * 접속 중인 사람의 보관함·점수는 `HoldingChanged`로 바로 고쳐진다.
+     */
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void onBanned(com.trendist.keyword.support.KeywordPageEvents.Banned e) { purgeBanned(e.countryCode(), e.normalized()); }
+
+    int purgeBanned(String countryCode, String normalized) {
+        TransactionTemplate fresh = new TransactionTemplate(tx.getTransactionManager());
+        fresh.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        List<Long> ids = fresh.execute(st -> playerKeywords.findIdsHoldingBanned(countryCode, normalized, normalized.length() >= BannedWordFilter.MIN_WORD_LENGTH));
+        int removed = 0;
+        for (Long id : ids == null ? List.<Long>of() : ids) {
+            try {
+                Boolean r = fresh.execute(st -> {
+                    PlayerKeyword pk = playerKeywords.findById(id).orElse(null);
+                    if (pk == null) return false;
+                    Player p = players.findByIdForUpdate(pk.getPlayer().getId()).orElseThrow(); // 잠금 순서: 플레이어 → 키워드
+                    Long keywordId = pk.getKeyword().getId();
+                    playerKeywords.delete(pk);
+                    playerKeywords.flush();
+                    removeHolding(p, keywordId, Instant.now(clock));
+                    return true;
+                });
+                if (Boolean.TRUE.equals(r)) removed++;
+            } catch (RuntimeException ex) {
+                log.warn("purge banned holding {} failed", id, ex);
+            }
+        }
+        return removed;
+    }
+
     private void removeHolding(Player p, Long keywordId, Instant now) {
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();
         long oldTrend = k.getTrendValue();
@@ -704,7 +745,7 @@ public class KeywordServiceImpl implements KeywordService {
     public KeywordDtos.KeywordCard detail(long userId, long keywordId, String ip, String userAgent) {
         Player p = playerService.requireCurrent(userId);
         Keyword k = keywords.findWithAiById(keywordId)
-                .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !isBanned(x))
+                .filter(x -> x.getCountry().getId().equals(p.getCountry().getId()) && !isBanned(x) && !bannedWords.contains(p.getCountry().getCode(), x.getNormalized()))
                 .orElseThrow(() -> ApiException.notFound("KEYWORD_NOT_FOUND", "키워드를 찾을 수 없어요"));
         viewCounter.hit(k.getId(), ip, userAgent); // 볼 수 있는 키워드일 때만 센다(없거나 금지면 위에서 이미 404)
         return card(k, p, Instant.now(clock));

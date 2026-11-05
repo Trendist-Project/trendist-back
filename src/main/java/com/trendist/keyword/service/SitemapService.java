@@ -3,6 +3,7 @@ package com.trendist.keyword.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.trendist.common.code.CodeTables;
+import com.trendist.keyword.support.BannedWordFilter;
 import com.trendist.config.AppProperties;
 import com.trendist.country.entity.Country;
 import com.trendist.country.repository.CountryRepository;
@@ -37,8 +38,10 @@ public class SitemapService {
     private final String baseUrl;
     private final Cache<String, String> cache = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(5)).maximumSize(1).build();
 
-    public SitemapService(KeywordRepository keywords, CountryRepository countries, CodeTables codes, AppProperties props) {
-        this.keywords = keywords; this.countries = countries; this.codes = codes;
+    private final BannedWordFilter bannedWords;
+
+    public SitemapService(KeywordRepository keywords, CountryRepository countries, CodeTables codes, BannedWordFilter bannedWords, AppProperties props) {
+        this.keywords = keywords; this.countries = countries; this.codes = codes; this.bannedWords = bannedWords;
         this.baseUrl = props.share() == null ? new AppProperties.Share(null).baseUrl() : props.share().baseUrl();
     }
 
@@ -57,6 +60,7 @@ public class SitemapService {
                 if (remaining <= 0) { log.warn("sitemap is full ({} urls); older keywords are left out", MAX_URLS); break; }
                 List<Object[]> rows = keywords.findSitemapRows(c.getId(), banned, PageRequest.of(0, remaining));
                 for (Object[] r : rows) {
+                    if (bannedWords.contains(c.getCode(), (String) r[0])) continue; // 금지어가 들어 있으면 뺀다(상한 계산은 그대로 둔다)
                     String loc = KeywordPage.url(baseUrl, c.getCode(), (String) r[0]);
                     String lastmod = ((Instant) r[1]).truncatedTo(ChronoUnit.SECONDS).toString();
                     b.append("  <url><loc>").append(loc).append("</loc><lastmod>").append(lastmod).append("</lastmod></url>\n");

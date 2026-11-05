@@ -20,6 +20,15 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     List<PlayerKeyword> findActiveByPlayer(@Param("playerId") Long playerId, @Param("now") Instant now,
                                            @Param("bannedStateId") Long bannedStateId);
 
+    /**
+     * 금지된 키워드를 가진 보관함 행 번호(만료된 것 포함, 4.7): 그 키워드와 똑같은 것, contain이면 금지어가 들어 있는 다른 키워드까지.
+     */
+    @Query("""
+            select pk.id from PlayerKeyword pk
+            where pk.keyword.country.code = :countryCode
+              and (pk.keyword.normalized = :normalized or (:contain = true and locate(:normalized, pk.keyword.normalized) > 0))""")
+    List<Long> findIdsHoldingBanned(@Param("countryCode") String countryCode, @Param("normalized") String normalized, @Param("contain") boolean contain);
+
     /** 현재 유행도의 키워드 점수 부분: 🔥활성 키워드의 trend_value 합(4.8). */
     @Query("""
             select coalesce(sum(k.trendValue), 0) from PlayerKeyword pk join pk.keyword k

@@ -6,4 +6,7 @@ public final class KeywordPageEvents {
 
     /** countryCode는 나라 코드(KR·GLOBAL), normalized는 정규화 키 */
     public record Changed(String countryCode, String normalized) {}
+
+    /** 키워드가 금지됐다(커밋 뒤 모든 플레이어의 보관함에서 그 키워드와, 금지어가 들어 있는 키워드를 지운다, 4.7) */
+    public record Banned(String countryCode, String normalized) {}
 }

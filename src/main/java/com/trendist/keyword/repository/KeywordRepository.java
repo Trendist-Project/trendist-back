@@ -131,6 +131,10 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("update Keyword k set k.viewCount = k.viewCount + :n where k.id = :id")
     int addViewCount(@Param("id") Long id, @Param("n") long n);
 
+    /** 금지어 목록(금지 키워드의 정규화 키, 포함 검사용 4.6) */
+    @Query("select k.normalized from Keyword k where k.country.code = :countryCode and k.keywordState.id = :stateId")
+    List<String> findNormalizedByCountryCodeAndState(@Param("countryCode") String countryCode, @Param("stateId") Long stateId);
+
     /** 사이트맵(4.28): 그 나라에서 금지가 아닌 키워드의 [정규화 키, 수정 시각]. 최근에 만든 키워드부터(상한을 넘으면 오래된 것이 빠진다). */
     @Query("select k.normalized, k.updatedAt from Keyword k where k.country.id = :countryId and k.keywordState.id <> :bannedId order by k.id desc")
     List<Object[]> findSitemapRows(@Param("countryId") Long countryId, @Param("bannedId") Long bannedId,

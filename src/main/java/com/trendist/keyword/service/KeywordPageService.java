@@ -3,6 +3,7 @@ package com.trendist.keyword.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.trendist.common.code.CodeTables;
+import com.trendist.keyword.support.BannedWordFilter;
 import com.trendist.common.exception.ApiException;
 import com.trendist.config.AppProperties;
 import com.trendist.keyword.dto.KeywordDtos;
@@ -32,6 +33,7 @@ public class KeywordPageService {
     private final KeywordActivityService activity;
     private final KeywordViewCounter views;
     private final CodeTables codes;
+    private final BannedWordFilter bannedWords;
     private final String baseUrl;
     private final Cache<String, Optional<Cached>> cache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30)).maximumSize(20_000).build();
@@ -40,8 +42,8 @@ public class KeywordPageService {
     private record Cached(long id, KeywordPage.Data data) {}
 
     public KeywordPageService(KeywordRepository keywords, KeywordActivityService activity, KeywordViewCounter views,
-                              CodeTables codes, AppProperties props) {
-        this.keywords = keywords; this.activity = activity; this.views = views; this.codes = codes;
+                              CodeTables codes, BannedWordFilter bannedWords, AppProperties props) {
+        this.keywords = keywords; this.activity = activity; this.views = views; this.codes = codes; this.bannedWords = bannedWords;
         this.baseUrl = props.share() == null ? new AppProperties.Share(null).baseUrl() : props.share().baseUrl();
     }
 
@@ -60,6 +62,7 @@ public class KeywordPageService {
         } catch (ApiException e) {
             return Optional.empty();
         }
+        if (bannedWords.contains(code, normalized)) return Optional.empty(); // 금지어가 들어 있는 키워드는 열리지 않는다(4.6)
         String key = code + "|" + normalized;
         Optional<Cached> cached = cache.get(key, k -> load(code, normalized));
         // 캐시된 값이라도 금지 여부는 매번 새로 본다(금지한 키워드가 캐시 시간 동안 열리지 않게)
