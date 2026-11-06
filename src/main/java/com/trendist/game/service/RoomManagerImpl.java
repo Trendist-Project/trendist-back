@@ -33,14 +33,28 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private final Map<Long, ScheduledExecutorService> tickers = new ConcurrentHashMap<>();
     private final ScheduledExecutorService tuningRefresher = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "room-tuning"));
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor(); // DB·외부 호출은 틱 밖에서
+    /**
+     * 방의 DB 작업(키워드 빼앗기·잃기, 처치 기록, 구슬 보상 등)이 동시에 쓰는 DB 연결 수 상한. 칭호 검사는 커밋 뒤 REQUIRES_NEW로 두 번째 연결을 요구하므로
+     * (TitleServiceImpl.on), 연결을 하나씩 쥔 작업이 풀(기본 10개) 이상으로 몰리면 모두가 두 번째 연결을 기다리며 서버가 멈춘다. 봇이 많아 싸움이 잦을 때 그렇게 멈췄다.
+     * 넘치는 작업은 가상 스레드에서 차례를 기다린다(방 틱은 막히지 않는다). 작업 하나가 최대 연결 2개를 쓰므로 4개면 풀의 8개 이하이고, HTTP 요청 몫이 남는다.
+     */
+    private final java.util.concurrent.Semaphore dbSlots = new java.util.concurrent.Semaphore(4);
+
+    private void db(Runnable task) {
+        workers.submit(() -> {
+            dbSlots.acquireUninterruptibly();
+            try { task.run(); } finally { dbSlots.release(); }
+        });
+    }
     private final SettingService settings;
     private final KeywordService keywordService;
+    private final com.trendist.player.service.PlayerService playerService;
     private final LevelService levels;
     private final ObjectMapper json;
-    private final RoomStateService roomStates;
 
-    public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json, RoomStateService roomStates) {
-        this.roomStates = roomStates;
+    public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json,
+                           @org.springframework.context.annotation.Lazy com.trendist.player.service.PlayerService playerService) {
+        this.playerService = playerService;
         this.settings = settings;
         this.levels = levels;
         this.keywordService = keywordService;
@@ -54,27 +68,29 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 rooms.values().forEach(r -> {
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
                     if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);
+                    r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
                     r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
+                    r.setOfflineKeepSeconds(settings.getInt(SettingKeys.OFFLINE_KEEP_SECONDS));
                     if (!t.equals(r.tuning())) { r.setTuning(t); r.submit(rr -> broadcastTuning(rr)); }
                     if (!z.equals(r.zoneTuning())) r.setZoneTuning(z);
                 });
             } catch (RuntimeException e) { log.warn("tuning refresh failed", e); }
         }, 1, 1, TimeUnit.SECONDS);
-        // 30초마다 접속 중인 사람의 위치와 활동 영역을 저장한다(서버가 갑자기 꺼져도 최대 30초 전 위치에서 이어 간다)
+        // 60초마다 방마다 🔥 키워드 목록을 새로 읽는다(봇의 키워드와 점수 계산, 4.21)
         tuningRefresher.scheduleAtFixedRate(() -> {
-            try { rooms.values().forEach(this::saveStateAsync); } catch (RuntimeException e) { log.warn("room state save failed", e); }
-        }, 30, 30, TimeUnit.SECONDS);
+            try { rooms.forEach((id, r) -> loadCatalog(id, r, false)); } catch (RuntimeException e) { log.warn("bot catalog refresh failed", e); }
+        }, 60, 60, TimeUnit.SECONDS);
     }
 
-    /** 틱 스레드에서 위치를 모아 작업 스레드에서 저장한다(DB는 틱 밖에서). */
-    private void saveStateAsync(Room r) {
-        r.submit(room -> {
-            List<Room.SavedPos> snap = room.snapshotPositions();
-            double area = room.currentArea();
-            workers.submit(() -> {
-                try { roomStates.save(room.countryId(), area, snap); } catch (RuntimeException e) { log.warn("room state save failed", e); }
-            });
-        });
+    /** 그 나라의 🔥 키워드 목록을 읽어 방에 넣는다. now면 지금 읽고(방을 만들 때), 아니면 작업 스레드에서 읽은 뒤 방 큐에 넣는다. */
+    private void loadCatalog(long countryId, Room r, boolean now) {
+        Runnable load = () -> {
+            try {
+                var list = keywordService.botCatalog(countryId).stream().map(k -> new Room.CatalogKw(k.id(), k.text(), k.score())).toList();
+                if (now) r.setKeywordCatalog(list); else r.submit(rr -> rr.setKeywordCatalog(list));
+            } catch (RuntimeException e) { log.warn("bot catalog load failed for country {}", countryId, e); }
+        };
+        if (now) load.run(); else db(load);
     }
 
     @Override
@@ -84,9 +100,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             r.setZoneTuning(zoneTuning());
             r.setComboTuning(comboTuning());
             r.setDashTuning(dashTuning());
+            r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
             r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
-            try { roomStates.area(id).ifPresent(r::restoreArea); } catch (RuntimeException e) { log.warn("room area restore failed", e); } // 서버를 다시 켠 뒤 저장해 둔 활동 영역에서 시작한다
+            r.setOfflineKeepSeconds(settings.getInt(SettingKeys.OFFLINE_KEEP_SECONDS)); // 연결이 끊겨도 원이 남아 있는 시간(4.32)
             r.setLevelForExp(levels::levelFor); // 봇 레벨도 사람과 같은 레벨표(levels)로 정한다
+            loadCatalog(id, r, true); // 봇이 가질 🔥 키워드 목록. 첫 봇이 나오기 전에 읽어 둔다
             ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(
                     run -> { Thread t = new Thread(run, "room-" + id); t.setDaemon(true); return t; }); // 틱은 플랫폼 스레드
             ex.scheduleAtFixedRate(() -> {
@@ -121,8 +139,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getInt(SettingKeys.BOT_PLAYERS),
                 settings.getInt(SettingKeys.BOT_MIN_PLAYERS),
                 settings.getDouble(SettingKeys.BOT_CAP_RATIO),
-                settings.getDouble(SettingKeys.BOT_STEP_MIN),
-                settings.getDouble(SettingKeys.BOT_STEP_MAX),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP));
     }
 
@@ -135,7 +151,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     /** 연속 빼앗기 콤보 설정(4.25). */
     private Room.ComboTuning comboTuning() {
         return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_FLAME_AT), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0,
-                settings.getInt(SettingKeys.COMBO_WIPE_ORB_PERCENT));
+                settings.getInt(SettingKeys.COMBO_WIPE_ORB_PERCENT), settings.getInt(SettingKeys.COMBO_MAX_SECONDS));
     }
 
     /** 세이프존 설정(4.22). */
@@ -260,11 +276,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         long loserId = loser.playerId;
         String winnerName = winner.nickname, loserName = loser.nickname; // 봇(이름 Bot)에게 져도 키워드를 잃는다(4.21)
         Long winnerId = winner.bot ? null : winner.playerId;
-        workers.submit(() -> {
+        db(() -> {
             try {
                 if (winnerId == null) {
                     // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
+                        r.botTakes(winner, lost.keywordId()); // 이긴 봇이 사람이 잃은 그 키워드를 메모리에 가진다(4.21)
                         r.fightResult(winner, r.byPlayer(loserId), false); // 진 사람 콤보·불꽃은 사라지고, 이긴 봇의 콤보는 +1(4.25)
                         Room.Member m = r.byPlayer(loserId);
                         if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
@@ -291,16 +308,19 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     public void requestWipe(Room room, Room.Member loser, Room.Member winner) {
         long loserId = loser.playerId, winnerId = winner.playerId;
         String winnerName = winner.nickname;
-        workers.submit(() -> {
+        db(() -> {
             try {
-                keywordService.loseAll(loserId).ifPresent(lost -> room.submit(r -> {
+                keywordService.loseAll(loserId).ifPresent(lost -> {
+                    if (!winner.bot) playerService.recordSteal(winnerId); // 모두 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
+                    room.submit(r -> {
                     r.fightResult(winner, r.byPlayer(loserId), false); // 이긴 쪽(사람·봇) 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
                     r.dropPrizeOrbs(loserId, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
                     Room.Member m = r.byPlayer(loserId);
                     if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "wiped", lost.count(), "score", lost.score()));
                     Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
                     if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score()));
-                }));
+                    });
+                });
             } catch (RuntimeException e) {
                 log.warn("wipe keywords failed for player {}", loserId, e);
             }
@@ -308,12 +328,48 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
-    public void requestBotWin(Room room, Room.Member winner, Room.Member bot) {
+    public void requestSteal(Room room, Room.Member attacker) {
+        long playerId = attacker.playerId;
+        db(() -> {
+            try {
+                playerService.recordSteal(playerId);
+            } catch (RuntimeException e) {
+                log.warn("record steal failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestDefeat(Room room, Room.Member loser) {
+        long playerId = loser.playerId;
+        db(() -> {
+            try {
+                playerService.recordDefeat(playerId);
+            } catch (RuntimeException e) {
+                log.warn("record defeat failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestKill(Room room, Room.Member killer) {
+        long playerId = killer.playerId;
+        db(() -> {
+            try {
+                playerService.recordKill(playerId);
+            } catch (RuntimeException e) {
+                log.warn("record kill failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestBotWin(Room room, Room.Member winner, Room.Member bot, long keywordId) {
         long playerId = winner.playerId;
         String botName = bot.nickname;
-        workers.submit(() -> {
+        db(() -> {
             try {
-                KeywordDtos.OrbResult r = keywordService.gainFromBot(playerId);
+                KeywordDtos.OrbResult r = keywordService.gainFromBot(playerId, keywordId); // 봇이 잃은 그 키워드를 얻는다(4.21)
                 Map<String, Object> msg = new HashMap<>();
                 msg.put("type", "hit");
                 msg.put("target", botName);
@@ -339,7 +395,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @Override
     public void requestOrb(Room room, Room.Member eater, boolean prize) {
         long playerId = eater.playerId;
-        workers.submit(() -> {
+        db(() -> {
             try {
                 KeywordDtos.OrbResult r = prize ? keywordService.openPrizeOrb(playerId) : keywordService.openOrb(playerId);
                 Map<String, Object> msg = new HashMap<>();
@@ -361,7 +417,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void send(Room.Member m, ByteBuffer binary) {
-        if (m.bot) return; // 봇은 연결이 없다
+        if (m.bot || m.offline) return; // 봇은 연결이 없고, 연결이 끊긴 원(4.32)에는 보낼 곳이 없다
         WebSocketSession s = (WebSocketSession) m.session;
         if (!s.isOpen()) return;
         try { s.sendMessage(new BinaryMessage(binary)); } catch (Exception e) { /* 느린 연결: 데코레이터가 버린다 */ }
@@ -375,14 +431,14 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void sendText(Room.Member m, Map<String, Object> message) {
-        if (m.bot) return; // 봇은 연결이 없다
+        if (m.bot || m.offline) return; // 봇은 연결이 없고, 연결이 끊긴 원(4.32)에는 보낼 곳이 없다
         WebSocketSession s = (WebSocketSession) m.session;
         if (!s.isOpen()) return;
         try { s.sendMessage(new TextMessage(json.writeValueAsString(message))); } catch (Exception e) { /* 연결 종료 */ }
     }
 
     @Override
-    public void submitWork(Runnable r) { workers.submit(r); }
+    public void submitWork(Runnable r) { db(r); }
 
     @Override
     public void kick(long countryId, long playerId, String message) {
@@ -402,17 +458,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @PreDestroy
     public void shutdown() {
-        // 서버를 끌 때: 접속 중인 사람과 방금 나간 사람의 위치와 활동 영역을 한 번 저장한다(웹소켓이 먼저 닫혀도 나간 위치를 기억하고 있다)
-        for (Room r : rooms.values()) {
-            try {
-                CompletableFuture<Object[]> snap = new CompletableFuture<>();
-                r.submit(room -> snap.complete(new Object[]{room.snapshotPositions(), room.currentArea()}));
-                @SuppressWarnings("unchecked")
-                List<Room.SavedPos> positions = (List<Room.SavedPos>) snap.get(3, TimeUnit.SECONDS)[0];
-                roomStates.save(r.countryId(), (double) snap.get()[1], positions);
-                log.info("room {} state saved on shutdown: {} positions", r.countryId(), positions.size());
-            } catch (Exception e) { log.warn("room state save on shutdown failed", e); }
-        }
         tickers.values().forEach(ExecutorService::shutdownNow);
         tuningRefresher.shutdownNow();
         workers.shutdownNow();

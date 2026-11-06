@@ -18,10 +18,14 @@ public final class SettingKeys {
     public static final String PLUS_TTL_HOURS = "plus_ttl_hours";
     public static final String ACTIVATE_HOLDERS = "activate_holders";
     public static final String EXP_PER_PLUS = "exp_per_plus";
+    public static final String ATTACK_EXP = "attack_exp";
+    public static final String KILL_EXP = "kill_exp";
     public static final String WORLD_SIZE = "world_size";
     public static final String MIN_RADIUS = "min_radius";
     public static final String MAX_DIAMETER = "max_diameter";
+    public static final String AREA_GROW_SPEED = "area_grow_speed";
     public static final String AREA_SHRINK_SPEED = "area_shrink_speed";
+    public static final String OFFLINE_KEEP_SECONDS = "offline_keep_seconds";
     public static final String SCORE_CAP = "score_cap";
     public static final String MAX_SPEED = "max_speed";
     public static final String ZOOM_FACTOR = "zoom_factor";
@@ -39,8 +43,6 @@ public final class SettingKeys {
     public static final String BOT_PLAYERS = "bot_players";
     public static final String BOT_MIN_PLAYERS = "bot_min_players";
     public static final String BOT_CAP_RATIO = "bot_cap_ratio";
-    public static final String BOT_STEP_MIN = "bot_step_min";
-    public static final String BOT_STEP_MAX = "bot_step_max";
     public static final String ORB_SPAWN_PERCENT = "orb_spawn_percent";
     public static final String ORB_ACTIVE_PERCENT = "orb_active_percent";
     public static final String RANK_TITLE_MIN_PLAYERS = "rank_title_min_players";
@@ -64,6 +66,7 @@ public final class SettingKeys {
     public static final String AI_COMMENT_DAILY_MAX = "ai_comment_daily_max";
     public static final String AI_COMMENT_GROUNDING = "ai_comment_grounding";
     public static final String COMBO_BOT_COUNTS = "combo_bot_counts";
+    public static final String COMBO_MAX_SECONDS = "combo_max_seconds";
 
     public static final List<Def> DEFAULTS = List.of(
             // 트렌드 값(4.8): 가진 비율 s = 가진 사람 / max(활동 인원, 최소 인원). s가 최고점 비율이면 최대 기준값
@@ -77,8 +80,12 @@ public final class SettingKeys {
             new Def(PLUS_TTL_HOURS, "24", 1, 168, "+ 삭제 시간(시간)"),
             new Def(ACTIVATE_HOLDERS, "3", 1, 1000, "🔥활성 전환 인원"),
             new Def(EXP_PER_PLUS, "1", 0, 100, "+ 한 번의 EXP"),
+            new Def(ATTACK_EXP, "1", 0, 100, "공격에 성공할 때마다 얻는 EXP(키워드를 빼앗거나 잃게 한 것마다, 봇이 상대여도, 불꽃으로 모두 잃게 해도 한 번)"),
+            new Def(KILL_EXP, "5", 0, 1000, "상대를 죽였을 때 얻는 EXP(키워드가 없는 사람·봇을 쓰러뜨렸을 때)"),
             new Def(WORLD_SIZE, "48000", 1000, 50000, "기준 맵 한 변(px)"),
             new Def(MIN_RADIUS, "16", 4, 100, "최소 반지름(px)"),
+            new Def(OFFLINE_KEEP_SECONDS, "60", 0, 3600, "연결이 끊겨도 원이 아레나에 남아 있는 시간(초): 끊긴 자리에 그대로 남아 공격받거나 방어하는 등 남아 있는 사람처럼 동작하다가, 이 시간이 지나면 아레나에서 뺀다(0이면 끊기는 순간 뺀다). 그 뒤 접속하면 가운데 세이프존에서 시작한다"),
+            new Def(AREA_GROW_SPEED, "300", 0, 10000, "활동 영역이 커지는 속도: 한 변이 1초에 이만큼(px)씩만 커진다(0이면 바로 커짐). 사람·봇이 들어올 때 맵 벽이 갑자기 튀지 않고 부드럽게 움직이게 한다"),
             new Def(AREA_SHRINK_SPEED, "60", 0, 10000, "활동 영역이 줄어드는 속도: 한 변이 1초에 이만큼(px)씩만 줄어든다(0이면 바로 줄어듦). 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀리지 않게 한다"),
             new Def(MAX_DIAMETER, "600", 40, 5000, "최대 지름(px, 고정값. 맵 크기와 관계없다)"),
             new Def(SCORE_CAP, "2000", 1, 1000000, "크기 상한 점수(S_cap)"),
@@ -103,9 +110,7 @@ public final class SettingKeys {
             // 사람이 많아도 봇이 하나도 없으면 봇 이기기(보상·칭호)를 할 수 없으므로 최소 인원을 둔다. 봇을 아예 없애려면 두 값 모두 0
             new Def(BOT_MIN_PLAYERS, "1", 0, 200, "봇 최소 인원: 사람이 있으면 방 인원과 관계없이 봇을 이 수 이상 둔다(0이면 사람이 많을 때 봇 없음)"),
             new Def(BOT_CAP_RATIO, "1.0", 0.1, 10, "봇 유행도 상한: 그 방에 접속 중인 사람 유행도 평균의 이 배수(1이면 평균)"),
-            new Def(BOT_STEP_MIN, "20", 0, 100, "봇이 가진 키워드 하나의 점수 최소(사람의 키워드 점수처럼)"),
-            new Def(BOT_STEP_MAX, "50", 0, 100, "봇이 가진 키워드 하나의 점수 최대"),
-            new Def(RANK_TITLE_MIN_PLAYERS, "11", 1, 1000, "순위 칭호(핫스타·시상대·정상) 최소 접속 인원: 지금 그 나라에 접속 중인 사람이 이 인원 이상일 때만 순위 칭호를 준다"),
+            new Def(RANK_TITLE_MIN_PLAYERS, "10", 1, 1000, "순위 칭호(핫스타·시상대·정상) 최소 접속 인원: 지금 그 나라에 접속 중인 사람이 이 인원 이상일 때만 순위 칭호를 준다"),
             new Def(ORB_ACTIVE_PERCENT, "70", 0, 100, "? 구슬에서 🔥활성 키워드를 얻을 확률(%). 나머지는 가진 키워드 하나를 잃음(🔥·💤 무관, 없으면 꽝)"),
             // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
             new Def(SAFE_CENTER_RATIO, "0.09", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
@@ -126,6 +131,7 @@ public final class SettingKeys {
             new Def(DASH_COOLDOWN_SECONDS, "30", 1, 600, "대시를 쓴 때부터 다시 쓸 수 있을 때까지의 시간(초, 대시 시간 포함)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(COMBO_WIPE_ORB_PERCENT, "50", 0, 100, "불꽃인 사람에게 부딪혀 키워드를 모두 잃었을 때, 잃은 🔥활성 키워드 개수의 몇 %(올림)만큼 ! 구슬이 그 자리에 떨어지는지(0이면 안 떨어짐). ! 구슬은 먹으면 항상 키워드를 얻는다"),
+            new Def(COMBO_MAX_SECONDS, "300", 0, 86400, "콤보 유지시간(초): 마지막으로 콤보가 오른 때부터 이 시간이 지나면 연속 횟수와 불꽃이 사라진다. 콤보가 추가될 때마다 다시 시작한다(기본 300초 = 5분, 0이면 제한 없음)"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
 }

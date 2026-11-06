@@ -5,6 +5,9 @@ spring:
     username: sa
     password: ""
 trendist:
+  titles:
+    # 칭호 검사를 같은 스레드에서 바로 한다(결과를 바로 확인하려고). 운영은 별도 스레드가 차례로 한다
+    sync-check: true
   # 테스트에서는 외부(구글) 요청을 하지 않는다
   google-trends:
     enabled: false

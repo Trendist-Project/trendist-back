@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
-    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
+    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
 
     /** 충돌 테스트: 무작위 세이프존을 끄고, 가운데 고정 세이프존(한 변 600px) 밖에서 부딪히게 한다(4.22). */
     static final Room.ZoneTuning NO_RANDOM_ZONES = new Room.ZoneTuning(0.06, 600, 0.035, 400, 0, 0, 300);
@@ -24,8 +24,15 @@ class RoomTest {
         final List<Long> prizeEaters = new ArrayList<>();
         final List<long[]> wipes = new ArrayList<>();
         public void requestWipe(Room room, Room.Member loser, Room.Member winner) { wipes.add(new long[]{loser.playerId, winner.playerId}); }
+        final List<Long> defeats = new ArrayList<>();
+        public void requestDefeat(Room room, Room.Member loser) { defeats.add(loser.playerId); }
+        final List<Long> steals = new ArrayList<>();
+        public void requestSteal(Room room, Room.Member attacker) { steals.add(attacker.playerId); }
+        final List<Long> kills = new ArrayList<>();
+        public void requestKill(Room room, Room.Member killer) { kills.add(killer.playerId); }
         final List<Long> botWinners = new ArrayList<>();
-        public void requestBotWin(Room room, Room.Member winner, Room.Member bot) { botWinners.add(winner.playerId); }
+        final List<Long> botWinKeywords = new ArrayList<>();
+        public void requestBotWin(Room room, Room.Member winner, Room.Member bot, long keywordId) { botWinners.add(winner.playerId); botWinKeywords.add(keywordId); }
         public void send(Room.Member m, ByteBuffer binary) { snapshots++; sent.add(binary); }
         final List<Long> closed = new ArrayList<>();
         public void close(Room.Member m) { closed.add(m.playerId); }
@@ -34,11 +41,35 @@ class RoomTest {
     }
 
     @Test
+    void comboExpiresAfterMaxSecondsAndEachNewComboRestartsTheTime() {
+        // 4.25: 콤보 유지시간: 마지막으로 콤보가 오른 때부터 maxSeconds가 지나면 연속 횟수와 불꽃이 사라진다(expired). 콤보가 추가될 때마다 다시 시작한다. 0이면 제한 없음
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setComboTuning(new Room.ComboTuning(5, true, 50, 10));
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
+        r.fightResult(a, b, false); // 콤보 1, 지금부터 10초
+        for (int i = 0; i < 20 * 6; i++) r.tick();
+        assertThat(a.combo).isEqualTo(1); // 6초 뒤에는 아직 유지
+        r.fightResult(a, b, false);       // 콤보 2: 유지시간이 다시 10초부터 시작한다
+        for (int i = 0; i < 20 * 6; i++) r.tick();
+        assertThat(a.combo).isEqualTo(2); // 처음부터 12초가 지났지만 마지막 콤보로부터는 6초라 유지
+        for (int i = 0; i < 20 * 6; i++) r.tick();
+        assertThat(a.combo).isZero();     // 마지막 콤보로부터 12초: 사라진다
+        assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "expired".equals(m.get("event")) && m.get("e").equals(a.entityNo));
+        // 제한을 끄면(0) 오래 지나도 유지된다
+        r.setComboTuning(new Room.ComboTuning(5, true, 50, 0));
+        r.fightResult(a, b, false);
+        for (int i = 0; i < 20 * 30; i++) r.tick();
+        assertThat(a.combo).isEqualTo(1);
+    }
+
+    @Test
     void comboLightsFlameAndBreaksOnLoss() {
         // 4.25: 5번 연속 이기면 불꽃이 붙고(start), 한 번이라도 잃으면 콤보와 불꽃이 모두 사라진다(broken)
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, false, 50));
+        r.setComboTuning(new Room.ComboTuning(5, false, 50, 300));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 4; i++) r.fightResult(1L, 2L, false);
@@ -66,6 +97,120 @@ class RoomTest {
         assertThat(out.texts.stream().filter(m -> "levelFx".equals(m.get("type"))))
                 .hasSize(2) // 두 사람 모두에게
                 .allMatch(m -> m.get("e").equals(a.entityNo) && m.get("level").equals(2));
+    }
+
+    /** 키워드가 없는 a(점수 0)와 있는 b(점수 50)를 가운데 세이프존 밖에서 겹치게 한다. */
+    private static Room deathRoom(Out out, List<Long> aKeywords) {
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, aKeywords);
+        Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
+        a.protectUntil = 0; b.protectUntil = 0;
+        a.x = 800; a.y = 800; b.x = 810; b.y = 800;
+        return r;
+    }
+
+    @Test
+    void noKeywordsAndBeatenMeansDeath() {
+        // 4.31: 키워드가 하나도 없는 채로 지면 죽는다. 방에서 빠지고, 죽은 사람에게 died(죽인 사람 이름), 죽인 사람에게 kill(상대 이름)을 보낸다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        Room.Member a = r.byPlayer(1);
+        r.tick();
+        assertThat(a.dead).isTrue();
+        assertThat(r.byPlayer(1)).isNull();
+        assertThat(r.members()).hasSize(1);
+        assertThat(out.loses).isEmpty(); // 잃을 키워드가 없으니 키워드 잃기 요청은 없다
+        assertThat(out.texts).anyMatch(m -> "died".equals(m.get("type")) && "b".equals(m.get("by")));
+        assertThat(out.texts).anyMatch(m -> "kill".equals(m.get("type")) && "a".equals(m.get("target")));
+        assertThat(out.kills).containsExactly(2L); // 죽인 횟수 기록 요청(4.31)
+        assertThat(out.defeats).containsExactly(1L); // 진 사람의 패배 횟수 기록 요청(4.31)
+    }
+
+    @Test
+    void withKeywordsOrProtectionNobodyDies() {
+        Out out = new Out();
+        Room r = deathRoom(out, List.of(100L)); // 키워드가 있으면 하나 잃을 뿐
+        r.tick();
+        assertThat(r.byPlayer(1)).isNotNull();
+        assertThat(out.loses).hasSize(1);
+        Out out2 = new Out();
+        Room r2 = deathRoom(out2, List.of());
+        r2.byPlayer(1).protectUntil = 1e9; // 보호 중이면 죽지 않는다
+        r2.tick();
+        assertThat(r2.byPlayer(1)).isNotNull();
+        assertThat(out2.texts).noneMatch(m -> "died".equals(m.get("type")));
+    }
+
+    @Test
+    void flameKillsSomeoneWithNoKeywords() {
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        r.byPlayer(2).combo = 5; // 불꽃이 붙은 쪽이 이긴다
+        r.byPlayer(2).score = 0;
+        r.tick();
+        assertThat(r.byPlayer(1)).isNull();
+        assertThat(out.wipes).isEmpty();
+    }
+
+    @Test
+    void deadPlayerKeepsWatchingLiveRoomAndIsNotCountedAsSpectator() {
+        // 4.31: 죽은 뒤에도 방의 스냅샷을 계속 받아 움직임을 본다. 관리자 관전자 수에는 세지 않고, 리스폰하면 구경 목록에서 빠진다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        Room.Member a = r.byPlayer(1);
+        r.tick();
+        assertThat(a.dead).isTrue();
+        assertThat(r.spectators()).contains(a);
+        assertThat(r.spectatorCount()).isZero();
+        int before = out.snapshots;
+        for (int i = 0; i < 6; i++) r.tick();
+        assertThat(out.snapshots).isGreaterThan(before); // 스냅샷이 계속 간다
+        Room.Member again = r.join(1, "s1", "a", 1, 0, List.of());
+        assertThat(r.spectators()).doesNotContain(a).doesNotContain(again);
+    }
+
+    @Test
+    void botWithNoKeywordsDiesAndRespawnsInCenterAndKillIsRecorded() {
+        // 4.31: 봇도 키워드가 없는 채로 지면 죽고(죽인 사람에게 kill, 죽인 횟수 기록), 다음 봇 채우기에서 가운데 세이프존에 새 봇이 나온다
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member human = h[0], bot = botsOf(r).getFirst();
+        bot.botKeywords.clear();
+        bot.botExp = 0;
+        bot.score = 0; bot.radius = r.radiusFor(0); bot.displayRadius = bot.radius;
+        bot.protectUntil = 0; human.protectUntil = 0;
+        human.score = 500; human.radius = r.radiusFor(500); human.displayRadius = human.radius;
+        bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
+        r.tick();
+        assertThat(bot.dead).isTrue();
+        assertThat(r.members()).doesNotContain(bot);
+        assertThat(out.kills).containsExactly(human.playerId);
+        assertThat(out.defeats).isEmpty(); // 봇의 패배는 세지 않는다(사람만)
+        assertThat(out.texts).anyMatch(m -> "kill".equals(m.get("type")) && "Bot".equals(m.get("target")));
+        // 1초마다 봇을 채운다. 새 봇이 나온 그 틱에서 바로 자리를 본다(그 뒤로는 봇이 스스로 움직여 세이프존을 벗어날 수 있다)
+        Room.Member again = null;
+        for (int i = 0; i < 25 && again == null; i++) {
+            r.tick();
+            again = botsOf(r).stream().filter(x -> x != bot).findFirst().orElse(null);
+        }
+        assertThat(again).isNotNull();
+        assertThat(r.inSafeZone(again.x, again.y)).isTrue();
+        assertThat(again.protectUntil).isZero(); // 안전한 가운데에서 시작하므로 보호는 주지 않는다(4.31)
+    }
+
+    @Test
+    void respawnStartsInCenterSafeZoneWithoutProtection() {
+        // 4.31: 죽은 뒤 다시 들어오면 죽은 자리가 아니라 가운데 고정 세이프존에서 시작한다. 안전한 자리라 보호(무적)는 주지 않는다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        r.tick();
+        assertThat(r.byPlayer(1)).isNull();
+        Room.Member again = r.join(1, "s1", "a", 1, 0, List.of(), Room.Appearance.DEFAULT, true);
+        assertThat(again.dead).isFalse();
+        assertThat(r.inSafeZone(again.x, again.y)).isTrue();
+        assertThat(again.protectUntil).isZero();
     }
 
     @Test
@@ -133,33 +278,10 @@ class RoomTest {
 
     @Test
     void orbsSpawnUpToMax() {
-        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 5, 0.5, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100), new Out());
+        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 5, 0.5, 2.2, 5, 33, 0, 0, 1.5, 100), new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         for (int i = 0; i < 20 * 10; i++) r.tick(); // 10초
         assertThat(r.orbCount()).isEqualTo(5);
-    }
-
-    @Test
-    void rejoinWithinFiveMinutesKeepsLastPositionAndProtection() {
-        Room.Tuning withProtect = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 5, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
-        Room r = new Room(1, withProtect, new Out());
-        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
-        m.x = 321; m.y = -123;
-        double protectUntil = m.protectUntil;
-        r.leave(m);
-        for (int i = 0; i < 20 * 240; i++) r.tick(); // 4분 뒤 새로고침(기억하는 시간은 5분)
-
-        Room.Member back = r.join(1, "s2", "a", 1, 0, List.of());
-        assertThat(back.x).isEqualTo(321);
-        assertThat(back.y).isEqualTo(-123);
-        assertThat(back.protectUntil).isEqualTo(protectUntil); // 들어올 때 보호를 다시 받지 않는다
-
-        back.x = 321; back.y = -123;
-        r.leave(back);
-        for (int i = 0; i < 20 * 301; i++) r.tick(); // 5분이 지나면 새 자리
-        Room.Member later = r.join(1, "s3", "a", 1, 0, List.of());
-        assertThat(later.x != 321 || later.y != -123).isTrue();
-        assertThat(later.protectUntil).isGreaterThan(protectUntil);
     }
 
     @Test
@@ -200,6 +322,45 @@ class RoomTest {
     }
 
     @Test
+    void protectedCircleIsAGhostThatPassesThroughOthers() {
+        // 4.3: 무적(잃은 뒤·입장·리스폰 직후 보호)인 원은 유령처럼 충돌하지 않고 통과한다: 양쪽 모두 밀리거나 튕기지 않고, 싸움(키워드 잃기·죽음)도 없다
+        for (boolean protectBig : new boolean[]{false, true}) {
+            Out out = new Out();
+            Room r = fightRoom(out, 0, 0); // a(점수 10, 작음), b(점수 50, 큼), 겹쳐 있다
+            Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+            (protectBig ? b : a).protectUntil = 1e9;
+            double ax = a.x, ay = a.y, bx = b.x, by = b.y;
+            for (int i = 0; i < 3; i++) r.tick();
+            assertThat(a.x).isEqualTo(ax);
+            assertThat(a.y).isEqualTo(ay);
+            assertThat(b.x).isEqualTo(bx);
+            assertThat(b.y).isEqualTo(by);
+            assertThat(a.kbX).isZero();
+            assertThat(b.kbX).isZero();
+            assertThat(out.loses).isEmpty();
+            assertThat(out.texts).noneMatch(m -> "knock".equals(m.get("type")));
+        }
+    }
+
+    @Test
+    void smallFlameStaysPutAndBiggerNonFlameIsKnockedAway() {
+        // 4.25: 작은 불꽃이 큰 상대와 부딪히면 이기는 쪽은 불꽃이므로 물리도 같다: 불꽃은 제자리, 불꽃 아닌 쪽이 밀려나 튕긴다
+        Out out = new Out();
+        Room r = fightRoom(out, 5, 0); // a(점수 10, 작음, 불꽃), b(점수 50, 큼)
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        assertThat(b.displayRadius).isGreaterThan(a.displayRadius);
+        double ax = a.x, ay = a.y, bx = b.x;
+        r.tick();
+        assertThat(a.x).isEqualTo(ax); // 이긴 불꽃은 밀려나지 않는다
+        assertThat(a.y).isEqualTo(ay);
+        assertThat(b.x).isGreaterThan(bx); // 불꽃 아닌 쪽이 불꽃에서 멀어진다(b가 a의 오른쪽)
+        assertThat(b.kbX).isGreaterThan(0);
+        assertThat(a.kbX).isZero();
+        assertThat(out.wipes).hasSize(1);
+        assertThat(out.texts).anyMatch(m -> "knock".equals(m.get("type")));
+    }
+
+    @Test
     void bothFlameFallBackToScoreRule() {
         Out out = new Out();
         Room r = fightRoom(out, 5, 5);
@@ -217,9 +378,19 @@ class RoomTest {
         assertThat(out.loses).hasSize(1);
     }
 
+    /** 봇이 가질 🔥 키워드 목록(4.21): 번호 1~4, 유행도 30·40·20·10 */
+    static final List<Room.CatalogKw> CATALOG = List.of(new Room.CatalogKw(1, "k1", 30), new Room.CatalogKw(2, "k2", 40),
+            new Room.CatalogKw(3, "k3", 20), new Room.CatalogKw(4, "k4", 10));
+
+    private static Room botRoomOf(Room.Tuning tu, Out out) {
+        Room r = new Room(1, tu, out);
+        r.setKeywordCatalog(CATALOG);
+        return r;
+    }
+
     /** 사람 1명 + 봇 n명을 만들고, 봇들이 채워진 뒤 돌려준다. 사람은 멀리 두어 싸움에 끼지 않는다. */
     private static Room botRoom(Out out, int bots, Room.Member[] humanOut) {
-        Room r = new Room(1, withBots(1 + bots), out);
+        Room r = botRoomOf(withBots(1 + bots), out);
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member human = r.join(1, "s1", "사람", 1, 100, List.of(11L));
         for (int i = 0; i < 25 * bots; i++) r.tick();
@@ -237,7 +408,7 @@ class RoomTest {
         Room.Member[] h = new Room.Member[1];
         Room r = botRoom(out, 1, h);
         Room.Member human = h[0], bot = botsOf(r).getFirst();
-        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(30); bot.botKeywords.add(40);
+        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(new Room.BotKw(1)); bot.botKeywords.add(new Room.BotKw(2));
         bot.combo = 3;
         human.combo = 5;
         bot.score = 900; human.score = 100;
@@ -245,6 +416,7 @@ class RoomTest {
         r.tick();
         assertThat(bot.botKeywords).isEmpty();
         assertThat(out.wipes).isEmpty(); // 봇은 DB 키워드가 없어 방 안에서 처리한다
+        assertThat(out.steals).containsExactly(human.playerId); // 모두 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
         assertThat(human.combo).isEqualTo(6); // 봇을 이긴 것도 콤보(combo_bot_counts 기본 켜짐)
         assertThat(bot.combo).isZero();       // 잃은 봇의 콤보는 사라진다
         assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(2).equals(m.get("wiped")));
@@ -274,14 +446,66 @@ class RoomTest {
         Room.Member[] h = new Room.Member[1];
         Room r = botRoom(out, 1, h);
         Room.Member human = h[0], bot = botsOf(r).getFirst();
-        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(30);
+        bot.protectUntil = 0; bot.botKeywords.clear(); bot.botKeywords.add(new Room.BotKw(1));
         bot.combo = 4; human.combo = 0; // 불꽃 전(4)이라 점수 싸움이다. 지면 봇의 콤보가 사라진다
         bot.score = 10; human.score = 900;
         bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
         r.tick();
         assertThat(bot.combo).isZero();
         assertThat(out.botWinners).containsExactly(1L);
+        assertThat(out.botWinKeywords).containsExactly(1L); // 봇이 잃은 바로 그 키워드를 사람이 빼앗는다(4.21)
         assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "reset".equals(m.get("event")) && "Bot".equals(m.get("nickname")));
+    }
+
+    private static int snapshotCount(ByteBuffer b) { byte[] x = b.array(); return ((x[9] & 0xff) << 8) | (x[10] & 0xff); }
+
+    @Test
+    void snapshotsOnlyIncludeCirclesAroundEachPlayersView() {
+        // 관심 영역 전송(9.2): 사람마다 화면 둘레(보이는 범위 + 여유)의 원만 받는다. 내 원은 늘 들어가고, 전원이 범위 안이면 같은 배열을 나눠 쓴다. 표시 칸은 0
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
+        Room.Member c = r.join(3, "s3", "c", 1, 0, List.of());
+        a.x = 0; a.y = 0; b.x = 300; b.y = 0; c.x = 4000; c.y = 0;
+        for (int i = 0; i < 2; i++) r.tick();
+        // 기본 보이는 범위(5000)에서는 모두 보인다: 같은 배열
+        assertThat(out.sent).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(snapshotCount(out.sent.get(0))).isEqualTo(3);
+        assertThat(out.sent.get(0).array()).isSameAs(out.sent.get(1).array());
+        byte[] first = out.sent.get(0).array();
+        for (int i = 0; i < 3; i++) assertThat(first[11 + i * 23 + 22]).isZero();
+        // a가 좁은 범위(500)를 알리면 a는 가까운 b까지만 받고, 먼 c는 빠진다(내 원은 그대로)
+        out.sent.clear();
+        r.setView(a, 500, 500); // 여유를 더해도 약 1,050px
+        a.x = 0; b.x = 300; c.x = 4000;
+        for (int i = 0; i < 2; i++) r.tick();
+        assertThat(out.sent.stream().filter(x -> snapshotCount(x) == 2)).isNotEmpty();
+        assertThat(out.sent.stream().filter(x -> snapshotCount(x) == 3)).isNotEmpty(); // 범위를 알리지 않은 b·c는 여전히 모두 받는다
+        // 한도: 너무 작은 값은 300으로 맞춘다
+        r.setView(a, 1, 1);
+        assertThat(a.viewHalfW).isEqualTo(Room.VIEW_MIN);
+    }
+
+    @Test
+    void botKeywordsFollowCatalogAndBotTakesHumanKeyword() {
+        // 4.21: 봇의 키워드는 실제 키워드 번호이고 점수는 목록의 현재 유행도다. 목록에서 사라진 키워드는 봇도 잃고, 이긴 봇은 사람이 잃은 키워드를 가진다
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member bot = botsOf(r).getFirst();
+        bot.botExp = 0; bot.botKeywords.clear(); bot.botKeywords.add(new Room.BotKw(1));
+        r.setKeywordCatalog(List.of(new Room.CatalogKw(2, "k2", 40))); // 1번이 목록에서 사라졌다(비활성·금지)
+        assertThat(bot.botKeywords).isEmpty();
+        r.setKeywordCatalog(List.of(new Room.CatalogKw(1, "k1", 30), new Room.CatalogKw(3, "k3", 20)));
+        bot.botKeywords.clear();
+        r.botTakes(bot, 3);
+        r.botTakes(bot, 3);  // 이미 가졌으면 두 번 넣지 않는다
+        r.botTakes(bot, 99); // 목록에 없는 키워드는 가지지 않는다
+        assertThat(bot.botKeywords).extracting(Room.BotKw::id).containsExactly(3L);
+        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + 20); // 점수 = 키워드의 현재 유행도
+        r.setKeywordCatalog(List.of(new Room.CatalogKw(3, "k3", 35))); // 유행도가 바뀌면 봇 점수도 따라간다
+        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + 35);
     }
 
     @Test
@@ -294,13 +518,16 @@ class RoomTest {
         Room.Member win = bots.get(0), lose = bots.get(1);
         human.x = 5000; human.y = 5000;
         win.protectUntil = 0; lose.protectUntil = 0;
-        lose.botKeywords.clear(); lose.botKeywords.add(30);
+        lose.botKeywords.clear(); lose.botKeywords.add(new Room.BotKw(1));
+        win.botKeywords.clear();
         win.combo = 4; lose.combo = 3;
         win.score = 900; lose.score = 10;
         win.x = 800; win.y = 800; lose.x = 810; lose.y = 800;
         r.tick();
         assertThat(win.combo).isEqualTo(5); // 봇이 봇을 이겨도 콤보 +1(설정 켜짐), 불꽃이 붙는다
         assertThat(lose.combo).isZero();
+        assertThat(win.botKeywords).extracting(Room.BotKw::id).containsExactly(1L); // 이긴 봇이 진 봇의 키워드를 가져간다(4.21)
+        assertThat(lose.botKeywords).isEmpty();
         assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "start".equals(m.get("event")) && "Bot".equals(m.get("nickname")));
     }
 
@@ -428,7 +655,7 @@ class RoomTest {
     @Test
     void activeAreaScalesWithWorldSize() {
         // 적은 인원에서도 기준 맵 한 변의 1/4, 1000명이면 한 변 전체(4.2)
-        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100), new Out());
+        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100), new Out());
         assertThat(small.activeArea(1)).isEqualTo(6000);
         assertThat(small.activeArea(1000)).isEqualTo(24000);
         assertThat(new Room(1, T, new Out()).activeArea(1)).isEqualTo(3000);
@@ -437,19 +664,19 @@ class RoomTest {
     @Test
     void orbTargetFollowsArea() {
         // 3,000×3,000px에 20개였던 비율(밀도 2.2)을 넓이에 비례해 유지한다. 상한 orbMax를 넘지 않는다(4.20)
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
         Room r = new Room(1, tu, new Out());
         assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
         assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역(지금 최소)
         assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
-        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
+        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
         assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
     }
 
     @Test
     void orbsFillInBatches() {
         // 목표 79개면 간격마다 5%(4개)씩 생긴다
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 20, 50, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 0, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
         Room r = new Room(1, tu, new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         r.tick();
@@ -459,7 +686,7 @@ class RoomTest {
     static Room.Tuning withBots(int botPlayers) { return withBots(botPlayers, 0); }
 
     static Room.Tuning withBots(int botPlayers, int botMinPlayers) {
-        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, botPlayers, botMinPlayers, 1.5, 20, 50, 100);
+        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, botPlayers, botMinPlayers, 1.5, 100);
     }
 
     @Test
@@ -494,12 +721,12 @@ class RoomTest {
     @Test
     void botsFollowPlayerRulesAndCap() {
         // 봇도 유행도 = min(EXP, 100) + 키워드 점수 합, 레벨 = 레벨표(EXP), 사람 평균 × 1.5(이 테스트의 배수)를 넘지 않는다
-        Room r = new Room(1, withBots(10), new Out());
+        Room r = botRoomOf(withBots(10), new Out());
         r.join(1, "s1", "사람", 1, 400, List.of());
         for (int i = 0; i < 20 * 12; i++) r.tick();
         for (Room.Member b : r.members()) {
             if (!b.bot) continue;
-            int sum = b.botKeywords.stream().mapToInt(Integer::intValue).sum();
+            long sum = b.botKeywords.stream().mapToLong(k -> CATALOG.stream().filter(c -> c.id() == k.id()).findFirst().orElseThrow().value()).sum();
             assertThat(b.score).isEqualTo(Math.min(b.botExp, 100) + sum);
             assertThat(b.level).isEqualTo(Room.defaultLevelForExp(b.botExp));
             assertThat(b.score).isLessThanOrEqualTo(600); // 400 × 1.5
@@ -514,7 +741,7 @@ class RoomTest {
     @Test
     void humanLosesKeywordToBotAndBotLosesKeywordToHuman() {
         Out out = new Out();
-        Room r = new Room(1, withBots(2), out);
+        Room r = botRoomOf(withBots(2), out);
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member human = r.join(1, "s1", "사람", 1, 1000, List.of(11L));
         for (int i = 0; i < 25; i++) r.tick(); // 봇 하나가 들어온다
@@ -532,10 +759,10 @@ class RoomTest {
         // 사람이 더 크면 봇은 (메모리의) 키워드 하나를 잃는다
         // 1등(사람) 점수를 먼저 되돌린다. 100점이면 봇 상한이 150이라, 기다리는 동안 봇이 상한 정리로 바뀔 수 있다
         bot.x = -2500; bot.y = -2500; human.x = 2500; human.y = 2500;
-        human.score = 900; bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(30, 40)); bot.score = 80;
+        human.score = 900; bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(new Room.BotKw(1), new Room.BotKw(2))); bot.score = 80;
         for (int i = 0; i < 20; i++) r.tick(); // 같은 쌍 쿨다운이 지나게 떨어뜨려 기다린다
         bot.protectUntil = 0; human.protectUntil = 0;
-        bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(30, 40));
+        bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(new Room.BotKw(1), new Room.BotKw(2)));
         bot.score = 80; human.score = 900;
         bot.x = 2000; bot.y = 2000; human.x = 2010; human.y = 2000;
         r.tick();
@@ -571,7 +798,7 @@ class RoomTest {
 
     @Test
     void silentConnectionIsDroppedFromRoom() {
-        // 90초 동안 아무 메시지(ping 포함)도 없으면 방에서 빼고 연결을 닫는다. 메시지를 보내는 사람은 남는다
+        // 90초 동안 아무 메시지(ping 포함)도 없으면 연결을 닫고 끊긴 것으로 본다: 원은 남은 시간(60초) 동안 남았다가 빠진다(4.32). 메시지를 보내는 사람은 남는다
         long[] now = {1_000_000_000L};
         Out out = new Out();
         Room r = new Room(1, T, out, () -> now[0]);
@@ -580,6 +807,14 @@ class RoomTest {
         for (int i = 0; i < 20 * 95; i++) {
             now[0] += 50_000_000L;
             alive.lastHeardNanos = now[0]; // 2초마다 ping을 보내는 사람
+            r.tick();
+        }
+        assertThat(out.closed).containsExactly(1L);   // 90초가 지나 연결을 닫았고
+        assertThat(silent.offline).isTrue();          // 원은 아직 남아 있다
+        assertThat(r.members()).contains(silent, alive);
+        for (int i = 0; i < 20 * 65; i++) {           // 끊긴 뒤 60초가 지나면 진짜로 뺀다
+            now[0] += 50_000_000L;
+            alive.lastHeardNanos = now[0];
             r.tick();
         }
         assertThat(r.members()).containsExactly(alive);
@@ -605,11 +840,11 @@ class RoomTest {
     }
 
     @Test
-    void firstTimePlayerStartsInCenterZoneAndZonesAreSent() {
+    void everyJoinStartsInCenterZoneAndZonesAreSent() {
         Out out = new Out();
         Room r = new Room(1, T, out);
         for (int i = 0; i < 20; i++) {
-            Room.Member m = r.join(100 + i, "s" + i, "new", 1, 0, List.of(), true);
+            Room.Member m = r.join(100 + i, "s" + i, "new", 1, 0, List.of());
             assertThat(Math.abs(m.x)).isLessThanOrEqualTo(450); // 가운데 존 한 변 900px
             assertThat(Math.abs(m.y)).isLessThanOrEqualTo(450);
         }
@@ -649,7 +884,7 @@ class RoomTest {
     @Test
     void botCapIsAverageOfConnectedHumans() {
         // 봇 상한 = 접속 중인 사람 유행도 평균 × 배수(기본 1). 봇은 평균에 들어가지 않는다(4.21)
-        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, 10, 0, 1.0, 20, 50, 100);
+        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 3, 0, 0, 3, 2.2, 5, 100, 10, 0, 1.0, 100);
         Room r = new Room(1, avg, new Out());
         r.join(1, "s1", "작은", 1, 100, List.of());
         r.join(2, "s2", "큰", 1, 500, List.of());

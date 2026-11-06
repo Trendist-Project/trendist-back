@@ -72,7 +72,7 @@ public class PlayerServiceImpl implements PlayerService {
             // 장착한 꾸미기 프로필(4.9). 효과·그림은 로그인 사용자만 그린다
             var look = looks.equippedLook(p);
             return new JoinInfo(p.getId(), p.getCountry().getId(), p.getNickname(), Math.toIntExact(p.getLevel()), p.getCurrentScore(),
-                    p.getTotalPlusCount() == 0, title, look.toSkin(), look.trailEffect());
+                    title, look.toSkin(), look.trailEffect());
         });
     }
 
@@ -127,10 +127,42 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    @Transactional
+    public void recordKill(long playerId) {
+        players.findByIdForUpdate(playerId).ifPresent(this::awardKill);
+    }
+
+    @Override
+    @Transactional
+    public void recordSteal(long playerId) {
+        players.findByIdForUpdate(playerId).ifPresent(this::awardAttack);
+    }
+
+    @Override
+    @Transactional
+    public void recordDefeat(long playerId) {
+        if (players.incrementDefeatCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.31)
+    }
+
+    @Override
+    public void awardAttack(Player p) {
+        p.incSteal(); // 칭호(4.10)
+        p.addExp(settings.getInt(SettingKeys.ATTACK_EXP)); // 공격에 성공할 때마다 EXP(관리자 설정 attack_exp)
+        recompute(p); // 레벨·점수를 다시 정하고 방과 칭호 검사에 알린다
+    }
+
+    @Override
+    public void awardKill(Player p) {
+        p.incKill(); // 칭호(4.31)
+        p.addExp(settings.getInt(SettingKeys.KILL_EXP)); // 죽였을 때 EXP(관리자 설정 kill_exp)
+        recompute(p);
+    }
+
+    @Override
     public PlayerDtos.PlayerSummary summary(Player p) {
         return new PlayerDtos.PlayerSummary(p.getId(), p.getNickname(), p.getCountry().getCode(), p.getLevel(), p.getExp(),
                 levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getTotalPlusCount(),
-                p.getCommentScore(), p.getSearchCount(), changeableAt(p), p.getStealCount(), p.getBotWinCount(), p.getActiveDays());
+                p.getCommentScore(), p.getSearchCount(), changeableAt(p), p.getStealCount(), p.getBotWinCount(), p.getActiveDays(), p.getKillCount(), p.getDefeatCount());
     }
 
     @Override

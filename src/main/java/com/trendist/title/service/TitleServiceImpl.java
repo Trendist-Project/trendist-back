@@ -54,6 +54,23 @@ public class TitleServiceImpl implements TitleService {
     private final TransactionTemplate tx;
     private final SettingService settings;
 
+    @org.springframework.beans.factory.annotation.Value("${trendist.titles.sync-check:false}")
+    private boolean syncCheck;
+    private final java.util.Set<Long> pendingChecks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.concurrent.ExecutorService checker = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "title-check");
+        t.setDaemon(true);
+        return t;
+    });
+    /** 칭호 검사는 늘 새 트랜잭션에서 한다(커밋이 끝난 뒤의 이벤트 처리 중이어도 같은 트랜잭션에 끼지 않게) */
+    private TransactionTemplate newTx;
+
+    @jakarta.annotation.PostConstruct
+    void initNewTx() {
+        newTx = new TransactionTemplate(tx.getTransactionManager());
+        newTx.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
+    }
+
     /** 조건을 풀어 둔 칭호. target은 METRIC이면 기준값(gte), RANK면 순위(within). */
     private record Cond(Title title, String type, String metric, long target) {}
 
@@ -84,6 +101,8 @@ public class TitleServiceImpl implements TitleService {
             case "bot_win_count" -> p.getBotWinCount();
             case "orb_count" -> p.getOrbCount();
             case "lose_count" -> p.getLoseCount();
+            case "kill_count" -> p.getKillCount();
+            case "defeat_count" -> p.getDefeatCount();
             case "active_days" -> p.getActiveDays();
             default -> 0;
         };
@@ -131,16 +150,34 @@ public class TitleServiceImpl implements TitleService {
         return titles.findById(titleId).filter(Title::isEnabled).map(t -> t.name(lang)).orElse(null);
     }
 
-    /** 수치가 바뀐 트랜잭션이 끝난 뒤에 검사한다(커밋된 값으로). 칭호 검사가 실패해도 원래 요청에는 영향이 없다. */
+    /**
+     * 수치가 바뀐 트랜잭션이 끝난 뒤에 검사한다(커밋된 값으로). 칭호 검사가 실패해도 원래 요청에는 영향이 없다.
+     * 검사는 싸움·키워드 작업이 쥔 DB 연결과 겹치지 않게 별도 스레드 하나가 차례로 한다(예전에는 같은 스레드에서 두 번째 연결을 요구해, 연결을 쥔 작업이
+     * 풀 크기만큼 몰리면 서버가 멈췄다). 같은 플레이어의 검사가 줄에 이미 있으면 다시 넣지 않는다(몰려도 한 번만).
+     * 자동 테스트는 결과를 바로 보려고 `trendist.titles.sync-check=true`로 같은 스레드에서 바로 한다.
+     */
     @TransactionalEventListener(fallbackExecution = true)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(GameEvents.TitleCheck e) {
-        try { checkMetrics(e.playerId()); } catch (RuntimeException ex) { log.warn("title check {} failed", e.playerId(), ex); }
+        if (syncCheck) { runCheck(e.playerId()); return; }
+        if (!pendingChecks.add(e.playerId())) return;
+        checker.execute(() -> {
+            pendingChecks.remove(e.playerId()); // 지금부터 바뀌는 수치는 다음 검사에서 본다
+            runCheck(e.playerId());
+        });
     }
+
+    private void runCheck(long playerId) {
+        try { newTx.executeWithoutResult(st -> doCheck(playerId)); } catch (RuntimeException ex) { log.warn("title check {} failed", playerId, ex); }
+    }
+
+    @jakarta.annotation.PreDestroy
+    void stopChecker() { checker.shutdownNow(); }
 
     @Override
     @Transactional
-    public void checkMetrics(long playerId) {
+    public void checkMetrics(long playerId) { doCheck(playerId); }
+
+    private void doCheck(long playerId) {
         Player p = players.findById(playerId).orElse(null);
         if (p == null) return;
         List<Cond> reached = conditions().stream()
@@ -151,7 +188,7 @@ public class TitleServiceImpl implements TitleService {
     /**
      * RANK 칭호(4.10): 그 나라 리더보드(접속 중인 사람끼리의 순위, 4.14)를 10초마다 보고 N위 안의 사람에게 준다.
      * 리더보드는 방 메모리 값이라 DB를 보지 않는다. 혼자 있어도 1위가 되는 일을 막으려고, 접속 중인 사람이
-     * `rank_title_min_players`(기본 11명) 이상일 때만 준다.
+     * `rank_title_min_players`(기본 10명) 이상일 때만 준다.
      */
     @Scheduled(fixedDelay = 10_000, initialDelay = 15_000)
     public void checkRanks() {

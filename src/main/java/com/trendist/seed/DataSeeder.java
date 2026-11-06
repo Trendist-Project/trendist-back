@@ -222,10 +222,19 @@ public class DataSeeder implements ApplicationRunner {
      * 칭호 ID는 번역 키라서 넣는 순서를 고정한다: TITLES(1~22) 다음에 MORE_TITLES(23~51). 표시 순서(sort_order)는 TITLE_ORDER의 순서 × 10.
      */
     private int seedTitles() {
-        if (titles.count() > 0) return 0;
         int added = 0;
-        for (String[][] list : List.of(TITLES, MORE_TITLES)) {
-            for (String[] t : list) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        if (titles.count() == 0) {
+            for (String[][] list : List.of(TITLES, MORE_TITLES)) {
+                for (String[] t : list) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+            }
+        }
+        // 죽인 횟수 칭호(4.31): 나중에 추가했으므로 이미 있는 DB에도 한 번 넣는다. 죽인 횟수 칭호가 하나라도 있으면(관리자가 이름을 바꾸거나 지운 경우 포함) 다시 넣지 않는다
+        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("kill_count"))) {
+            for (String[] t : KILL_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        // 패배 횟수 칭호(4.31)도 같은 방식으로 한 번 넣는다
+        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("defeat_count"))) {
+            for (String[] t : DEFEAT_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
         return added;
     }
@@ -268,6 +277,24 @@ public class DataSeeder implements ApplicationRunner {
             {"키워드 신화", "키워드를 동시에 200개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":200}"},
     };
 
+    /** 죽인 횟수 칭호(4.31) 5개 */
+    private static final String[][] KILL_TITLES = {
+            {"첫 처치", "상대를 처음 쓰러뜨렸어요", "METRIC", "{\"metric\":\"kill_count\",\"gte\":1}"},
+            {"해결사", "상대를 10번 쓰러뜨렸어요", "METRIC", "{\"metric\":\"kill_count\",\"gte\":10}"},
+            {"저승사자", "상대를 50번 쓰러뜨렸어요", "METRIC", "{\"metric\":\"kill_count\",\"gte\":50}"},
+            {"아레나의 지배자", "상대를 200번 쓰러뜨렸어요", "METRIC", "{\"metric\":\"kill_count\",\"gte\":200}"},
+            {"최후의 승자", "상대를 1,000번 쓰러뜨렸어요", "METRIC", "{\"metric\":\"kill_count\",\"gte\":1000}"},
+    };
+
+    /** 패배 횟수 칭호(4.31) 5개: 지는 것을 비웃지 않고 다시 일어서는 것을 칭찬하는 이름 */
+    private static final String[][] DEFEAT_TITLES = {
+            {"첫 패배", "처음으로 패배했어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":1}"},
+            {"칠전팔기", "10번 패배하고도 다시 일어났어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":10}"},
+            {"백전노장", "50번 패배했지만 계속 도전해요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":50}"},
+            {"불사조", "200번 쓰러지고도 다시 날아올랐어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":200}"},
+            {"끝없는 도전자", "1,000번 패배해도 멈추지 않았어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":1000}"},
+    };
+
     /** 칭호함에 보이는 순서: 종류별로 쉬운 것부터 */
     private static final List<String> TITLE_ORDER = List.of(
             "트렌드 워처", "트렌드 탐험가", "트렌드 수집가", "트렌드 사냥꾼", "트렌드 장인", "트렌드 전설",
@@ -281,6 +308,8 @@ public class DataSeeder implements ApplicationRunner {
             "봇 사냥 입문", "봇 사냥꾼", "기계 파괴자",
             "행운 탐색자", "구슬 수집가", "구슬 마니아",
             "오뚝이", "불굴",
+            "첫 처치", "해결사", "저승사자", "아레나의 지배자", "최후의 승자",
+            "첫 패배", "칠전팔기", "백전노장", "불사조", "끝없는 도전자",
             "새내기", "단골", "터줏대감", "산증인");
 
     /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */
@@ -333,9 +362,9 @@ public class DataSeeder implements ApplicationRunner {
             {"떠오르는 별", "현재 유행도가 500에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":500}"},
             {"큰손", "현재 유행도가 1,000에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":1000}"},
             {"거인", "최대 크기(현재 유행도 2,000)에 도달했어요", "METRIC", "{\"metric\":\"current_score\",\"gte\":2000}"},
-            {"핫스타", "현재 유행도 TOP 10에 들었어요(접속자 11명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":10}"},
-            {"시상대", "현재 유행도 TOP 3에 들었어요(접속자 11명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":3}"},
-            {"정상", "현재 유행도 1위에 올랐어요(접속자 11명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":1}"},
+            {"핫스타", "현재 유행도 TOP 10에 들었어요(접속자 10명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":10}"},
+            {"시상대", "현재 유행도 TOP 3에 들었어요(접속자 10명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":3}"},
+            {"정상", "현재 유행도 1위에 올랐어요(접속자 10명 이상일 때)", "RANK", "{\"metric\":\"current_score\",\"within\":1}"},
             {"해설 새싹", "댓글 점수 10점을 모았어요", "METRIC", "{\"metric\":\"comment_score\",\"gte\":10}"},
             {"친절한 해설가", "댓글 점수 100점을 모았어요", "METRIC", "{\"metric\":\"comment_score\",\"gte\":100}"},
             {"해설 대장", "댓글 점수 500점을 모았어요", "METRIC", "{\"metric\":\"comment_score\",\"gte\":500}"},

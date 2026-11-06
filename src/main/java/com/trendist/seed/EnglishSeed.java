@@ -13,7 +13,7 @@ final class EnglishSeed {
 
     record Title(String nameEn, String descriptionEn) {}
 
-    /** 칭호 51개: 한국어 이름 → 영어 이름·설명 */
+    /** 칭호 61개: 한국어 이름 → 영어 이름·설명 */
     static final Map<String, Title> TITLES = Map.ofEntries(
             t("트렌드 워처", "Trend Watcher", "Added your first keyword"),
             t("트렌드 탐험가", "Trend Explorer", "Added 30 keywords"),
@@ -41,9 +41,9 @@ final class EnglishSeed {
             t("큰손", "High Roller", "Your trend score reached 1,000"),
             t("슈퍼스타", "Superstar", "Your trend score reached 1,500"),
             t("거인", "Giant", "Reached max size (trend score 2,000)"),
-            t("핫스타", "Hot Star", "Made the trend score TOP 10 (with 11 or more players online)"),
-            t("시상대", "Podium", "Made the trend score TOP 3 (with 11 or more players online)"),
-            t("정상", "Summit", "Reached #1 in trend score (with 11 or more players online)"),
+            t("핫스타", "Hot Star", "Made the trend score TOP 10 (with 10 or more players online)"),
+            t("시상대", "Podium", "Made the trend score TOP 3 (with 10 or more players online)"),
+            t("정상", "Summit", "Reached #1 in trend score (with 10 or more players online)"),
             t("첫 마디", "First Words", "Earned 1 comment point"),
             t("해설 새싹", "Commentary Sprout", "Earned 10 comment points"),
             t("친절한 해설가", "Friendly Commentator", "Earned 100 comment points"),
@@ -57,6 +57,16 @@ final class EnglishSeed {
             t("봇 사냥 입문", "Bot Hunting 101", "Beat a bot 10 times"),
             t("봇 사냥꾼", "Bot Hunter", "Beat a bot 100 times"),
             t("기계 파괴자", "Machine Breaker", "Beat a bot 500 times"),
+            t("첫 처치", "First Blood", "Took down an opponent for the first time"),
+            t("해결사", "Closer", "Took down opponents 10 times"),
+            t("저승사자", "Reaper", "Took down opponents 50 times"),
+            t("아레나의 지배자", "Arena Overlord", "Took down opponents 200 times"),
+            t("최후의 승자", "Last One Standing", "Took down opponents 1,000 times"),
+            t("첫 패배", "First Defeat", "Lost for the first time"),
+            t("칠전팔기", "Never Give Up", "Got back up after 10 defeats"),
+            t("백전노장", "Battle-Hardened", "Lost 50 times but keep challenging"),
+            t("불사조", "Phoenix", "Fell 200 times and rose again"),
+            t("끝없는 도전자", "Endless Challenger", "Kept going after 1,000 defeats"),
             t("행운 탐색자", "Lucky Seeker", "Ate 10 ? orbs"),
             t("구슬 수집가", "Orb Collector", "Ate 100 ? orbs"),
             t("구슬 마니아", "Orb Maniac", "Ate 1,000 ? orbs"),
@@ -261,7 +271,7 @@ final class EnglishSeed {
 
                             > The picture above shows the colors currently set in the game. These colors can change during operation."""),
                     new Article("Titles", """
-                            You receive titles automatically when you meet their conditions. There are 51 of them, covering adding keywords, levels, trend score, the leaderboard, comments, searching, stealing, bots, orbs, days played, and more.
+                            You receive titles automatically when you meet their conditions. They cover adding keywords, levels, trend score, the leaderboard, comments, searching, stealing, bots, orbs, knockouts, days played, and more.
 
                             - The moment you earn a title, a **🏅 New title alert** pops up at the top of the screen. It disappears on its own after 6 seconds, and pressing **Equip** puts that title right under your name.
                             - In **My info → 🏅 Titles** you can pick one of your titles and **equip** it. The equipped title shows at the top of the list as "Equipped", and appears in yellow under your nickname in the arena. **Unequip** it to hide it.

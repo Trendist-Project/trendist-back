@@ -385,9 +385,63 @@ class ApiFlowTest {
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
         java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
-        assertThat(all).hasSize(51);
+        assertThat(all).hasSize(61);
         // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
         assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
+    }
+
+    @Test
+    void killCountIsRecordedAndGrantsKillTitle() throws Exception {
+        // 4.31: 죽이면 죽인 횟수가 오르고 "첫 처치" 칭호를 받는다. 프로필에도 killCount가 보인다
+        String t = player("처치시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.killCount").value(0));
+        long expBeforeKill = playerRepo.findById(pid).orElseThrow().getExp();
+        playerService.recordKill(pid);
+        assertThat(playerRepo.findById(pid).orElseThrow().getKillCount()).isEqualTo(1);
+        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(expBeforeKill + 5); // 죽이면 EXP +kill_exp(기본 5)
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.killCount").value(1));
+        String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
+        assertThat(names).contains("첫 처치");
+    }
+
+    @Test
+    void defeatCountIsRecordedAndGrantsDefeatTitle() throws Exception {
+        // 4.31: 패배(키워드 없이 져서 죽음)하면 패배 횟수가 오르고 "첫 패배" 칭호를 받는다. 프로필에도 defeatCount가 보인다. EXP는 주지 않는다
+        String t = player("패배시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(0));
+        long exp0 = playerRepo.findById(pid).orElseThrow().getExp();
+        playerService.recordDefeat(pid);
+        assertThat(playerRepo.findById(pid).orElseThrow().getDefeatCount()).isEqualTo(1);
+        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0);
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(1));
+        String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
+        assertThat(names).contains("첫 패배");
+    }
+
+    @Test
+    void botWinGivesTheKeywordTheBotLost() throws Exception {
+        // 4.21: 봇을 이기면 봇이 잃은 바로 그 키워드를 얻는다(무작위가 아니라 지정). 목록(botCatalog)은 그 나라의 🔥 키워드다
+        keywordService.adminAdd("KR", "봇이잃은키워드");
+        String t = player("봇지정시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        long countryId = playerRepo.findById(pid).orElseThrow().getCountry().getId();
+        var picked = keywordService.botCatalog(countryId).stream().filter(k -> k.text().equals("봇이잃은키워드")).findFirst().orElseThrow();
+        long exp0 = playerRepo.findById(pid).orElseThrow().getExp();
+        var r = keywordService.gainFromBot(pid, picked.id());
+        assertThat(r.text()).isEqualTo("봇이잃은키워드");
+        // 봇도 빼앗기 대상이다: 봇을 이겨도 빼앗은 횟수 +1(4.3)
+        assertThat(playerRepo.findById(pid).orElseThrow().getStealCount()).isEqualTo(1);
+        assertThat(playerRepo.findById(pid).orElseThrow().getBotWinCount()).isEqualTo(1);
+        // 불꽃으로 모두 잃게 한 경우 등 방이 알리는 공격 성공도 한 번에 +1이고, 칭호 확인이 따라온다
+        // 공격 성공 EXP(attack_exp, 기본 1) + 새 키워드를 얻은 일반 추가 EXP(exp_per_plus, 기본 1)
+        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0 + 2);
+        playerService.recordSteal(pid);
+        assertThat(playerRepo.findById(pid).orElseThrow().getStealCount()).isEqualTo(2);
+        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0 + 3); // 공격 성공 한 번 = EXP +1
     }
 
     @Test

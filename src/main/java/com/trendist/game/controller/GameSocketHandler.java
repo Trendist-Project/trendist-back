@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 게임 WebSocket(9.2, 9.3). 토큰은 주소에 담지 않고 연결 직후 첫 메시지로 받는다. 5초 안에 인증하지 못하면 끊는다.
- * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, ping{t}, chat{text}, bye(페이지를 떠남),
+ * 클라이언트 → 서버(JSON): auth, input{dx,dy}, move{x,y}, view{hw,hh}(보이는 범위), ping{t}, chat{text}, respawn(죽은 뒤 다시 들어오기, 4.31), bye(페이지를 떠남),
  * spectate{token,country}(관리자 관전, 13.13: 원 없이 방의 스냅샷만 받고 입력은 모두 무시한다)
  * 서버 → 클라이언트: 바이너리 스냅샷·미니맵, JSON(welcome, tuning, roster, score, lost, pong, chat, chatHistory, chatError, safeZones)
  */
@@ -40,6 +40,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private static final String ATTR_SAFE = "safe";
     private static final String ATTR_INPUTS = "inputs";
     private static final String ATTR_SPECTATOR = "spectator";
+    private static final String ATTR_UID = "uid"; // 인증한 사용자 번호(다시 들어오기 = 리스폰에 쓴다, 4.31)
     private static final String ATTR_LANG = "lang"; // 인증 첫 메시지의 lang(ko|en). 이 연결에 보내는 문구의 언어
 
     private final JwtService jwt;
@@ -48,7 +49,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final KeywordService keywordService;
     private final ChatService chatService;
     private final RoomManager rooms;
-    private final com.trendist.game.service.RoomStateService roomStates;
     private final ObjectMapper json;
     private final com.trendist.user.service.SanctionService sanctionService;
     private final com.trendist.country.service.CountryService countries;
@@ -93,11 +93,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
             else if ("spectate".equals(type)) spectate(session, node.path("token").asString(""), node.path("country").asString("KR"));
             return;
         }
+        if (member.session != session.getAttributes().get(ATTR_SAFE)) return; // 같은 계정의 새 연결이 이 원을 이어받았다: 이전 연결의 메시지는 버린다(4.32)
         member.lastHeardNanos = System.nanoTime(); // 살아 있다는 표시(응답 없는 접속 정리에 쓴다)
         if ("bye".equals(type)) {
             // 페이지를 떠난다(구글 로그인으로 이동, 새로고침, 탭 닫기): 닫힘 신호를 기다리지 않고 바로 방에서 뺀다
             Room room = (Room) session.getAttributes().get(ATTR_ROOM);
-            if (room != null) room.submit(r -> r.leave(member));
+            if (room != null) room.submit(r -> r.disconnect(member, session.getAttributes().get(ATTR_SAFE))); // 원은 offline_keep_seconds 동안 남는다(4.32)
             close(session, CloseStatus.NORMAL);
             return;
         }
@@ -107,6 +108,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
             rooms.sendText(member, Map.of("type", "pong", "t", Double.isFinite(t) ? t : 0));
             return;
         }
+        if (member.dead && ("chat".equals(type) || "emote".equals(type))) return; // 죽은 동안은 말도 이모트도 보내지 않는다(4.31)
         if ("chat".equals(type)) { chat(session, member, node.path("text").asString("")); return; }
         if ("emote".equals(type)) {
             // 이모트(4.26): 정해진 코드만, 2초에 1번꼴(잠깐 몰려도 3번까지)
@@ -117,6 +119,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
             }
             return;
         }
+        if ("respawn".equals(type)) {
+            // 리스폰(4.31): 죽은 상태에서만 받는다. 방은 죽은 사람이 다시 들어오면 가운데 세이프존에서 시작하게 한다
+            if (member.dead && allowInput(session, type) && session.getAttributes().get(ATTR_UID) instanceof Long uid) join(session, uid, true);
+            return;
+        }
+        if (member.dead) return; // 죽은 동안에는 다른 입력을 받지 않는다
         if (!allowInput(session, type)) return;
         long receivedNanos = System.nanoTime(); // 방은 이 시점부터 조작을 적용한다(틱 경계로 반올림하지 않는다)
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
@@ -126,6 +134,10 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 room.submit(r -> r.setInput(member, dx, dy, receivedNanos));
             }
             case "dash" -> room.submit(r -> r.dash(member)); // 대시(4.27). 쿨타임·움직이는 중인지는 방이 본다
+            case "view" -> { // 내 화면에 보이는 세계 범위(관심 영역 전송, 9.2): 가로·세로 절반(px). 방이 범위를 다듬어 쓴다
+                double hw = node.path("hw").asDouble(0), hh = node.path("hh").asDouble(0);
+                if (Double.isFinite(hw) && Double.isFinite(hh) && hw > 0 && hh > 0) room.submit(r -> r.setView(member, hw, hh));
+            }
             case "move" -> {
                 double x = node.path("x").asDouble(0), y = node.path("y").asDouble(0);
                 if (Double.isFinite(x) && Double.isFinite(y)) room.submit(r -> r.setTarget(member, x, y, receivedNanos));
@@ -162,19 +174,24 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private void authenticate(WebSocketSession session, String token) {
         Optional<Long> uid = jwt.verify(token).filter(guard::accepts).map(JwtService.Verified::userId);
         if (uid.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("AUTH_FAILED")); return; }
+        session.getAttributes().put(ATTR_UID, uid.get());
+        join(session, uid.get(), false);
+    }
+
+    /** 방에 들어간다(접속과 리스폰이 같은 길, respawn이면 입장 보호를 주지 않는다). 들어가면 welcome을 보낸다. */
+    private void join(WebSocketSession session, long userId, boolean respawn) {
         rooms.submitWork(() -> {
             try {
-                Optional<PlayerService.JoinInfo> info = playerService.joinInfo(uid.get());
+                Optional<PlayerService.JoinInfo> info = playerService.joinInfo(userId);
                 if (info.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("NO_PLAYER")); return; }
                 PlayerService.JoinInfo player = info.get();
                 List<Long> keywordIds = keywordService.activeKeywordIds(player.playerId());
                 Room room = rooms.room(player.countryId());
-                Room.Resume resume = roomStates.position(player.playerId()).orElse(null); // 서버를 다시 켠 뒤라면 저장해 둔 마지막 위치
                 WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
                 room.submit(r -> {
                     if (!session.isOpen()) return;
-                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds, player.firstTime(),
-                            new Room.Appearance(player.title(), player.skin(), player.trail()), resume);
+                    Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds,
+                            new Room.Appearance(player.title(), player.skin(), player.trail()), respawn);
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),
@@ -280,7 +297,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         Room room = (Room) session.getAttributes().get(ATTR_ROOM);
         Room.Member m = (Room.Member) session.getAttributes().get(ATTR_MEMBER);
         Room.Member sp = (Room.Member) session.getAttributes().get(ATTR_SPECTATOR);
-        if (room != null && m != null) room.submit(r -> r.leave(m));
+        if (room != null && m != null) room.submit(r -> r.disconnect(m, session.getAttributes().get(ATTR_SAFE))); // 원은 offline_keep_seconds 동안 남는다(4.32)
         if (room != null && sp != null) room.submit(r -> r.removeSpectator(sp));
     }
 

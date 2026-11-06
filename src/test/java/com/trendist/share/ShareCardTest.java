@@ -160,7 +160,9 @@ class ShareCardTest {
         String body = mvc.perform(get("/api/admin/share-cards?sort=createdAt").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat((Integer) JsonPath.read(body, "$.cards")).isGreaterThanOrEqualTo(1);
-        assertThat((String) JsonPath.read(body, "$.items[0].nickname")).isEqualTo("통계");
+        // 같은 초에 만든 카드끼리는 정렬 순서가 정해져 있지 않으므로, 첫 항목이 아니라 목록 안에 있는지로 확인한다
+        java.util.List<String> nicknames = JsonPath.read(body, "$.items[*].nickname");
+        assertThat(nicknames).contains("통계");
     }
 
     /** JWT의 sub(users.id) */

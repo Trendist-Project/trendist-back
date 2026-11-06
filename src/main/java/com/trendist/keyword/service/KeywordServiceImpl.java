@@ -233,17 +233,36 @@ public class KeywordServiceImpl implements KeywordService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<BotKeyword> botCatalog(long countryId) {
+        List<BotKeyword> out = new ArrayList<>();
+        for (Object[] r : keywords.findCatalogRows(countryId, codes.keywordStateId(CodeTables.KW_ACTIVE))) {
+            out.add(new BotKeyword(((Number) r[0]).longValue(), (String) r[1], ((Number) r[2]).longValue()));
+        }
+        return out;
+    }
+
+    @Override
     @Transactional
-    public KeywordDtos.OrbResult gainFromBot(long playerId) {
+    public KeywordDtos.OrbResult gainFromBot(long playerId) { return gainFromBot(playerId, null); }
+
+    @Override
+    @Transactional
+    public KeywordDtos.OrbResult gainFromBot(long playerId, long keywordId) { return gainFromBot(playerId, Long.valueOf(keywordId)); }
+
+    private KeywordDtos.OrbResult gainFromBot(long playerId, Long botKeywordId) {
         Player p = players.findByIdForUpdate(playerId).orElse(null);
         if (p == null) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
         p.incBotWin(); // 칭호(4.10)
+        playerService.awardAttack(p); // 봇도 빼앗기 대상이다: 공격에 성공했으니 빼앗은 횟수 +1과 공격 성공 EXP(4.3)
         events.publishEvent(new GameEvents.TitleCheck(p.getId()));
         Instant now = Instant.now(clock);
         // 구슬과 달리 꽝이 없다. 🔥 키워드 전체에서 고른다
         List<Long> ids = keywords.findIdsByCountryAndState(p.getCountry().getId(), codes.keywordStateId(CodeTables.KW_ACTIVE));
         if (ids.isEmpty()) return new KeywordDtos.OrbResult("NONE", null, null, null, 0, null, null);
-        Keyword k = keywords.findByIdForUpdate(ids.get(ThreadLocalRandom.current().nextInt(ids.size()))).orElseThrow();
+        // 봇이 잃은 그 키워드를 준다. 그 사이 🔥가 아니게 됐으면(비활성·금지) 무작위 🔥 키워드로 대신한다
+        Long pick = botKeywordId != null && ids.contains(botKeywordId) ? botKeywordId : ids.get(ThreadLocalRandom.current().nextInt(ids.size()));
+        Keyword k = keywords.findByIdForUpdate(pick).orElseThrow();
         Optional<PlayerKeyword> existing = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()); // 만료됐지만 아직 안 지운 행일 수도 있다
         if (existing.isPresent() && !existing.get().isExpired(now)) {
             // 이미 가진 키워드: 사람에게서 빼앗을 때와 같이 남은 시간만 지금부터 다시 24시간(4.3)
@@ -528,7 +547,7 @@ public class KeywordServiceImpl implements KeywordService {
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
         p.incLose(); // 칭호(4.10). removeHolding이 재합산하며 칭호를 검사한다
         removeHolding(p, keywordId, now);
-        return Optional.of(new LostKeyword(text, score));
+        return Optional.of(new LostKeyword(keywordId, text, score));
     }
 
     @Override
@@ -574,8 +593,7 @@ public class KeywordServiceImpl implements KeywordService {
         playerKeywords.flush();
         loser.incLose(); // 칭호(4.10)
         activity.add(loser.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
-        winner.incSteal();
-        events.publishEvent(new GameEvents.TitleCheck(winner.getId()));
+        playerService.awardAttack(winner); // 빼앗은 횟수 +1과 공격 성공 EXP(4.3). 점수·레벨을 다시 정하고 칭호를 확인한다
         removeHolding(loser, keywordId, now);
 
         Keyword k = keywords.findByIdForUpdate(keywordId).orElseThrow();

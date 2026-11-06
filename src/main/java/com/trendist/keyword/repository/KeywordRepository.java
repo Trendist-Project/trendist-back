@@ -93,6 +93,10 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     List<Object[]> countByStateForAdmin(@Param("countryId") Long countryId, @Param("anySource") boolean anySource,
                                         @Param("sourceIds") List<Long> sourceIds, @Param("q") String q);
 
+    /** 그 나라의 한 상태 키워드의 번호·이름·유행도(봇이 가질 키워드 목록, 4.21). */
+    @Query("select k.id, k.text, k.trendValue from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId")
+    List<Object[]> findCatalogRows(@Param("countryId") Long countryId, @Param("stateId") Long stateId);
+
     /** 그 나라의 한 상태 키워드 번호(구슬 보상 추첨). */
     @Query("select k.id from Keyword k where k.country.id = :countryId and k.keywordState.id = :stateId")
     List<Long> findIdsByCountryAndState(@Param("countryId") Long countryId, @Param("stateId") Long stateId);

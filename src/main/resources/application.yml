@@ -7,6 +7,12 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    hikari:
+      # DB 연결 풀(기본값은 10). 같은 DB를 다른 앱도 쓰므로 합이 max_connections(151)의 60~70%를 넘지 않게 한다.
+      # 운영 DB에서 사용한 최대 연결이 69였으므로 20으로 올려도 최악 79(52%). 환경 변수로 바꿀 수 있다
+      maximum-pool-size: ${HIKARI_MAX_POOL:20}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
   jpa:
     open-in-view: false
     hibernate:

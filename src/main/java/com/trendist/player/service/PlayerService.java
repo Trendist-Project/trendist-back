@@ -8,9 +8,8 @@ import java.util.Optional;
 public interface PlayerService {
 
     /** 방 입장에 필요한 값(트랜잭션 안에서 꺼낸다). */
-    /** firstTime: 아직 키워드를 한 번도 추가하지 않은 처음 온 플레이어. 가운데 세이프존에서 시작한다(4.22). */
     /** title·skin·trail은 이름표 아래 칭호, 원의 꾸미기, 이동 효과 코드(4.9, 4.10, 4.23). */
-    record JoinInfo(long playerId, long countryId, String nickname, int level, double score, boolean firstTime,
+    record JoinInfo(long playerId, long countryId, String nickname, int level, double score,
                     String title, com.trendist.game.room.Room.Skin skin, String trail) {}
 
     /** 사용자의 현재 나라 플레이어. 마지막으로 플레이한 나라, 없으면 KR. */
@@ -46,4 +45,19 @@ public interface PlayerService {
 
     /** 다른 트랜잭션에서 한 플레이어를 잠그고 다시 합산한다(재합산 잡, 전체 점검). */
     void recomputeLocked(long playerId, boolean fixHoldCount);
+
+    /** 죽였다(4.31): 죽인 횟수 +1 하고 칭호를 확인한다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    void recordKill(long playerId);
+
+    /** 공격에 성공했다(4.3): 빼앗은 횟수 +1(불꽃으로 키워드를 모두 잃게 해도 1). 칭호를 확인한다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    void recordSteal(long playerId);
+
+    /** 행을 이미 잠근 트랜잭션 안에서: 공격 성공 1회(빼앗은 횟수 +1, EXP `attack_exp`)를 반영하고 점수·레벨을 다시 정한다(4.3). */
+    void awardAttack(Player p);
+
+    /** 패배했다(키워드가 없는 채로 져서 죽음, 4.31): 패배 횟수 +1 하고 칭호를 확인한다. 행을 잠그지 않는다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    void recordDefeat(long playerId);
+
+    /** 행을 이미 잠근 트랜잭션 안에서: 죽였다(죽인 횟수 +1, EXP `kill_exp`)를 반영하고 점수·레벨을 다시 정한다(4.31). */
+    void awardKill(Player p);
 }

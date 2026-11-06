@@ -19,7 +19,7 @@ public final class AdminUserDtos {
 
     /** 플레이어 누적 수치 */
     public record Stats(long exp, long level, long score, long holdCount, long totalPlusCount, long searchCount, long commentScore,
-                        long stealCount, long botWinCount, long orbCount, long loseCount, long activeDays,
+                        long stealCount, long botWinCount, long orbCount, long loseCount, long activeDays, long killCount, long defeatCount,
                         long titleCount, String title, long commentCount, long chatCount) {}
 
     public record CommentLine(long id, String keyword, String body, long likes, long dislikes, boolean deleted, Instant createdAt) {}

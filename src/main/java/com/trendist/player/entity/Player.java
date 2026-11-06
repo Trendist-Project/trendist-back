@@ -48,6 +48,10 @@ public class Player extends BaseTimeEntity {
     @Column(name = "orb_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long orbCount;
     /** 충돌로 키워드를 잃은 횟수(4.3) */
     @Column(name = "lose_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long loseCount;
+    /** 죽인 횟수: 키워드가 없는 사람·봇을 쓰러뜨린 횟수(4.31) */
+    @Column(name = "kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long killCount;
+    /** 패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 4.31) */
+    @Column(name = "defeat_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long defeatCount;
     /** 키워드를 얻은 날의 수(나라 시간대 기준으로 서로 다른 날, 처음 만든 날 포함) */
     @Column(name = "active_days", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long activeDays;
 
@@ -76,6 +80,7 @@ public class Player extends BaseTimeEntity {
     public void incBotWin() { this.botWinCount++; }
     public void incOrb() { this.orbCount++; }
     public void incLose() { this.loseCount++; }
+    public void incKill() { this.killCount++; }
     /** 활성 칭호(4.10). null이면 숨김. 가진 칭호인지는 서비스가 확인한다. */
     public void changeTitle(Long titleId) { this.titleId = titleId; }
 

@@ -130,6 +130,8 @@ CREATE TABLE players (
   search_count        BIGINT NOT NULL DEFAULT 0 COMMENT '누적 검색 횟수(검색할 때마다 +1, 줄지 않음)',
   steal_count         BIGINT NOT NULL DEFAULT 0 COMMENT '다른 플레이어에게서 키워드를 빼앗은 횟수(칭호용, 줄지 않음)',
   bot_win_count       BIGINT NOT NULL DEFAULT 0 COMMENT '봇을 이겨 보상을 받은 횟수(칭호용)',
+  kill_count          BIGINT NOT NULL DEFAULT 0 COMMENT '상대(사람·봇)를 죽인 횟수(칭호용, 4.31)',
+  defeat_count        BIGINT NOT NULL DEFAULT 0 COMMENT '패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 칭호용, 4.31)',
   orb_count           BIGINT NOT NULL DEFAULT 0 COMMENT '? 구슬을 먹은 횟수(꽝 포함, 칭호용)',
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
   active_days         BIGINT NOT NULL DEFAULT 0 COMMENT '플레이한 날의 수(만든 날·키워드를 얻은 날, 나라 시간대 기준, 칭호용)',
@@ -629,27 +631,3 @@ CREATE TABLE setting_histories (
   KEY idx_sh_setting (setting_id, created_at),
   CONSTRAINT fk_sh_setting FOREIGN KEY (setting_id) REFERENCES settings (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정 변경 이력';
-
-CREATE TABLE player_positions (
-  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '위치 ID',
-  player_id  BIGINT NOT NULL COMMENT '플레이어(players)',
-  x          DOUBLE NOT NULL COMMENT '마지막 위치 x(px, 맵 가운데가 0)',
-  y          DOUBLE NOT NULL COMMENT '마지막 위치 y(px)',
-  saved_at   DATETIME(6) NOT NULL COMMENT '이 위치에 있던 시각(5분이 지나면 쓰지 않는다)',
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
-  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
-  PRIMARY KEY (id),
-  UNIQUE KEY uk_player_positions_player (player_id),
-  KEY idx_player_positions_saved (saved_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어 마지막 위치(서버를 다시 켜도 이어 가기, 9.2)';
-
-CREATE TABLE room_states (
-  id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '방 상태 ID',
-  country_id  BIGINT NOT NULL COMMENT '나라(countries)',
-  active_area DOUBLE NOT NULL COMMENT '활동 영역 한 변(px)',
-  saved_at    DATETIME(6) NOT NULL COMMENT '저장 시각(5분이 지나면 쓰지 않는다)',
-  created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
-  updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
-  PRIMARY KEY (id),
-  UNIQUE KEY uk_room_states_country (country_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='방(나라) 저장 상태(활동 영역, 9.2)';
