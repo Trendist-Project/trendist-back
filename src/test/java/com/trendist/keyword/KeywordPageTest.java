@@ -54,6 +54,7 @@ class KeywordPageTest {
         // 게임 안 키워드 팝업과 같은 구성: 제목 줄, 상태·점수 영역, 통계 칸, 기간 탭(24시간·7일·30일·180일) 그래프
         assertThat(page).contains("class=\"modal keyword-modal\"").contains("class=\"kw-hero\"").contains("class=\"kw-stats\"")
                 .contains("rng-24h").contains("rng-7d").contains("rng-30d").contains("rng-180d").contains("게임에서 추가");
+        assertThat(page).contains("googletagmanager.com/gtm.js").contains("ns.html?id=GTM-WRFP5PLN"); // 방문 분석
         // 다른 서버의 같은 주소는 다른 키워드(없음)
         mvc.perform(get("/global/keywords/{k}", "소소한페이지키워드")).andExpect(status().isNotFound());
         String missing = mvc.perform(get("/kr/keywords/{k}", "없는키워드zzz")).andExpect(status().isNotFound())

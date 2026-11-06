@@ -45,9 +45,10 @@ public final class SharePage {
                 <!doctype html>
                 <html lang="%6$s">
                 <head>
+                %9$s
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
-                <meta name="robots" content="noindex">
+                <meta name="robots" content="index,follow">
                 <title>%1$s · Trendist</title>
                 <meta name="description" content="%2$s">
                 <meta property="og:type" content="website">
@@ -64,7 +65,9 @@ public final class SharePage {
                 <meta name="twitter:description" content="%2$s">
                 <meta name="twitter:image" content="%4$s">
                 <link rel="canonical" href="%3$s">
-                <link rel="icon" href="/favicon.ico">
+                <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+                <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+                <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">
                 <style>
                   body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
                     padding:24px 16px;box-sizing:border-box;background:#0d1420;color:#e8eef6;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif}
@@ -75,6 +78,7 @@ public final class SharePage {
                 </style>
                 </head>
                 <body>
+                %10$s
                 <img src="%4$s" width="1080" height="1350" alt="%1$s">
                 <a class="play" href="%5$s">%7$s</a>
                 <p>%8$s</p>
@@ -82,7 +86,8 @@ public final class SharePage {
                 </html>
                 """.formatted(t, desc, escape(url), escape(image), escape(play), d.english() ? "en" : "ko",
                         d.english() ? "Play now" : "플레이 하러 가기",
-                        d.english() ? "Know the trend. Grow bigger. Trendist" : "트랜드를 아는 자, 커진다. Trendist");
+                        d.english() ? "Know the trend. Grow bigger. Trendist" : "트랜드를 아는 자, 커진다. Trendist",
+                        com.trendist.common.support.AnalyticsTag.HEAD, com.trendist.common.support.AnalyticsTag.BODY);
     }
 
     public static String notFound(String baseUrl) {

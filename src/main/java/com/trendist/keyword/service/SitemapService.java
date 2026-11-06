@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 사이트맵 `/sitemap.xml`(4.28): 메인 주소와 금지가 아닌 모든 키워드 페이지를 한 파일로 만든다.
+ * 사이트맵 `/sitemap.xml`(4.28): 메인 주소, 금지가 아닌 모든 키워드 페이지, 공유 페이지(/share/코드)를 한 파일로 만든다.
  * 키워드가 생길 때마다 파일을 고치는 대신 요청이 오면 DB에서 바로 만들고 5분 캐시한다.
  * 그래서 새 키워드는 최대 5분 안에 들어가고, 금지된 키워드는 5분 안에 빠진다.
  * 사이트맵 한 파일의 상한(5만 주소)을 넘으면 가장 최근에 만든 키워드부터 {@value #MAX_URLS}개만 담는다.
@@ -35,13 +35,15 @@ public class SitemapService {
     private final KeywordRepository keywords;
     private final CountryRepository countries;
     private final CodeTables codes;
+    private final com.trendist.share.repository.ShareCardRepository shareCards;
     private final String baseUrl;
     private final Cache<String, String> cache = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(5)).maximumSize(1).build();
 
     private final BannedWordFilter bannedWords;
 
-    public SitemapService(KeywordRepository keywords, CountryRepository countries, CodeTables codes, BannedWordFilter bannedWords, AppProperties props) {
-        this.keywords = keywords; this.countries = countries; this.codes = codes; this.bannedWords = bannedWords;
+    public SitemapService(KeywordRepository keywords, CountryRepository countries, CodeTables codes, BannedWordFilter bannedWords, AppProperties props,
+                          com.trendist.share.repository.ShareCardRepository shareCards) {
+        this.shareCards = shareCards; this.keywords = keywords; this.countries = countries; this.codes = codes; this.bannedWords = bannedWords;
         this.baseUrl = props.share() == null ? new AppProperties.Share(null).baseUrl() : props.share().baseUrl();
     }
 
@@ -66,6 +68,12 @@ public class SitemapService {
                     b.append("  <url><loc>").append(loc).append("</loc><lastmod>").append(lastmod).append("</lastmod></url>\n");
                 }
                 remaining -= rows.size();
+            }
+            if (remaining > 0) { // 남는 자리에 공유 페이지(/share/코드)를 최근 것부터 담는다
+                for (Object[] r : shareCards.findSitemapRows(PageRequest.of(0, remaining))) {
+                    String lastmod = ((Instant) r[1]).truncatedTo(ChronoUnit.SECONDS).toString();
+                    b.append("  <url><loc>").append(baseUrl).append("/share/").append(r[0]).append("</loc><lastmod>").append(lastmod).append("</lastmod></url>\n");
+                }
             }
             return b.append("</urlset>\n").toString();
         });

@@ -32,6 +32,7 @@ class ShareCardTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ShareCardRenderer renderer;
+    @Autowired com.trendist.keyword.service.SitemapService sitemapService;
 
     private String player(String nickname) throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
@@ -63,6 +64,12 @@ class ShareCardTest {
                 .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(html).contains("<meta property=\"og:image\" content=\"http://localhost:8080/share/" + code + "/card.png\">")
                 .contains("공유왕의 트렌드 성적표").contains("/share/" + code + "/play");
+        // 검색 수집(index)과 방문 분석(GTM)
+        assertThat(html).contains("content=\"index,follow\"").doesNotContain("noindex").contains("googletagmanager.com/gtm.js").contains("GTM-WRFP5PLN").contains("ns.html?id=GTM-WRFP5PLN");
+        // 사이트맵에도 들어간다(5분 캐시를 비우고 확인)
+        sitemapService.onChanged(null);
+        assertThat(mvc.perform(get("/sitemap.xml")).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
+                .contains("<loc>http://localhost:8080/share/" + code + "</loc>");
 
         byte[] png = mvc.perform(get("/share/" + code + "/card.png")).andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "image/png"))

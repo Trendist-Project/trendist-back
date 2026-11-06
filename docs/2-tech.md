@@ -206,7 +206,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /share/{code}/play` | [플레이 하러 가기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
 | `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
 | `GET /{kr\|global}/keywords/{slug}` | 공개 키워드 페이지 HTML(로그인 없음, 4.28). 금지·없는 키워드는 404. 열 때마다 조회수를 세므로 `no-cache` |
-| `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소와 금지가 아닌 모든 키워드 페이지를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
+| `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소, 금지가 아닌 모든 키워드 페이지, 공유 페이지(`/share/{코드}`)를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
 | `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
 
@@ -464,7 +464,7 @@ java {
 - 검색엔진 최적화: 메인 `index.html`의 description·canonical·`og:`·twitter 메타(이미지는 절대 주소), `public/robots.txt`(`/admin/`·`/api/` 제외, `/share/`는 미리보기 수집기를 위해 막지 않음), `public/sitemap.xml`(메인 주소), `<noscript>` 소개 본문. 관리자 화면 `admin/index.html`은 `noindex, nofollow`. 공유 카드 페이지는 카드별 `og:` 태그와 `noindex`를 백엔드가 만든다(4.24). 서버 렌더링은 쓰지 않는다(로그인 없는 캔버스 게임이라 검색 노출 대상이 메인 화면뿐).
 - 공개 키워드 페이지·사이트맵(4.28): `/kr/keywords/**`, `/global/keywords/**`, `/sitemap.xml`은 백엔드가 준다. **운영 nginx에 `location ~ ^/(kr|global)/keywords/ { proxy_pass http://trendist-back:4001; }`와 `location = /sitemap.xml { proxy_pass http://trendist-back:4001; }`를 `/share/`와 같은 헤더(Host·X-Forwarded)로 추가해야 한다.** `location =`가 정적 파일(`root`)보다 먼저 맞으므로 남은 정적 `sitemap.xml`보다 우선하지만, 혼란을 막으려고 프론트의 `public/sitemap.xml`은 지웠다. 로컬은 Vite가 같은 주소를 백엔드로 넘긴다(`vite.config.ts`). 사이트 주소는 `trendist.share.base-url`을 쓴다. 이미 제출한 `https://trendist.kr/sitemap.xml`은 그대로 쓰면 되고, 새로 제출할 주소는 없다.
 - DB 마이그레이션(Flyway, 11.3): 의존성 `spring-boot-starter-flyway`·`flyway-mysql`. 운영 배포 전에 **DB를 백업**한다(처음 Flyway가 켜지면 `flyway_schema_history`가 새로 생기고 V2가 운영 DB에 적용된다). 마이그레이션이 실패하면 애플리케이션이 시작하지 않는다(단일 컨테이너 중단 배포라 이전 컨테이너가 이미 내려가 있다).
-- 접속 분석: 메인 `index.html`의 `<head>` 바로 다음에 Google 태그(GTM-WRFP5PLN)를 한 번 둔다. 관리자 화면(`admin/`)과 백엔드가 그리는 공유 카드 페이지(`/share/`)에는 넣지 않는다(운영자 접속이 수치에 섞이지 않게 하고, 공유 유입 분석은 자체 공유 통계로 본다, 13.8).
+- 접속 분석: 메인 `index.html`의 `<head>` 바로 다음에 Google 태그(GTM-WRFP5PLN)를 한 번 둔다. 백엔드가 그리는 공개 페이지(키워드 페이지 `/kr/keywords/…`·`/global/keywords/…`, 공유 카드 페이지 `/share/{코드}`)에는 표준 GTM 코드(`<head>` 스크립트와 `<body>` `<noscript>`, `AnalyticsTag`)를 같은 컨테이너로 넣어 검색에서 들어온 방문도 한곳에서 본다(2026-11-06). 관리자 화면(`admin/`)에는 넣지 않는다(운영자 접속이 수치에 섞이지 않게). 공유 유입은 자체 공유 통계로도 본다(13.8).
 - 자랑하기 카드 공유 주소(4.24): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.

@@ -43,4 +43,8 @@ public interface ShareCardRepository extends JpaRepository<ShareCard, Long> {
 
     @Query(value = "select c from ShareCard c join fetch c.player", countQuery = "select count(c) from ShareCard c")
     Page<ShareCard> findPage(Pageable pageable);
+
+    /** 사이트맵용(4.28): 최근 카드부터 [코드, 만든 시각] */
+    @Query("select c.code, c.createdAt from ShareCard c order by c.id desc")
+    java.util.List<Object[]> findSitemapRows(Pageable pageable);
 }

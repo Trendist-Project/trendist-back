@@ -143,6 +143,7 @@ public final class KeywordPage {
                 <!doctype html>
                 <html lang="@@LANG@@">
                 <head>
+                @@GTM_HEAD@@
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="robots" content="index,follow">
@@ -158,10 +159,13 @@ public final class KeywordPage {
                 <meta name="twitter:card" content="summary">
                 <meta name="twitter:title" content="@@TITLE@@">
                 <meta name="twitter:description" content="@@DESC@@">
-                <link rel="icon" href="/favicon.ico">
+                <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+                <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+                <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">
                 <style>@@CSS@@</style>
                 </head>
                 <body>
+                @@GTM_BODY@@
                 <div class="page">
                 <a class="brand" href="@@BASE@@/"><img src="/logo.png" alt="" width="28" height="28">Trendist</a>
                 <main class="modal keyword-modal">
@@ -199,6 +203,7 @@ public final class KeywordPage {
                 </body>
                 </html>
                 """
+                .replace("@@GTM_HEAD@@", com.trendist.common.support.AnalyticsTag.HEAD).replace("@@GTM_BODY@@", com.trendist.common.support.AnalyticsTag.BODY)
                 .replace("@@CSS@@", CSS).replace("@@LANG@@", en ? "en" : "ko").replace("@@TITLE@@", title).replace("@@DESC@@", desc)
                 .replace("@@URL@@", url).replace("@@BASE@@", base).replace("@@KW@@", SharePage.escape(d.text()))
                 .replace("@@CLOSE@@", en ? "Close" : "닫기").replace("@@AI@@", ai).replace("@@STATE@@", d.active() ? "활성" : "비활성")
@@ -265,14 +270,18 @@ public final class KeywordPage {
                 <!doctype html>
                 <html lang="@@LANG@@">
                 <head>
+                @@GTM_HEAD@@
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="robots" content="noindex">
                 <title>@@TITLE@@ | Trendist</title>
-                <link rel="icon" href="/favicon.ico">
+                <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+                <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+                <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">
                 <style>@@CSS@@</style>
                 </head>
                 <body>
+                @@GTM_BODY@@
                 <div class="page">
                 <a class="brand" href="@@BASE@@/"><img src="/logo.png" alt="" width="28" height="28">Trendist</a>
                 <main class="card">
@@ -289,6 +298,7 @@ public final class KeywordPage {
                 </body>
                 </html>
                 """
+                .replace("@@GTM_HEAD@@", com.trendist.common.support.AnalyticsTag.HEAD).replace("@@GTM_BODY@@", com.trendist.common.support.AnalyticsTag.BODY)
                 .replace("@@CSS@@", NF_CSS).replace("@@LANG@@", en ? "en" : "ko").replace("@@BASE@@", base).replace("@@ART@@", art)
                 .replace("@@TITLE@@", en ? "We couldn't find that keyword" : "키워드를 찾을 수 없어요")
                 .replace("@@LEAD@@", en ? "The keyword may not exist yet, or it can't be opened.<br>Find a rising keyword in the game and add it first." : "아직 없는 키워드이거나 열 수 없는 키워드예요.<br>게임에서 뜨는 키워드를 찾아 먼저 추가해 보세요.")
