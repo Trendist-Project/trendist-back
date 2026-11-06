@@ -134,4 +134,31 @@ public final class SettingKeys {
             new Def(COMBO_MAX_SECONDS, "300", 0, 86400, "콤보 유지시간(초): 마지막으로 콤보가 오른 때부터 이 시간이 지나면 연속 횟수와 불꽃이 사라진다. 콤보가 추가될 때마다 다시 시작한다(기본 300초 = 5분, 0이면 제한 없음)"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간(시간). 목록에 보일 때마다 지금부터 다시 센다"));
+
+    // ---------------------------------------------------------------- 관리자 화면 그룹(13.3)
+
+    /** 관리자 설정 화면의 그룹 순서. 새 설정을 만들면 아래 GROUP_OF에서 그룹을 정한다(없으면 "기타"). */
+    public static final List<String> GROUP_ORDER = List.of("트렌드·키워드", "성장·경험치·칭호", "맵·크기", "이동·충돌", "보호·접속",
+            "세이프존", "? 구슬", "NPC 봇", "대시", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
+
+    private static final java.util.Map<String, String> GROUP_OF = new java.util.HashMap<>();
+    private static void group(String group, String... names) { for (String n : names) GROUP_OF.put(n, group); }
+    static {
+        group("트렌드·키워드", TREND_FULL_SHARE, TREND_MIN_POPULATION, TREND_LOG_SOFTNESS, TREND_BASE_RATIO, TREND_MAX_BASE,
+                EXTERNAL_CONFIRM_HEAT, EXTERNAL_HOLD_HOURS, PLUS_TTL_HOURS, ACTIVATE_HOLDERS);
+        group("성장·경험치·칭호", EXP_SCORE_CAP, EXP_PER_PLUS, ATTACK_EXP, KILL_EXP, RANK_TITLE_MIN_PLAYERS);
+        group("맵·크기", WORLD_SIZE, MIN_RADIUS, MAX_DIAMETER, SCORE_CAP, ZOOM_FACTOR, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
+        group("이동·충돌", MAX_SPEED, BIG_RATIO, KNOCKBACK_CAP, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, COLLISION_COOLDOWN);
+        group("보호·접속", LOSE_PROTECT_SECONDS, JOIN_PROTECT_SECONDS, OFFLINE_KEEP_SECONDS);
+        group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
+        group("? 구슬", ORB_DENSITY, ORB_MAX, ORB_SPAWN_SECONDS, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT);
+        group("NPC 봇", BOT_PLAYERS, BOT_MIN_PLAYERS, BOT_CAP_RATIO);
+        group("대시", DASH_SPEED_MULTIPLIER, DASH_SECONDS, DASH_COOLDOWN_SECONDS);
+        group("콤보·불꽃", COMBO_FLAME_AT, COMBO_WIPE_ORB_PERCENT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
+        group("꾸미기·계정", CUSTOMIZE_UNLOCK_LEVEL, ART_CHANGE_MINUTES, NICKNAME_CHANGE_MINUTES);
+        group("AI 설명", AI_COMMENT_ENABLED, AI_COMMENT_BATCH_SIZE, AI_COMMENT_DAILY_MAX, AI_COMMENT_GROUNDING);
+    }
+
+    /** 설정이 속한 그룹(관리자 화면에서 묶어 보여 준다). 그룹을 정하지 않은 설정은 "기타". */
+    public static String groupOf(String name) { return GROUP_OF.getOrDefault(name, "기타"); }
 }

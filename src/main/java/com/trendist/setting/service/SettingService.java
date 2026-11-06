@@ -10,7 +10,7 @@ public interface SettingService {
 
     /** 관리자 화면의 설정 한 줄(13.3). defaultValue는 코드의 기본값. */
     record Item(String name, String value, String type, java.math.BigDecimal min, java.math.BigDecimal max, String description,
-                String defaultValue, java.time.Instant updatedAt) {}
+                String defaultValue, java.time.Instant updatedAt, String group) {}
 
     /** 모든 설정(코드의 기본값 순서대로). */
     java.util.List<Item> list();
