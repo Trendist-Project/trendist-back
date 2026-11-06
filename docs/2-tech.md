@@ -49,7 +49,7 @@
 | api | 검색, `+`, 보관함, 댓글, 랭킹, 정보 팝업, 점수 추이, 칭호, 공지, 가이드, 탈퇴 |
 | game | 나라별 방, 입장 인원 검사, 게임 루프, 충돌, 관심 영역, 스냅샷 |
 | trend | 외부 수집, 외부 확인과 반영 소스 결정, 트렌드 값 계산, 상태 전이, 나라 현지 시각 배치 |
-| admin | 키워드 금지·일괄 추가, 밸런스 설정, 공지, 가이드, 긴급 안내, 신고·제재, 사용자·통계·대시보드·관전, 트렌드 키워드 목록, 연동, AI 설명 (소스 가중치·칭호·레벨 편집은 아직 없음) |
+| admin | 키워드 금지·일괄 추가, 밸런스 설정, 공지, 가이드, 긴급 안내, 신고·제재, 사용자·통계·대시보드·관전, 트렌드 키워드 목록, 연동, AI 설명 |
 | auth | 방문자 ID 필터, Google 로그인, 권한 |
 
 ### 9.2 게임 서버
@@ -70,7 +70,7 @@
 - DB 연결 풀(Hikari): `application.yml`에서 최대 20개·최소 유지 5개로 둔다(Hikari 기본값은 10개, 환경 변수 `HIKARI_MAX_POOL`, `HIKARI_MIN_IDLE`로 조절). 같은 DB를 다른 앱도 쓰므로 모든 앱의 풀 합이 `max_connections`(151)의 60~70%를 넘지 않게 정한다. 운영에서 쓴 최대 연결이 69개여서 20개로 해도 최악 79개(52%)다. 서버를 여러 대 띄우면 서버 수 × 풀 크기로 계산한다.
 - 싸움 DB 부담 줄이기: ① 처치 횟수·빼앗기 횟수와 EXP는 행을 잠근 트랜잭션에서 한 번에 올리고 점수·레벨을 다시 정한다(`PlayerService.awardAttack`·`awardKill`, 불꽃·죽음처럼 행을 잠그지 않던 경로는 `recordSteal`·`recordKill`이 잠그고 부른다). EXP를 주려면 점수·레벨을 다시 정해야 하므로 락 없는 `UPDATE … + 1`은 쓰지 않는다. 키워드를 옮기는 싸움은 어차피 그 행을 잠근다. ② 칭호 검사(`TitleServiceImpl.on`)는 싸움 트랜잭션이 끝난 뒤 별도 스레드 하나(`title-check`)가 차례로 하고, 같은 플레이어의 검사가 줄에 있으면 다시 넣지 않는다(몰려도 한 번만). 자동 테스트는 `trendist.titles.sync-check=true`(`application-test.yml`)로 같은 스레드에서 바로 한다. ③ 스냅샷은 받는 사람마다 복사하지 않고 같은 배열을 보낸다. 표시 칸(마지막 1바이트)은 0이고, 클라이언트(`Arena.applySnapshot`)가 `welcome`의 내 번호와 같은 원을 내 원으로 본다.
 - 봇의 공간 격자(4.21): `Room.thinkBots`가 이번 틱에 생각할 봇이 있으면 `BotGrid`를 한 번 만든다(한 변 500px 칸, 원과 구슬을 중심이 속한 칸에 넣음). 봇은 방 전체 대신 `도망·쫓기 범위 + 내 반지름 + 가장 큰 원의 반지름` 안의 칸에 있는 원과 `구슬 탐색 범위` 안의 칸에 있는 구슬만 본다. 비용이 봇 수 × 인원에서 봇 수 × 주변 수로 준다.
-- 방 DB 작업 동시 실행 제한: `RoomManagerImpl.db`가 방의 DB 작업(빼앗기·잃기·처치 기록·구슬 보상·입장 등)을 동시에 4개까지만 돌린다. 칭호 검사(`TitleServiceImpl.on`)가 커밋 뒤 `REQUIRES_NEW`로 두 번째 연결을 요구해서, 연결을 쥔 작업이 풀 크기(최대 20개) 이상 몰리면 모두 서로를 기다리며 서버가 멈추기 때문이다(봇을 50명으로 늘려 싸움이 잦을 때 실제로 멈췄다). 넘치는 작업은 가상 스레드에서 차례를 기다리고 방 틱은 막히지 않는다.
+- 방 DB 작업 동시 실행 제한: `RoomManagerImpl.db`가 방의 DB 작업(빼앗기·잃기·처치 기록·구슬 보상·입장 등)을 동시에 4개까지만 돌린다. 방의 작업이 연결 풀(최대 20개)을 다 쥐면 HTTP 요청이 연결을 얻지 못하므로 HTTP 몫을 남기려는 제한이다. 칭호 검사(`TitleServiceImpl.on`)는 커밋 뒤 별도 스레드 하나가 맡아 작업이 두 번째 연결을 요구하지 않으므로 교착은 생기지 않는다. 넘치는 작업은 가상 스레드에서 차례를 기다리고 방 틱은 막히지 않는다.
 - 봇의 실제 키워드(4.21): `Room.Member.botKeywords`는 키워드 번호(`BotKw`)만 들고, 이름·유행도는 방의 `catalog`(`CatalogKw`: 번호·이름·유행도)에서 찾는다. `RoomManagerImpl.loadCatalog`가 방을 만들 때 한 번, 그 뒤 60초마다 `KeywordService.botCatalog(countryId)`(그 나라 🔥 키워드)를 읽어 `Room.setKeywordCatalog`로 넣고, 목록에서 사라진 키워드는 봇에서도 뺀다. 사람이 봇을 이기면 `Outbox.requestBotWin(…, keywordId)` → `KeywordService.gainFromBot(playerId, keywordId)`가 그 키워드를 준다. 봇이 이기면 `Room.botGain`(봇끼리) 또는 `RoomManagerImpl.requestLose`가 `Room.botTakes`로 사람이 잃은 키워드(`LostKeyword.keywordId`)를 봇 메모리에 넣는다. DB에는 쓰지 않는다.
 - 죽음·리스폰(4.31): `Room.collide`가 키워드 없는 사람(봇 포함)이 보호 없이 지면 `Room.die`로 `members`·`byPlayer`에서 빼고 `Member.dead`를 켠 뒤 `died{by, byE}`(본인)·`kill{target}`(죽인 사람)을 보낸다(연결은 유지하고, 죽은 사람은 `spectators` 집합에 넣어 스냅샷·미니맵 등을 관전자처럼 계속 받는다. `spectatorCount`에는 세지 않으며 리스폰·나감·무응답 때 빠진다). `GameSocketHandler`는 `dead`인 연결의 입력·채팅·이모트를 버리고 `respawn`만 받아(인증 때 저장한 사용자 번호 `ATTR_UID`로) 입장과 같은 경로(`join`)로 다시 넣는다. 방은 `diedUntil`(플레이어 → 5분)에 든 사람이 들어오면 저장된 위치와 상관없이 `centerSpawn`에 입장 보호로 둔다. 봇이 죽으면 `botRespawns`를 올리고 `maintainBots`의 `addBot`이 그 수만큼 가운데(`centerSpawn`)에서 새 봇을 만든다. 죽인 쪽이 사람이면 `Outbox.requestKill` → 작업 스레드의 `PlayerService.recordKill`이 `players.kill_count`를 올리고 `TitleCheck`를 낸다(마이그레이션 V6). 프론트는 `died`에서 입력을 끊고 캔버스에 `dead` 클래스(CSS 흑백·어둡게)와 리스폰 오버레이를 띄우며, `welcome`이 오면 걷는다.
 - 레벨업 이펙트(4.30): `Room.applyScore`가 레벨이 오른 사람의 `levelFx{e, level}`를 방 전체(관전 포함)에 보낸다(고정 연출 빛기둥, 설정·꾸미기 없음).
@@ -148,7 +148,6 @@ WHERE p.id IN (/* 500명 */)
 | 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 1분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
 | AI 설명 갱신 요청(4.12) | 플레이어당 1시간에 10회(429 `AI_REQUEST_RATE`) |
 | 외부 온디맨드 조회, 새 키워드 생성(아직 없음) | 사용자·IP 단위 분당 제한 |
-| 트렌드 상자 열기(아직 없음) | 초당 2회 |
 | 토큰 발급·갱신·게스트 시작(`/api/auth/*`, 아직 없음) | IP 단위 분당 10회 |
 | 자랑하기 카드 공유 주소 만들기 | 사용자당 분당 10회(429 `SHARE_TOO_FAST`). 값이 같은 카드는 같은 주소를 돌려주므로 행이 늘지 않는다 |
 
@@ -234,41 +233,8 @@ WHERE p.id IN (/* 500명 */)
 | 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4), 사이트 통계(13.9: 지난 한 시간의 `site_hourly_stats` 행을 쓰고 그날의 `site_daily_stats`를 시간별 행에서 다시 만들기. 서버를 끌 때도 이번 시간 값을 저장) |
 | 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외). 만료된 갱신 토큰 삭제는 아직 없다 |
 
-### 9.8 트렌드 상자 (4.19)
-아직 구현하지 않았다(코드에 `Room`의 상자 상태·`OPEN_BOX` 메시지·관리자 설정이 없다). 아래는 설계다.
-
-상자는 몇 분만 사는 일회성 데이터라 DB에 저장하지 않고 방(`Room`) 메모리에서만 관리한다. 서버를 다시 켜면 상자는 사라지고 다음 주기에 새로 생긴다.
-
-상태
-
-```java
-record TrendBox(
-    long id,               // 방 안에서 증가하는 번호
-    float x, float y,      // 월드 좌표
-    long keywordId,        // 상자에 담긴 키워드(모든 사용자에게 같음)
-    Instant expiresAt,     // 상자가 사라지는 시각
-    Set<Long> openedBy     // 연 사용자 id(한 사람 한 번)
-) {}
-```
-
-- 방마다 `Map<Long, TrendBox>`를 둔다. 틱 스레드만 읽고 쓰므로 락이 없다.
-
-흐름
-1. 생성: 방의 틱이 다음 생성 시각이 되면 작업 스레드에 키워드 선택을 맡긴다. 작업 스레드는 메모리의 나라별 키워드 캐시(활성 상태, 반영 소스가 외부, `trend_value` ≥ 상자 최소 트렌드 값, 금지 아님, 최근 상자 키워드 제외)에서 무작위로 하나 골라 큐로 돌려준다. 틱이 위치를 정해 상자를 추가한다. 위치는 벽에서 일정 거리 안쪽, 다른 상자와 일정 거리 이상, 가능하면 사람이 있는 구역 근처로 고른다.
-2. 전송: 스냅샷에 상자 목록(`id`, 위치, 남은 시간, 내가 열었는지)만 싣는다. `keywordId`는 절대 스냅샷에 넣지 않는다. 관심 영역 밖 상자는 미니맵용으로 위치만 낮은 주기(예: 5초)로 보낸다.
-3. 열기: 클라이언트가 WebSocket으로 `OPEN_BOX {boxId}`를 보낸다. 틱에서 순서대로 검사한다.
-   - 상자가 있고 만료 전인가 → 없으면 `BOX_GONE`
-   - 서버 기준 내 아이콘 위치와 상자의 거리가 기준(150px) 이하인가 → 아니면 `BOX_TOO_FAR`
-   - 이미 열었는가 → 그러면 `BOX_ALREADY_OPENED`
-   - 통과하면 `openedBy`에 추가하고, 그 연결에만 `BOX_OPENED {boxId, keywordId, text, trendValue, holderCount, revealUntil}`을 보낸다.
-4. 공개: 클라이언트는 `revealUntil`까지 키워드 카드를 보여 주고, 지나면 이름을 가린다. 서버는 공개 시간 동안 그 사용자가 그 키워드를 상자에서 봤다는 것만 메모리에 둔다(검색하지 않고 카드에서 바로 `+`하는 요청을 허용하기 위해).
-5. 소멸: 틱이 `expiresAt`이 지난 상자를 지우고 스냅샷에서 뺀다. 사라지기 30초 전부터 클라이언트가 깜빡임 효과를 그린다.
-
-보안과 부하
-- 키워드는 연 사람에게 개별 메시지로만 가므로 다른 사람의 네트워크 탭에도 보이지 않는다.
-- 거리 검사는 클라이언트가 보낸 위치가 아니라 서버 시뮬레이션 위치로 한다.
-- 키워드 선택은 메모리 캐시만 쓰고 DB를 조회하지 않는다. 상자 수가 방당 3개라 부하는 무시할 수 있다.
-- 통계가 필요해지면(상자별 열람 수, 상자 키워드의 `+` 전환율) 상자 소멸 때 요약 한 줄을 로그로 남긴다. 지금은 테이블을 만들지 않는다.
+### 9.8 (결번)
+트렌드 상자는 ? 구슬(4.20)로 구현해 이 절은 비워 둔다. 뒤 절의 번호가 코드 주석에서 쓰이므로 번호는 비워 둔다. 구슬은 `Room` 메모리에서 관리한다(9.2).
 
 ### 9.9 키워드 카운터와 활동 기록 (4.12)
 키워드마다 누적 카운터 세 개를 두고, 시간별 기록과 하루별 기록을 두 테이블로 나눠 남겨서 카드의 활동 그래프에 쓴다.
@@ -372,15 +338,15 @@ record TrendBox(
 ### 11.1 규칙
 - 테이블 이름은 소문자 스네이크 케이스 복수형(마지막 단어만, 기간 접미사 `24h`는 복수형을 쓰지 않는다). 다대다 매핑은 `앞 단수_뒤 복수`(`player_keywords`). 외래 키 컬럼은 `참조 단수_id`이고(복수형의 s를 뗀다) 기본 키 바로 다음에 순서대로 둔다(ERD Cloud에 보이는 순서). 한 테이블에서 같은 테이블을 두 번 참조하는 컬럼은 두지 않는다(그래서 공지·가이드에는 마지막 수정 관리자 컬럼이 없다).
 - 모든 테이블의 기본 키는 `id BIGINT AUTO_INCREMENT` 하나다. 관계는 모두 비식별, 복합 키 없음. "한 번만" 규칙은 `UNIQUE`로 지킨다.
-- 시각 컬럼: 기본은 `created_at`·`updated_at`(`DATETIME(6)`, UTC, DB 기본값 + JPA Auditing). 고치지 않는 기록 테이블(`*_histories`, `user_notices`, `blocked_terms`, `chat_messages`)은 `created_at`만이다(`user_notices`·`blocked_terms`·`setting_histories`는 아직 없음). 칸을 덮어쓰거나 매시간 다시 쓰는 `player_score_24h`, `player_score_dailies`, `keyword_log_24h`, `keyword_log_dailies`는 `updated_at`도 둔다. 업무 시각(`expires_at`, `banned_at` 등)은 따로 둔다.
+- 시각 컬럼: 기본은 `created_at`·`updated_at`(`DATETIME(6)`, UTC, DB 기본값 + JPA Auditing). 고치지 않는 기록 테이블(`*_histories`, `user_notices`, `blocked_terms`, `chat_messages`)은 `created_at`만이다(`user_notices`·`blocked_terms`는 아직 없음). 칸을 덮어쓰거나 매시간 다시 쓰는 `player_score_24h`, `player_score_dailies`, `keyword_log_24h`, `keyword_log_dailies`는 `updated_at`도 둔다. 업무 시각(`expires_at`, `banned_at` 등)은 따로 둔다.
 - 정수 컬럼은 확장에 대비해 모두 `BIGINT`로 둔다(점수, 인원, 횟수, 순서, 레벨 등). 참/거짓은 `TINYINT(1)`, 0~23 시간 칸 같은 작은 번호는 `TINYINT`로 둔다. JPA 엔티티 필드도 `long`이다.
 - 코드값은 `ENUM` 대신 `VARCHAR` 대문자 코드(`countries`, `users.role` 등) 또는 이름만 있는 코드 테이블(`user_states`, `keyword_states`, `report_types`, `sanction_types`)로 둔다. 허용 값 검증은 `CHECK` 없이 애플리케이션에서 한다.
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 스키마는 Flyway 마이그레이션(`src/main/resources/db/migration`)으로 바꾸고, 시더가 초기 데이터를 넣는다(11.3). 자동 테스트만 시작할 때 JPA가 H2에 스키마를 만든다.
 
-### 11.2 테이블 (42개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (41개, 컬럼은 `4-schema.sql`)
 
-마이그레이션(V1~V14)이 만드는 테이블은 38개다. `user_notices`, `setting_histories`, `blocked_terms`, `blocked_nicknames`는 `4-schema.sql`에만 있는 설계 테이블이고 엔티티와 마이그레이션이 아직 없다(표에 "(아직 없음)"으로 적었다).
+마이그레이션(V1~V14)이 만드는 테이블은 38개다. `user_notices`, `blocked_terms`, `blocked_nicknames`는 `4-schema.sql`에만 있는 설계 테이블이고 엔티티와 마이그레이션이 아직 없다(표에 "(아직 없음)"으로 적었다).
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
@@ -390,7 +356,7 @@ record TrendBox(
 | | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
 | | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
 | | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
-| | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자 편집기는 아직 없고 DB로 수정) |
+| | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자 편집기 없이 DB로 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
@@ -410,7 +376,6 @@ record TrendBox(
 | | `guide_categories`, `guides` | 게임 가이드(영어 `name_en` / `title_en`·`body_en`) |
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
 | | `setting_groups`, `settings` | 설정 그룹(이름·표시 순서, V12)과 밸런스 설정(그룹·단위 포함) |
-| | `setting_histories`(아직 없음) | 밸런스 설정 변경 이력 |
 | | `blocked_terms`, `blocked_nicknames`(아직 없음) | 차단어, 금지 닉네임 |
 | | `sanction_types`, `sanctions` | 제재 타입과 사용자 제재 기록(사유·기간·해제) |
 | | `site_hourly_stats`, `site_daily_stats` | 관리자 통계(13.9). 나라 × 한 시간 / 나라 × 현지 날짜: 최고·평균 동시 접속, 활동 인원, 새 플레이어, 추가·검색·구슬·충돌로 잃기·채팅·댓글·자랑하기 카드 수 |

@@ -1,8 +1,8 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 42개, 외래 키 42개. 사람이 읽는 참고용 전체 스키마이고 실제 스키마는 Flyway 마이그레이션(V1~V14)이 만든다(11.3). 마이그레이션을 추가하면 이 파일도 같이 고친다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
--- user_notices, setting_histories, blocked_terms, blocked_nicknames는 설계만 있고 엔티티·마이그레이션이 아직 없다(해당 테이블 위에 표시).
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 41개, 외래 키 41개. 사람이 읽는 참고용 전체 스키마이고 실제 스키마는 Flyway 마이그레이션(V1~V14)이 만든다(11.3). 마이그레이션을 추가하면 이 파일도 같이 고친다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- user_notices, blocked_terms, blocked_nicknames는 설계만 있고 엔티티·마이그레이션이 아직 없다(해당 테이블 위에 표시).
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
 -- 확인 범위: 쉼표·괄호·외래 키 참조 대상·생성 순서는 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다. 실제 스키마의 실행은 Flyway 마이그레이션(V1~V14)을 로컬 MariaDB 10.11에서 확인했다(11.3).
@@ -637,15 +637,3 @@ CREATE TABLE settings (
   CONSTRAINT fk_settings_group FOREIGN KEY (group_id) REFERENCES setting_groups (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정값';
 
--- (아직 없음) 설정 변경 이력. 아직 없음: 엔티티·마이그레이션이 없다(변경은 서버 로그에만 남는다, 13.3)
-CREATE TABLE setting_histories (
-  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '이력 ID',
-  setting_id BIGINT NOT NULL COMMENT '설정 ID',
-  old_value  VARCHAR(2000) NULL COMMENT '이전 값',
-  new_value  VARCHAR(2000) NOT NULL COMMENT '새 값',
-  reason     VARCHAR(500) NOT NULL COMMENT '변경 사유',
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '변경 시각',
-  PRIMARY KEY (id),
-  KEY idx_sh_setting (setting_id, created_at),
-  CONSTRAINT fk_sh_setting FOREIGN KEY (setting_id) REFERENCES settings (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정 변경 이력';
