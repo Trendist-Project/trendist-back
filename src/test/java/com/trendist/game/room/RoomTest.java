@@ -111,6 +111,19 @@ class RoomTest {
     }
 
     @Test
+    void overlappingPairFightsOnlyOnceBecauseTheLoserBecomesAGhost() {
+        // 4.3: 쿨다운 없이도 같은 싸움이 되풀이되지 않는다. 진 쪽이 잃은 뒤 무적이 되어 다음 틱부터 통과한다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of(100L));
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        for (int i = 0; i < 20; i++) { // 1초 동안 계속 겹쳐 있어도(매 틱 같은 자리로 되돌린다)
+            a.x = 800; a.y = 800; b.x = 810; b.y = 800;
+            r.tick();
+        }
+        assertThat(out.loses).hasSize(1);
+    }
+
+    @Test
     void noKeywordsAndBeatenMeansDeath() {
         // 4.31: 키워드가 하나도 없는 채로 지면 죽는다. 방에서 빠지고, 죽은 사람에게 died(죽인 사람 이름), 죽인 사람에게 kill(상대 이름)을 보낸다
         Out out = new Out();

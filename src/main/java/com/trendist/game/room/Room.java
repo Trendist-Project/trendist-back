@@ -174,9 +174,6 @@ public class Room {
     public static final int MAX_SPECTATORS = 10;
     private volatile int spectatorSize;
     private final Map<Long, Set<Member>> holders = new HashMap<>();
-    /** 같은 두 원이 계속 겹쳐 있어도 튕김·싸움 판정은 이 시간(초)에 한 번만 한다(틱마다 되풀이되지 않게). 설정이 아니라 고정값이다 */
-    private static final double PAIR_COOLDOWN_SECONDS = 0.5;
-    private final Map<Long, Double> pairCooldown = new HashMap<>();
     private volatile double offlineKeepSeconds = 60; // 연결이 끊겨도 원이 아레나에 남아 있는 시간(초, 4.32). 0이면 바로 뺀다
     private final Map<Integer, double[]> orbs = new LinkedHashMap<>(); // ? 구슬 번호 → {x, y}
     private final Map<Integer, double[]> prizeOrbs = new LinkedHashMap<>(); // ! 구슬(불꽃에게 키워드를 모두 잃은 자리에 떨어짐) 번호 → {x, y, 사라질 시각}
@@ -638,7 +635,6 @@ public class Room {
             Map<Long, Live> view = new HashMap<>();
             for (Member m : members.values()) if (!m.bot) view.put(m.playerId, new Live(m.playerId, m.entityNo, m.nickname, m.level, m.score)); // 랭킹·정보 팝업은 사람만
             liveView = view;
-            pairCooldown.values().removeIf(until -> until < clockSeconds);
         }
     }
 
@@ -962,8 +958,6 @@ public class Room {
                 Member big = a.displayRadius >= b.displayRadius ? a : b, small = big == a ? b : a;
                 double ratio = big.displayRadius / small.displayRadius;
                 double sign = small == b ? 1 : -1; // small을 big에서 멀어지는 방향으로
-                Double until = pairCooldown.get(key);
-                boolean fresh = until == null || until < clockSeconds;
                 // 무적(잃은 뒤·입장·리스폰 직후 보호)인 원은 유령처럼 다른 원과 충돌하지 않고 통과한다(4.3): 밀거나 튕기지 않고 싸움도 없다
                 if (a.protectUntil > clockSeconds || b.protectUntil > clockSeconds) continue;
                 boolean aHot = isFlame(a), bHot = isFlame(b);
@@ -973,55 +967,48 @@ public class Room {
                     Member hot = aHot ? a : b, cold = hot == a ? b : a;
                     double away = cold == b ? 1 : -1; // cold를 hot에서 멀어지는 방향으로
                     cold.x += away * nx * overlap; cold.y += away * ny * overlap;
-                    if (fresh) {
-                        double base = hot.displayRadius >= cold.displayRadius ? Math.min(hot.displayRadius / cold.displayRadius, tu.knockbackCap()) : 1;
-                        knock(cold, away * nx, away * ny, base, tu);
-                        cold.targetX = null;
-                    }
+                    double base = hot.displayRadius >= cold.displayRadius ? Math.min(hot.displayRadius / cold.displayRadius, tu.knockbackCap()) : 1;
+                    knock(cold, away * nx, away * ny, base, tu);
+                    cold.targetX = null;
                 } else if (ratio < tu.bigRatio()) {
                     a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
                     b.x += nx * overlap / 2; b.y += ny * overlap / 2;
-                    if (fresh) {
-                        knock(a, -nx, -ny, 1, tu); knock(b, nx, ny, 1, tu);
-                        a.targetX = null; b.targetX = null; // 같이 튕기면 둘 다 목표 해제
-                    }
+                    knock(a, -nx, -ny, 1, tu); knock(b, nx, ny, 1, tu);
+                    a.targetX = null; b.targetX = null; // 같이 튕기면 둘 다 목표 해제
                 } else {
                     small.x += sign * nx * overlap; small.y += sign * ny * overlap;
-                    if (fresh) { knock(small, sign * nx, sign * ny, Math.min(ratio, tu.knockbackCap()), tu); small.targetX = null; }
+                    knock(small, sign * nx, sign * ny, Math.min(ratio, tu.knockbackCap()), tu); small.targetX = null;
                 }
-                if (fresh) {
-                    pairCooldown.put(key, clockSeconds + PAIR_COOLDOWN_SECONDS);
-                    boolean aFlame = isFlame(a), bFlame = isFlame(b);
-                    if (aFlame != bFlame) {
-                        // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)
-                        Member hot = aFlame ? a : b, cold = hot == a ? b : a;
-                        if (cold.protectUntil <= clockSeconds && cold.bot && !cold.botKeywords.isEmpty()) {
-                            botWipe(cold, hot, tu); // 봇의 (메모리) 키워드 점수를 모두 잃는다
-                        } else if (cold.protectUntil <= clockSeconds && !cold.bot && !cold.keywords.isEmpty()) {
-                            cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                            shield(cold, tu);
-                            outbox.requestWipe(this, cold, hot); // 이긴 쪽이 봇이어도 모두 잃는다
-                        } else if (cold.protectUntil <= clockSeconds) {
-                            die(cold, hot); // 이미 키워드가 없으면 죽는다(사람·봇, 4.31)
-                        }
-                    // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음. 둘 다 불꽃이어도 이 규칙이다
-                    } else if (a.score != b.score) {
-                        Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
-                        if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
-                            loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                            BotKw lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 실제 키워드 하나를 잃는다(4.21)
-                            shield(loser, tu);
-                            comboLose(loser, winner); // 잃으면 봇의 콤보와 불꽃도 사라진다(4.25)
-                            // 이긴 사람은 봇이 잃은 바로 그 키워드를 빼앗고, 이긴 쪽이 봇이면 그 키워드가 그 봇의 메모리 목록에 들어간다
-                            if (!winner.bot) outbox.requestBotWin(this, winner, loser, lost.id());
-                            else { botGain(winner, lost.id()); comboWin(winner, true); }
-                        } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
-                            loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                            shield(loser, tu);
-                            outbox.requestLose(this, loser, winner); // 이긴 쪽이 봇이어도 잃는다
-                        } else if (loser.protectUntil <= clockSeconds) {
-                            die(loser, winner); // 잃을 키워드가 없는 채로 지면 죽는다(사람·봇, 4.31)
-                        }
+                boolean aFlame = isFlame(a), bFlame = isFlame(b);
+                if (aFlame != bFlame) {
+                    // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)
+                    Member hot = aFlame ? a : b, cold = hot == a ? b : a;
+                    if (cold.protectUntil <= clockSeconds && cold.bot && !cold.botKeywords.isEmpty()) {
+                        botWipe(cold, hot, tu); // 봇의 (메모리) 키워드 점수를 모두 잃는다
+                    } else if (cold.protectUntil <= clockSeconds && !cold.bot && !cold.keywords.isEmpty()) {
+                        cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
+                        shield(cold, tu);
+                        outbox.requestWipe(this, cold, hot); // 이긴 쪽이 봇이어도 모두 잃는다
+                    } else if (cold.protectUntil <= clockSeconds) {
+                        die(cold, hot); // 이미 키워드가 없으면 죽는다(사람·봇, 4.31)
+                    }
+                // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음. 둘 다 불꽃이어도 이 규칙이다
+                } else if (a.score != b.score) {
+                    Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
+                    if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
+                        loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
+                        BotKw lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 실제 키워드 하나를 잃는다(4.21)
+                        shield(loser, tu);
+                        comboLose(loser, winner); // 잃으면 봇의 콤보와 불꽃도 사라진다(4.25)
+                        // 이긴 사람은 봇이 잃은 바로 그 키워드를 빼앗고, 이긴 쪽이 봇이면 그 키워드가 그 봇의 메모리 목록에 들어간다
+                        if (!winner.bot) outbox.requestBotWin(this, winner, loser, lost.id());
+                        else { botGain(winner, lost.id()); comboWin(winner, true); }
+                    } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
+                        loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
+                        shield(loser, tu);
+                        outbox.requestLose(this, loser, winner); // 이긴 쪽이 봇이어도 잃는다
+                    } else if (loser.protectUntil <= clockSeconds) {
+                        die(loser, winner); // 잃을 키워드가 없는 채로 지면 죽는다(사람·봇, 4.31)
                     }
                 }
             }
