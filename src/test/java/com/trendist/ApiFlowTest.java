@@ -760,7 +760,7 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$.points.length()").value(24))
                 .andExpect(jsonPath("$.points[23].live").value(true))
                 .andExpect(jsonPath("$.points[23].plus").value(1))
-                .andExpect(jsonPath("$.totalPlus").value(1));
+                .andExpect(jsonPath("$.addCount").value(1));
         mvc.perform(get("/api/keywords/" + id + "/activity?range=7d").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$.points.length()").value(7))
                 .andExpect(jsonPath("$.points[6].plus").value(1));

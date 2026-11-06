@@ -22,6 +22,9 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 203판 (2026-11-06)
+- **이름 정리 `total_plus_*` → `add_*`, "누적 추가·누적 검색" → "추가수·검색수"**(4.4, 9.9, 11.2, 17): 컬럼 `total_plus_count` → `add_count`(players, keywords, keyword_log_24h, keyword_log_dailies), `total_plus_inc` → `add_inc`(keyword_log_24h, keyword_log_dailies)로 바꾸고 **마이그레이션 V14**가 컬럼명과 칭호 조건 JSON의 `metric` 값(`total_plus_count` → `add_count`)을 고친다. 코드는 `totalPlusCount` → `addCount`, `incTotalPlus` → `incAdd` 등으로, API 응답 필드도 같이 바뀐다(`totalPlusCount` → `addCount`, 활동 그래프의 `totalPlus` → `addCount`, `totalSearch` → `searchCount`). 화면·문서의 표현은 "누적 추가" → "추가수", "누적 검색" → "검색수"(영문 Total adds/searches → Adds/Searches). `search_count` 컬럼은 그대로다. 이전 판의 이력 문구는 당시 표현 그대로 둔다
+
 ### 202판 (2026-11-06)
 - **같은 상대 연속 충돌 쿨다운 동작 삭제**(4.3): 201판에서 고정값(0.5초)으로 바꿨던 `Room.PAIR_COOLDOWN_SECONDS`와 `pairCooldown`을 없앴다. 이제 겹쳐 있는 두 원은 틱마다 판정한다. 싸움의 결과는 늘 진 쪽(또는 키워드를 모두 잃은 쪽)에게 잃은 뒤 무적을 걸어 다음 틱부터 유령처럼 통과하게 하므로(4.3) 같은 싸움이 되풀이되지 않고, 점수가 같아 승패가 없을 때와 겹침이 계속될 때는 튕김만 다시 걸린다(튕김은 값을 덮어써서 쌓이지 않는다). 1-planning의 충돌 표에서 "같은 상대 연속 충돌" 줄을 뺐다
 

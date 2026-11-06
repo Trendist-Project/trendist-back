@@ -91,7 +91,7 @@ public class TitleServiceImpl implements TitleService {
     /** players의 수치(4.10). 새 지표는 players에 컬럼을 추가하고 여기에 이름을 늘린다. */
     private static long metric(Player p, String name) {
         return switch (name) {
-            case "total_plus_count" -> p.getTotalPlusCount();
+            case "add_count" -> p.getAddCount();
             case "level" -> p.getLevel();
             case "hold_count" -> p.getHoldCount();
             case "current_score" -> p.getCurrentScore();

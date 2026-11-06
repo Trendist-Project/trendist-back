@@ -77,7 +77,7 @@ public class KeywordServiceImpl implements KeywordService {
         Player p = playerService.requireCurrent(userId);
         String text = KeywordNormalizer.display(q);
         String normalized = KeywordNormalizer.validate(text);
-        // 검색할 때마다 플레이어의 누적 검색 횟수 +1(찾았는지·금지인지와 관계없이). 형식에 맞지 않아 거절된 입력은 세지 않는다
+        // 검색할 때마다 플레이어의 검색수 +1(찾았는지·금지인지와 관계없이). 형식에 맞지 않아 거절된 입력은 세지 않는다
         players.incSearchCount(p.getId());
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.SEARCH); // 사이트 통계(13.9)
         events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 검색 칭호(4.10)
@@ -145,8 +145,8 @@ public class KeywordServiceImpl implements KeywordService {
             p.incHold();
             newHolder = true;
         }
-        k.incTotalPlus();
-        p.incTotalPlus();
+        k.incAdd();
+        p.incAdd();
         p.addExp(settings.getInt(SettingKeys.EXP_PER_PLUS)); // EXP는 💤 키워드에도 바로 준다(4.9)
         p.touchPlayed(now, ZoneId.of(p.getCountry().getTimezone())); // 활동한 날 칭호(4.10)
 
@@ -352,7 +352,7 @@ public class KeywordServiceImpl implements KeywordService {
         return adminView(k, false);
     }
 
-    private static final Set<String> ADMIN_SORTS = Set.of("trendValue", "holderCount", "totalPlusCount", "searchCount", "viewCount",
+    private static final Set<String> ADMIN_SORTS = Set.of("trendValue", "holderCount", "addCount", "searchCount", "viewCount",
             "createdAt", "activatedAt", "externalUntil");
 
     @Override
@@ -430,7 +430,7 @@ public class KeywordServiceImpl implements KeywordService {
 
     private AdminKeywordRow adminRow(Keyword k) {
         return new AdminKeywordRow(k.getId(), k.getText(), k.getNormalized(), k.getKeywordState().getName(), k.getDataSource().getName(),
-                k.getTrendValue(), k.getHolderCount(), k.getTotalPlusCount(), k.getSearchCount() + searchCounter.pending(k.getId()),
+                k.getTrendValue(), k.getHolderCount(), k.getAddCount(), k.getSearchCount() + searchCounter.pending(k.getId()),
                 k.getViewCount() + viewCounter.pendingOf(k.getId()), k.getExternalUntil(), k.getActivatedAt(), k.getBannedAt(), k.getCreatedAt());
     }
 
@@ -773,7 +773,7 @@ public class KeywordServiceImpl implements KeywordService {
         Optional<PlayerKeyword> mine = playerKeywords.findByPlayerIdAndKeywordId(p.getId(), k.getId()).filter(pk -> !pk.isExpired(now));
         String ai = k.getAiComment() == null ? null : k.getAiComment().getComment();
         return new KeywordDtos.KeywordCard(k.getId(), k.getText(), k.getKeywordState().getName(), k.getTrendValue(),
-                k.getHolderCount(), k.getTotalPlusCount(),
+                k.getHolderCount(), k.getAddCount(),
                 k.getSearchCount() + searchCounter.pending(k.getId()),
                 k.getViewCount() + viewCounter.pendingOf(k.getId()), mine.isPresent(),
                 mine.map(PlayerKeyword::getExpiresAt).orElse(null),

@@ -88,7 +88,7 @@ public class KeywordPageService {
         views.hit(f.keywordId(), ip, userAgent);
         KeywordPage.Data d = f.data();
         return new KeywordPage.Data(d.countryCode(), d.text(), d.normalized(), d.state(), d.trendValue(), d.holders(),
-                d.totalPlus(), d.searches(), d.views() + views.pendingOf(f.keywordId()), d.aiComment(), d.googleSource(), d.activities());
+                d.addCount(), d.searches(), d.views() + views.pendingOf(f.keywordId()), d.aiComment(), d.googleSource(), d.activities());
     }
 
     private Optional<Cached> load(String countryCode, String normalized) {
@@ -100,7 +100,7 @@ public class KeywordPageService {
         for (String r : RANGES) activities.put(r, activity.publicActivity(k.getId(), r));
         String comment = k.getAiComment() == null ? null : k.getAiComment().getComment();
         KeywordPage.Data data = new KeywordPage.Data(k.getCountry().getCode(), k.getText(), k.getNormalized(),
-                k.getKeywordState().getName(), k.getTrendValue(), k.getHolderCount(), k.getTotalPlusCount(),
+                k.getKeywordState().getName(), k.getTrendValue(), k.getHolderCount(), k.getAddCount(),
                 k.getSearchCount(), k.getViewCount(), comment, "google".equals(k.getDataSource().getName()), activities);
         return Optional.of(new Cached(k.getId(), data));
     }

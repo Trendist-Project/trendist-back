@@ -18,7 +18,7 @@ public final class KeywordPage {
 
     /** 페이지에 그릴 값. views는 저장된 값에 아직 저장 전인 값을 더한 것, activities는 24h·7d·30d·180d 순서 */
     public record Data(String countryCode, String text, String normalized, String state, long trendValue,
-                       long holders, long totalPlus, long searches, long views, String aiComment,
+                       long holders, long addCount, long searches, long views, String aiComment,
                        boolean googleSource, Map<String, KeywordDtos.Activity> activities) {
         public boolean english() { return !"KR".equalsIgnoreCase(countryCode); }
         public boolean active() { return "활성".equals(state); }
@@ -37,8 +37,8 @@ public final class KeywordPage {
     public static String description(Data d) {
         if (d.aiComment() != null && !d.aiComment().isBlank()) return d.aiComment();
         return d.english()
-                ? String.format(Locale.ENGLISH, "See how \"%s\" is trending on Trendist: %,d holders, %,d adds.", d.text(), d.holders(), d.totalPlus())
-                : String.format("Trendist에서 '%s' 키워드의 트렌드를 확인하세요. 가진 사람 %,d명, 누적 추가 %,d회.", d.text(), d.holders(), d.totalPlus());
+                ? String.format(Locale.ENGLISH, "See how \"%s\" is trending on Trendist: %,d holders, %,d adds.", d.text(), d.holders(), d.addCount())
+                : String.format("Trendist에서 '%s' 키워드의 트렌드를 확인하세요. 가진 사람 %,d명, 추가수 %,d회.", d.text(), d.holders(), d.addCount());
     }
 
     /** 게임 화면의 스타일(styles.css)에서 키워드 팝업에 쓰는 규칙만 옮긴 것. 게임 CSS를 바꾸면 같이 맞춘다. */
@@ -134,8 +134,8 @@ public final class KeywordPage {
         String attribution = d.googleSource() ? "<p class=\"src\">Data source: Google Trends</p>" : "";
         String[][] stats = {
                 {en ? "Holders" : "가진 사람", en ? "👥 " + n(d.holders()) : "👥 " + n(d.holders()) + "명"},
-                {en ? "Total adds" : "누적 추가", n(d.totalPlus())},
-                {en ? "Total searches" : "누적 검색", n(d.searches())},
+                {en ? "Adds" : "추가수", n(d.addCount())},
+                {en ? "Searches" : "검색수", n(d.searches())},
                 {en ? "Page views" : "조회수", n(d.views())}};
         StringBuilder statsHtml = new StringBuilder();
         for (String[] s : stats) statsHtml.append("<div><dt>").append(s[0]).append("</dt><dd>").append(s[1]).append("</dd></div>");

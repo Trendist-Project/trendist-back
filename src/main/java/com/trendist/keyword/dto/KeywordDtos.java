@@ -9,7 +9,7 @@ public final class KeywordDtos {
 
     /** 결과 카드(4.4). id가 null이면 아직 DB에 없는 새 단어(💤 카드). */
     public record KeywordCard(Long id, String text, String state, long trendValue,
-                              long holderCount, long totalPlusCount, long searchCount,
+                              long holderCount, long addCount, long searchCount,
                               long viewCount, boolean plusedByMe, Instant myExpiresAt, String aiComment, boolean aiCommentRequested) {}
 
     public record SearchResult(String status, KeywordCard keyword) {}
@@ -30,7 +30,7 @@ public final class KeywordDtos {
     public record ActivityPoint(Instant t, long search, long plus, long holders, boolean live) {}
 
     /** 활동 그래프. range: 24h / 7d / 30d / 180d, timezone: 나라 시간대. */
-    public record Activity(String range, String timezone, List<ActivityPoint> points, long totalSearch, long totalPlus, long holders) {}
+    public record Activity(String range, String timezone, List<ActivityPoint> points, long searchCount, long addCount, long holders) {}
 
     public record PlusRequest(@jakarta.validation.constraints.NotBlank String text) {}
 }

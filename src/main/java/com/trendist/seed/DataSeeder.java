@@ -261,7 +261,7 @@ public class DataSeeder implements ApplicationRunner {
 
     /** 칭호 23~51. ID가 TITLES 뒤로 이 순서대로 붙는다(순서를 바꾸지 않는다) */
     private static final String[][] MORE_TITLES = {
-            {"트렌드 탐험가", "키워드를 30번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":30}"},
+            {"트렌드 탐험가", "키워드를 30번 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":30}"},
             {"일취월장", "20레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":20}"},
             {"그랜드마스터", "70레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":70}"},
             {"알뜰 수집가", "키워드를 동시에 10개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":10}"},
@@ -361,11 +361,11 @@ public class DataSeeder implements ApplicationRunner {
     };
 
     private static final String[][] TITLES = {
-            {"트렌드 워처", "처음으로 키워드를 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":1}"},
-            {"트렌드 수집가", "키워드를 100번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":100}"},
-            {"트렌드 사냥꾼", "키워드를 500번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":500}"},
-            {"트렌드 장인", "키워드를 2,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":2000}"},
-            {"트렌드 전설", "키워드를 10,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":10000}"},
+            {"트렌드 워처", "처음으로 키워드를 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":1}"},
+            {"트렌드 수집가", "키워드를 100번 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":100}"},
+            {"트렌드 사냥꾼", "키워드를 500번 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":500}"},
+            {"트렌드 장인", "키워드를 2,000번 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":2000}"},
+            {"트렌드 전설", "키워드를 10,000번 추가했어요", "METRIC", "{\"metric\":\"add_count\",\"gte\":10000}"},
             {"완전체", "아이콘이 다 자랐어요(10레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":10}"},
             {"스타일리스트", "꾸미기가 열렸어요(10레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":10}"},
             {"베테랑", "30레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":30}"},

@@ -19,10 +19,10 @@ public class KeywordLog24h extends BaseTimeEntity {
     /** 이 칸에 기록한 시간의 시작(UTC 정시). 24시간이 지난 칸은 조회에서 무시한다. */
     @Column(name = "recorded_at", nullable = false, columnDefinition = "DATETIME") private Instant recordedAt;
     @Column(name = "search_count", nullable = false) private long searchCount;
-    @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
+    @Column(name = "add_count", nullable = false) private long addCount;
     @Column(name = "holder_count", nullable = false) private long holderCount;
     @Column(name = "search_inc", nullable = false) private long searchInc;
-    @Column(name = "total_plus_inc", nullable = false) private long totalPlusInc;
+    @Column(name = "add_inc", nullable = false) private long addInc;
     @Column(name = "holder_inc", nullable = false) private long holderInc;
 
     public KeywordLog24h(Keyword keyword, int hourSlot) {
@@ -30,10 +30,10 @@ public class KeywordLog24h extends BaseTimeEntity {
     }
 
     /** 그 시간이 끝날 때의 누적값과 그 시간의 증분으로 칸을 덮어쓴다. */
-    public void overwrite(Instant recordedAt, long searchCount, long totalPlusCount, long holderCount,
-                          long searchInc, long totalPlusInc, long holderInc) {
+    public void overwrite(Instant recordedAt, long searchCount, long addCount, long holderCount,
+                          long searchInc, long addInc, long holderInc) {
         this.recordedAt = recordedAt;
-        this.searchCount = searchCount; this.totalPlusCount = totalPlusCount; this.holderCount = holderCount;
-        this.searchInc = searchInc; this.totalPlusInc = totalPlusInc; this.holderInc = holderInc;
+        this.searchCount = searchCount; this.addCount = addCount; this.holderCount = holderCount;
+        this.searchInc = searchInc; this.addInc = addInc; this.holderInc = holderInc;
     }
 }

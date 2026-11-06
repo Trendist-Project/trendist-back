@@ -104,9 +104,9 @@
 
 ### 9.4 `+` 처리와 점수 재합산
 `+` 처리
-- 한 트랜잭션: `players` 행을 `SELECT ... FOR UPDATE`로 먼저 잠그고, `player_keywords`에 INSERT(또는 만료 행 재사용, 아래)한다(`expires_at` = 지금 + 24시간). 그다음 `keywords` 행의 `holder_count`·`total_plus_count`를 고치고 `trend_value`를 다시 계산한다. 마지막으로 `players.exp` +1(레벨은 메모리에 올려 둔 `levels` 표로 다시 정해 `players.level_id`에 그 행을 넣음), `players.current_score`에 그 키워드의 새 점수(`trend_value`)와 늘어난 EXP 점수(100 미만일 때 1)를 더하고, `total_plus_count` +1, 새 행이면 `hold_count` +1 한다. 잠금 순서(플레이어 → 키워드)는 항상 같게 둔다. 접속 중이면 방 메모리 점수도 같이 고친다.
+- 한 트랜잭션: `players` 행을 `SELECT ... FOR UPDATE`로 먼저 잠그고, `player_keywords`에 INSERT(또는 만료 행 재사용, 아래)한다(`expires_at` = 지금 + 24시간). 그다음 `keywords` 행의 `holder_count`·`add_count`를 고치고 `trend_value`를 다시 계산한다. 마지막으로 `players.exp` +1(레벨은 메모리에 올려 둔 `levels` 표로 다시 정해 `players.level_id`에 그 행을 넣음), `players.current_score`에 그 키워드의 새 점수(`trend_value`)와 늘어난 EXP 점수(100 미만일 때 1)를 더하고, `add_count` +1, 새 행이면 `hold_count` +1 한다. 잠금 순서(플레이어 → 키워드)는 항상 같게 둔다. 접속 중이면 방 메모리 점수도 같이 고친다.
 - 같은 키워드 중복은 `UNIQUE(player_id, keyword_id)`가 막는다. 화면의 `+` 버튼은 비활성화되어 있고, 서버는 만료 전 행이 있으면 요청을 거부한다.
-- 만료 행 재사용: `expires_at`이 지났지만 1분 잡이 아직 지우지 않은 행이 있으면 INSERT하지 않고 그 행을 UPDATE한다(`created_at`과 `expires_at`을 새 `+` 값으로 바꾼다). 행 수가 그대로이므로 `keywords.holder_count`와 `players.hold_count`는 바꾸지 않고, 두 `total_plus_count`만 +1 하며, `current_score`는 그 사람의 목록을 다시 합산해서 구한다. `created_at`을 갱신하므로 이 엔티티는 JPA Auditing의 `updatable = false`를 쓰지 않는다.
+- 만료 행 재사용: `expires_at`이 지났지만 1분 잡이 아직 지우지 않은 행이 있으면 INSERT하지 않고 그 행을 UPDATE한다(`created_at`과 `expires_at`을 새 `+` 값으로 바꾼다). 행 수가 그대로이므로 `keywords.holder_count`와 `players.hold_count`는 바꾸지 않고, 두 `add_count`만 +1 하며, `current_score`는 그 사람의 목록을 다시 합산해서 구한다. `created_at`을 갱신하므로 이 엔티티는 JPA Auditing의 `updatable = false`를 쓰지 않는다.
 - 1분 주기 잡이 `expires_at`이 지난 행을 삭제하고 `keywords.holder_count`와 `players.hold_count`를 −1(0 아래로 내려가지 않게), `trend_value`를 다시 계산한 뒤 그 플레이어의 점수를 다시 합산한다. 같은 `players` 행을 잠그고 `DELETE ... WHERE id = ? AND expires_at <= 지금`처럼 조건부로 지워서, 방금 재사용된 행을 지우거나 두 번 처리하지 않는다. 조회할 때도 `expires_at`을 검사한다.
 - 충돌로 잃기: 틱 밖의 작업 스레드가 잃는 사람의 후보 행(키워드 미금지) 중 하나를 무작위로 골라 DELETE하고, 같은 트랜잭션에서 `holder_count`·`hold_count`를 −1, `trend_value` 재계산, 그 플레이어의 점수 재합산을 한다. 행이 지워지므로 바로 다시 `+`할 수 있다. 끝나면 방에 점수 변경을, 잃은 사람에게만 알림을 보낸다. 후보가 없으면(`hold_count`가 0이면 조회 없이) 아무것도 하지 않는다.
 - 충돌로 빼앗기(사람끼리): 위 잃기와 같은 트랜잭션에서 이긴 사람에게 그 키워드를 준다. 두 `players` 행을 번호 순서로 먼저 잠그고(서로 동시에 빼앗아도 교착하지 않게) 키워드 행은 그다음에 잠근다. 이긴 사람에게 만료 전 행이 있으면 `created_at`·`expires_at`만 지금 기준으로 갱신하고, 없으면 `+` 처리와 같이 넣는다(만료 행 재사용 포함). 잃은 사람 −1, 이긴 사람 +1이라 `holder_count`와 트렌드 값은 결국 그대로다.
@@ -178,7 +178,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/room/players/{entity_no}/score-history?range=7d` | 내가 접속한 방의 다른 플레이어(7일만). 그 방에 없는 번호면 404. 7일 외의 range는 400 |
 | `GET /api/admin/users`·사용자 조치 API | 사용자 관리(13.10)는 선택 쿼리 `?country=KR\|GLOBAL`을 받는다(없으면 KR). 대시보드·통계·AI 설명도 같다 |
 | `GET /api/me/admin` | 관리자인지만(`{ "admin": true }`). 관리자 화면과 게임의 [🛠 관리자] 버튼이 부른다 |
-| `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·totalPlusCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
+| `GET /api/admin/keywords?country=&state=&source=&q=&sort=&dir=&page=&size=` | 관리자 키워드 목록(13.6). state는 상태 이름, source는 소스 이름, sort는 trendValue·holderCount·addCount·searchCount·createdAt·activatedAt·externalUntil, 50개씩 |
 | `GET /api/admin/keywords/lookup?country=&text=` | 키워드 한 개 조회(13.6). `{text, normalized, valid, reason, keyword}`: 규칙에 맞지 않으면 `valid=false`와 이유, 등록 전이면 `keyword=null`. 목록 행(`AdminKeywordRow`)은 `normalized`·`viewCount`를 포함 |
 | `GET /api/admin/emergency`, `POST /api/admin/emergency`, `POST /api/admin/emergency/{id}/cancel` | 관리자 긴급 안내(13.14, 4.29). 목록은 최근 20개와 상태(ACTIVE/ENDED/CANCELED), 올리기는 `{message(≤200자), messageEn(선택), minutes(1~720)}`, 새로 올리면 켜져 있던 것은 취소되고 접속 중인 모두에게 WebSocket으로 알린다 |
 | `GET /api/admin/integrations`, `PATCH /api/admin/integrations/{code}` | 관리자 연동 바로가기(13.15). 목록 `[{code, label, url}]`, 수정은 `{url}`(http(s)만, ≤500자) |
@@ -270,19 +270,19 @@ record TrendBox(
 
 | 컬럼 | 의미 | 바뀌는 때 |
 |---|---|---|
-| `search_count` | 누적 검색 수. 검색창에서 이 키워드로 찾아진 횟수(💤 포함, ⛔와 없는 단어 제외). 같은 사용자(방문자 ID)의 같은 키워드는 한 시간에 한 번만 센다 | 메모리 카운터를 매시 정각에 더함 |
-| `total_plus_count` | 누적 `+` 수. 24시간 삭제·충돌로 잃어도 줄지 않는다(💤, 만료 행 재사용 포함) | `+` 트랜잭션에서 +1 |
+| `search_count` | 검색수. 검색창에서 이 키워드로 찾아진 횟수(💤 포함, ⛔와 없는 단어 제외). 같은 사용자(방문자 ID)의 같은 키워드는 한 시간에 한 번만 센다 | 메모리 카운터를 매시 정각에 더함 |
+| `add_count` | 추가수. 24시간 삭제·충돌로 잃어도 줄지 않는다(💤, 만료 행 재사용 포함) | `+` 트랜잭션에서 +1 |
 | `holder_count` | 지금 가진 사람 수(`player_keywords` 행 수 캐시). 💤↔🔥 전환과 트렌드 값 계산(4.8)에 쓴다 | `+`(새 행) +1, 24시간 삭제·충돌로 잃기 −1 |
 
 기록 테이블
 
 | 테이블 | 한 행 | 보관 | 내용 |
 |---|---|---|---|
-| `keyword_log_24h` | 키워드 × 나라 현지 시 0~23의 24칸(`hour_slot`, 매시간 그 칸을 덮어쓴다. `recorded_at` = 그 시간의 시작, UTC 정시) | 키워드당 24칸(행을 지우지 않는다) | 그 시간이 끝날 때의 세 누적값(스냅샷)과 그 시간의 증분(`search_inc`, `total_plus_inc`, `holder_inc`, 음수 가능) |
+| `keyword_log_24h` | 키워드 × 나라 현지 시 0~23의 24칸(`hour_slot`, 매시간 그 칸을 덮어쓴다. `recorded_at` = 그 시간의 시작, UTC 정시) | 키워드당 24칸(행을 지우지 않는다) | 그 시간이 끝날 때의 세 누적값(스냅샷)과 그 시간의 증분(`search_inc`, `add_inc`, `holder_inc`, 음수 가능) |
 | `keyword_log_dailies` | 키워드 × 하루(`recorded_at`의 나라 현지 날짜) | 180일 | 그날 마지막 누적값과 그날의 증분 합 |
 
 흐름
-1. 검색은 DB를 건드리지 않고 메모리 카운터만 올린다(키워드별 `LongAdder`). 중복 검사용 (사용자, 키워드) 집합도 메모리에 두고 시간이 바뀌면 비운다. `+`의 `total_plus_count`·`holder_count`는 9.4의 트랜잭션에서 바로 바꾼다.
+1. 검색은 DB를 건드리지 않고 메모리 카운터만 올린다(키워드별 `LongAdder`). 중복 검사용 (사용자, 키워드) 집합도 메모리에 두고 시간이 바뀌면 비운다. `+`의 `add_count`·`holder_count`는 9.4의 트랜잭션에서 바로 바꾼다.
 2. 매시 정각 잡이 먼저 지난 한 시간의 검색 카운터를 비우며 `UPDATE keywords SET search_count = search_count + ?`로 더한다(키워드 번호 순으로 묶어서). 그다음 대상 키워드의 세 누적값과 그 시간의 증분을 `keyword_log_24h`에 `INSERT ... ON DUPLICATE KEY UPDATE`로 저장한다(그 시간의 칸을 덮어쓴다. 같은 시간을 다시 저장해도 같다). 증분은 그 시간 동안 메모리 카운터가 센 양이고, `holder_inc`는 직전에 저장한 가진 사람 수와의 차이다.
 3. 같은 잡이 그 행이 속한 현지 날짜의 `keyword_log_dailies` 행을 그날의 시간별 행에서 다시 만든다(증분은 합, 누적값은 그날 마지막 행의 값). 날짜가 다른 옛 칸은 제외하고, 매번 덮어쓰므로 재시작해도 중복 합산이 없으며 별도의 자정 정리 작업이 필요 없다.
 4. 대상은 그 시간에 카운터가 바뀌었거나 가진 사람이 1명 이상인 키워드다. 나머지는 행을 만들지 않고 그래프에서 증분 0으로 그린다.
@@ -377,7 +377,7 @@ record TrendBox(
 |---|---|---|
 | 사용자 | `user_states` | 사용자 상태(정상 / 탈퇴) |
 | | `users` | 계정(게스트 포함). 방문자 ID, OAuth 종류·ID, 상태, 권한, UI 언어, 계정 금지·업로드 정지 만료 시각, 탈퇴 시각 |
-| | `players` | 플레이어 = 사용자 × 나라. 닉네임, 누적 검색 횟수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 마지막 접속 시각, 누적 `+` 횟수, 댓글 점수 |
+| | `players` | 플레이어 = 사용자 × 나라. 닉네임, 검색수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 마지막 접속 시각, 추가수, 댓글 점수 |
 | | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
 | | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
 | | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
@@ -385,7 +385,7 @@ record TrendBox(
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
-| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 누적 검색 수·`+` 수, 가진 사람 수, 공개 페이지 조회수(`view_count`) |
+| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 검색수·`+` 수, 가진 사람 수, 공개 페이지 조회수(`view_count`) |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
 | | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). |
 | | `keyword_ai_comments` | 키워드 AI 한 줄 설명(4.12): 설명, 쓴 쪽(AI/ADMIN), 쓴 시각, 자동 시도 횟수. `keywords.ai_comment_id`가 가리키고(키워드 하나에 행 하나, 처음 만들기를 시도할 때 만듦) 키워드 행은 가볍게 둔다 |

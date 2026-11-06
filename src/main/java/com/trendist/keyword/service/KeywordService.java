@@ -59,7 +59,7 @@ public interface KeywordService {
 
     /** 관리자 키워드 목록의 한 줄(13.6). */
     record AdminKeywordRow(long id, String text, String normalized, String state, String source, long trendValue, long holderCount,
-                           long totalPlusCount, long searchCount, long viewCount, Instant externalUntil, Instant activatedAt,
+                           long addCount, long searchCount, long viewCount, Instant externalUntil, Instant activatedAt,
                            Instant bannedAt, Instant createdAt) {}
 
     /**
@@ -81,7 +81,7 @@ public interface KeywordService {
 
     /**
      * 관리자 키워드 목록(13.6). state: 활성/비활성/금지(이름, 비우면 전체), source: data_sources.name, q: 검색어,
-     * sort: trendValue / holderCount / totalPlusCount / searchCount / createdAt / activatedAt / externalUntil, dir: asc·desc.
+     * sort: trendValue / holderCount / addCount / searchCount / createdAt / activatedAt / externalUntil, dir: asc·desc.
      */
     /** state·source는 쉼표로 여러 개(예: "활성,금지"), 비우면 전체 */
     AdminKeywordPage adminSearch(String countryCode, String state, String source, String q, String sort, String dir, int page, int size);

@@ -31,9 +31,9 @@ public class Player extends BaseTimeEntity {
     private Level level;
     @Column(name = "current_score", nullable = false) private long currentScore; // 정수 점수(4.8)
     @Column(name = "hold_count", nullable = false) private long holdCount;
-    @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
+    @Column(name = "add_count", nullable = false) private long addCount;
     @Column(name = "comment_score", nullable = false) private long commentScore;
-    /** 누적 검색 횟수(4.4). 검색할 때마다 +1. 줄지 않는다. */
+    /** 검색수(4.4). 검색할 때마다 +1. 줄지 않는다. */
     @Column(name = "search_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long searchCount;
     /** 마지막으로 방에 접속해 있던 시각(1분 단위로 고친다). 관리자 통계의 7일·30일 활동 인원과 사용자 관리에 쓴다(13.9, 13.10) */
     @Column(name = "last_seen_at", columnDefinition = "DATETIME(6)") private Instant lastSeenAt;
@@ -67,7 +67,7 @@ public class Player extends BaseTimeEntity {
     public void addExp(long amount) { this.exp += amount; }
     public void setLevel(Level level) { this.level = level; }
     public void setCurrentScore(long score) { this.currentScore = score; }
-    public void incTotalPlus() { this.totalPlusCount++; }
+    public void incAdd() { this.addCount++; }
     public void incHold() { this.holdCount++; }
     public void decHold() { this.holdCount = Math.max(0, holdCount - 1); }
     public void setHoldCount(long holdCount) { this.holdCount = Math.max(0, holdCount); }

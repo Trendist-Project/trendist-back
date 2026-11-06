@@ -12,13 +12,13 @@ public final class AdminUserDtos {
     /** 목록의 한 줄. type: GUEST / GOOGLE, commentBannedUntil은 댓글 작성 정지 끝(없으면 null) */
     public record Row(long userId, long playerId, String nickname, String type, boolean admin, boolean withdrawn,
                       Instant bannedUntil, Instant uploadBannedUntil, Instant commentBannedUntil,
-                      long level, long score, long holdCount, long totalPlusCount, long reportCount,
+                      long level, long score, long holdCount, long addCount, long reportCount,
                       Instant createdAt, Instant lastSeenAt, boolean online, Instant chatBannedUntil) {}
 
     public record Page(List<Row> items, long total, int page, int size) {}
 
     /** 플레이어 누적 수치 */
-    public record Stats(long exp, long level, long score, long holdCount, long totalPlusCount, long searchCount, long commentScore,
+    public record Stats(long exp, long level, long score, long holdCount, long addCount, long searchCount, long commentScore,
                         long stealCount, long botWinCount, long orbCount, long loseCount, long activeDays, long killCount, long defeatCount,
                         long titleCount, String title, long commentCount, long chatCount) {}
 

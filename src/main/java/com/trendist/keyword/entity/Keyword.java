@@ -22,7 +22,7 @@ public class Keyword extends BaseTimeEntity {
     @Column(nullable = false, length = 100) private String normalized;
     @Column(name = "trend_value", nullable = false) private long trendValue; // 정수 점수(4.8)
     @Column(name = "search_count", nullable = false) private long searchCount;
-    @Column(name = "total_plus_count", nullable = false) private long totalPlusCount;
+    @Column(name = "add_count", nullable = false) private long addCount;
     @Column(name = "holder_count", nullable = false) private long holderCount;
     /** 키워드 조회수(4.28): 공개 키워드 페이지와 게임 안 상세 팝업을 연 횟수. 같은 방문자는 하루 1번, 크롤러는 제외. 메모리에 모았다가 1분마다 더한다. */
     @Column(name = "view_count", nullable = false) private long viewCount;
@@ -46,7 +46,7 @@ public class Keyword extends BaseTimeEntity {
 
     public void attachAiComment(KeywordAiComment row) { this.aiComment = row; }
     public void setTrendValue(long trendValue) { this.trendValue = trendValue; }
-    public void incTotalPlus() { totalPlusCount++; }
+    public void incAdd() { addCount++; }
     public void incHolder() { holderCount++; }
     public void decHolder() { holderCount = Math.max(0, holderCount - 1); }
     public void addSearch(long n) { searchCount += n; }

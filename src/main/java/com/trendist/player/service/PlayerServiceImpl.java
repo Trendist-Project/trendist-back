@@ -161,7 +161,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public PlayerDtos.PlayerSummary summary(Player p) {
         return new PlayerDtos.PlayerSummary(p.getId(), p.getNickname(), p.getCountry().getCode(), p.getLevel(), p.getExp(),
-                levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getTotalPlusCount(),
+                levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getAddCount(),
                 p.getCommentScore(), p.getSearchCount(), changeableAt(p), p.getStealCount(), p.getBotWinCount(), p.getActiveDays(), p.getKillCount(), p.getDefeatCount());
     }
 

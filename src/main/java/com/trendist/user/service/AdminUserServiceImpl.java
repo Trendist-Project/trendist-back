@@ -84,7 +84,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             case "created" -> Sort.by(by.apply("createdAt"));
             case "score" -> Sort.by(by.apply("currentScore"), by.apply("id"));
             case "level" -> Sort.by(by.apply("level.level"), by.apply("exp"), by.apply("id"));
-            case "plus" -> Sort.by(by.apply("totalPlusCount"), by.apply("id"));
+            case "plus" -> Sort.by(by.apply("addCount"), by.apply("id"));
             default -> Sort.by(by.apply("lastSeenAt").nullsLast(), by.apply("id")); // 접속 기록이 없는 사람은 어느 방향이든 맨 뒤
         };
         var result = players.searchForAdmin(c.getId(), text == null ? null : "%" + text.toLowerCase(Locale.ROOT) + "%", qid, f,
@@ -109,7 +109,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         Double live = rooms.liveScore(p.getCountry().getId(), p.getId());
         String title = p.getTitleId() == null ? null : titles.findById(p.getTitleId()).map(Title::getName).orElse(null);
         AdminUserDtos.Stats stats = new AdminUserDtos.Stats(p.getExp(), p.getLevel(), live != null ? Math.round(live) : p.getCurrentScore(),
-                p.getHoldCount(), p.getTotalPlusCount(), p.getSearchCount(), p.getCommentScore(), p.getStealCount(), p.getBotWinCount(),
+                p.getHoldCount(), p.getAddCount(), p.getSearchCount(), p.getCommentScore(), p.getStealCount(), p.getBotWinCount(),
                 p.getOrbCount(), p.getLoseCount(), p.getActiveDays(), p.getKillCount(), p.getDefeatCount(), playerTitles.findByPlayerId(p.getId()).size(), title,
                 comments.countByPlayerId(p.getId()), chats.countByPlayerId(p.getId()));
         Instant now = Instant.now(clock);
@@ -262,7 +262,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         Double live = rooms.liveScore(p.getCountry().getId(), p.getId());
         return new AdminUserDtos.Row(u.getId(), p.getId(), p.getNickname(), u.isGuest() ? "GUEST" : "GOOGLE",
                 User.ROLE_ADMIN.equals(u.getRole()), u.isWithdrawn(), ban, upload, comment, p.getLevel(),
-                live != null ? Math.round(live) : p.getCurrentScore(), p.getHoldCount(), p.getTotalPlusCount(), reportCount,
+                live != null ? Math.round(live) : p.getCurrentScore(), p.getHoldCount(), p.getAddCount(), reportCount,
                 p.getCreatedAt(), online.contains(p.getId()) ? now : p.getLastSeenAt(), online.contains(p.getId()), chat);
     }
 

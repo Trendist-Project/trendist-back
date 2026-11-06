@@ -51,8 +51,8 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
             int slot = hourStart.atZone(zone).getHour();
             // 새 칸은 값을 채운 뒤에 저장한다(recorded_at은 NOT NULL)
             KeywordLog24h row = hourly.findByKeywordIdAndHourSlot(k.getId(), slot).orElseGet(() -> new KeywordLog24h(k, slot));
-            row.overwrite(hourStart, k.getSearchCount(), k.getTotalPlusCount(), k.getHolderCount(),
-                    searchInc, Math.max(0, k.getTotalPlusCount() - base.plus()), k.getHolderCount() - base.holders());
+            row.overwrite(hourStart, k.getSearchCount(), k.getAddCount(), k.getHolderCount(),
+                    searchInc, Math.max(0, k.getAddCount() - base.plus()), k.getHolderCount() - base.holders());
             hourly.saveAndFlush(row);
             rebuildDay(k, hourStart.atZone(zone).toLocalDate(), zone, hourEnd);
         }
@@ -68,22 +68,22 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         KeywordLog24h last = rows.getLast();
         KeywordLogDaily d = daily.findByKeywordIdAndRecordDate(k.getId(), date).orElseGet(() -> new KeywordLogDaily(k, date));
         daily.save(d);
-        d.overwrite(last.getSearchCount(), last.getTotalPlusCount(), last.getHolderCount(),
+        d.overwrite(last.getSearchCount(), last.getAddCount(), last.getHolderCount(),
                 rows.stream().mapToLong(KeywordLog24h::getSearchInc).sum(),
-                rows.stream().mapToLong(KeywordLog24h::getTotalPlusInc).sum(),
+                rows.stream().mapToLong(KeywordLog24h::getAddInc).sum(),
                 rows.stream().mapToLong(KeywordLog24h::getHolderInc).sum());
     }
 
-    /** 그 시각 직전의 누적 + 수와 가진 사람 수. 증분은 지금 값에서 이것을 뺀다. */
+    /** 그 시각 직전의 추가수와 가진 사람 수. 증분은 지금 값에서 이것을 뺀다. */
     private record Base(long plus, long holders) {}
 
     private Base base(Keyword k, Instant since) {
         Optional<KeywordLog24h> prev = hourly.findTopByKeywordIdAndRecordedAtBeforeOrderByRecordedAtDesc(k.getId(), since);
-        if (prev.isPresent()) return new Base(prev.get().getTotalPlusCount(), prev.get().getHolderCount());
+        if (prev.isPresent()) return new Base(prev.get().getAddCount(), prev.get().getHolderCount());
         // 직전 기록이 없다(새 키워드거나 기록을 시작하기 전부터 있던 키워드). 그 시간 뒤에 +되어 남아 있는 행만 이번 증분으로 본다.
         // 옛 누적값이 한 시간에 몰려 그래프가 튀지 않게 하려는 것이다
         long recent = playerKeywords.countPlusedSince(k.getId(), since);
-        return new Base(Math.max(0, k.getTotalPlusCount() - recent), Math.max(0, k.getHolderCount() - recent));
+        return new Base(Math.max(0, k.getAddCount() - recent), Math.max(0, k.getHolderCount() - recent));
     }
 
     // ---------------------------------------------------------------- 조회
@@ -116,7 +116,7 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         // 이번 시간: 아직 정각 잡이 기록하지 않았으므로 지금 누적값과 메모리 검색 카운터로 만든다("집계 중")
         Base base = base(k, thisHour);
         long liveSearch = searchCounter.pending(k.getId());
-        long livePlus = Math.max(0, k.getTotalPlusCount() - base.plus());
+        long livePlus = Math.max(0, k.getAddCount() - base.plus());
 
         List<KeywordDtos.ActivityPoint> points = switch (range) {
             case "24h" -> hourlyPoints(k, thisHour, liveSearch, livePlus);
@@ -126,7 +126,7 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
             default -> throw ApiException.badRequest("ACTIVITY_RANGE", "기간은 24h, 7d, 30d, 180d 중 하나예요");
         };
         return new KeywordDtos.Activity(range, zone.getId(), points,
-                k.getSearchCount() + liveSearch, k.getTotalPlusCount(), k.getHolderCount());
+                k.getSearchCount() + liveSearch, k.getAddCount(), k.getHolderCount());
     }
 
     /** 최근 24시간: 지난 23시간의 칸(없으면 0) + 이번 시간. 가진 사람 수는 기록이 없는 시간에 직전 값을 이어 쓴다. */
@@ -142,7 +142,7 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
         for (Instant t = from; t.isBefore(thisHour); t = t.plus(1, ChronoUnit.HOURS)) {
             KeywordLog24h r = rows.get(t);
             if (r != null) holders = r.getHolderCount();
-            out.add(new KeywordDtos.ActivityPoint(t, r == null ? 0 : r.getSearchInc(), r == null ? 0 : r.getTotalPlusInc(), holders, false));
+            out.add(new KeywordDtos.ActivityPoint(t, r == null ? 0 : r.getSearchInc(), r == null ? 0 : r.getAddInc(), holders, false));
         }
         out.add(new KeywordDtos.ActivityPoint(thisHour, liveSearch, livePlus, k.getHolderCount(), true));
         return out;
@@ -163,13 +163,13 @@ public class KeywordActivityServiceImpl implements KeywordActivityService {
             KeywordLogDaily d = rows.get(date);
             if (d != null) holders = d.getHolderCount();
             out.add(new KeywordDtos.ActivityPoint(date.atStartOfDay(zone).toInstant(),
-                    d == null ? 0 : d.getSearchInc(), d == null ? 0 : d.getTotalPlusInc(), holders, false));
+                    d == null ? 0 : d.getSearchInc(), d == null ? 0 : d.getAddInc(), holders, false));
         }
         Instant todayStart = today.atStartOfDay(zone).toInstant();
         long search = liveSearch, plus = livePlus;
         for (KeywordLog24h r : hourly.findByKeywordIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAt(k.getId(), todayStart, thisHour)) {
             search += r.getSearchInc();
-            plus += r.getTotalPlusInc();
+            plus += r.getAddInc();
         }
         out.add(new KeywordDtos.ActivityPoint(todayStart, search, plus, k.getHolderCount(), true));
         return out;
