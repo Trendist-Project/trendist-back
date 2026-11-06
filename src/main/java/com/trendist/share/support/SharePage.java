@@ -73,7 +73,10 @@ public final class SharePage {
                     padding:24px 16px;box-sizing:border-box;background:#0d1420;color:#e8eef6;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif}
                   img{width:min(100%%,432px);height:auto;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
                   a.play{display:inline-block;padding:14px 28px;border-radius:12px;background:#3fb68b;color:#0d1420;font-weight:800;
-                    font-size:1.05rem;text-decoration:none}
+                    font-size:1.05rem;text-decoration:none;transition:background .15s,transform .15s,box-shadow .15s}
+                  a.play:hover{background:#5fd3a8;transform:translateY(-2px);box-shadow:0 6px 18px rgba(63,182,139,.35)}
+                  a.play:active{background:#35a07b;transform:translateY(0);box-shadow:none}
+                  a.play:focus-visible{outline:3px solid #9fe0c3;outline-offset:3px}
                   p{margin:0;color:#8b9bb0;font-size:.9rem}
                 </style>
                 </head>

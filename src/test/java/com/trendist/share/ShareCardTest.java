@@ -206,8 +206,8 @@ class ShareCardTest {
 
     @Test
     void rendererDrawsEveryTrailAndLevel() throws Exception {
-        List<ShareDtos.Record> recs = List.of(new ShareDtos.Record("추가수", "1,234회"), new ShareDtos.Record("빼앗기", "5회"),
-                new ShareDtos.Record("봇 사냥", "12회"), new ShareDtos.Record("활동한 날", "9일"));
+        List<ShareDtos.Record> recs = List.of(new ShareDtos.Record("보유 키워드", "7개"), new ShareDtos.Record("추가수", "1,234회"),
+                new ShareDtos.Record("처치", "12회"), new ShareDtos.Record("활동한 날", "9일"));
         String[] trails = {null, "afterimage", "sparkle", "flame", "bubble", "rainbow", "footprint", "pawprint", "birdprint", "bearprint", "rabbitprint", "petal", "unknown"};
         for (int i = 0; i < trails.length; i++) {
             var d = new ShareDtos.CardData("아주아주긴닉네임이라서", i + 1, i % 2 == 0 ? "트렌드 사냥꾼" : null, 1234L * i,

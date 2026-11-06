@@ -123,14 +123,14 @@ public class ShareCardServiceImpl implements ShareCardService {
         // GLOBAL 나라(영어) 플레이어의 카드는 영어로 만든다. 한국어 카드는 lang을 비워 기존 해시를 유지한다
         boolean en = Lang.ofLocale(p.getCountry().getDefaultLocale()).isEn();
         List<ShareDtos.Record> records = en ? List.of(
+                new ShareDtos.Record("Keywords held", String.format(java.util.Locale.ENGLISH, "%,d", s.holdCount())),
                 new ShareDtos.Record("Added", String.format(java.util.Locale.ENGLISH, "%,d", s.addCount())),
-                new ShareDtos.Record("Steals", String.format(java.util.Locale.ENGLISH, "%,d", s.stealCount())),
-                new ShareDtos.Record("Bot wins", String.format(java.util.Locale.ENGLISH, "%,d", s.botWinCount())),
+                new ShareDtos.Record("Kills", String.format(java.util.Locale.ENGLISH, "%,d", s.killCount())),
                 new ShareDtos.Record("Days active", String.format(java.util.Locale.ENGLISH, "%,d", s.activeDays())))
                 : List.of(
+                new ShareDtos.Record("보유 키워드", String.format("%,d개", s.holdCount())),
                 new ShareDtos.Record("추가수", String.format("%,d회", s.addCount())),
-                new ShareDtos.Record("빼앗기", String.format("%,d회", s.stealCount())),
-                new ShareDtos.Record("봇 사냥", String.format("%,d회", s.botWinCount())),
+                new ShareDtos.Record("처치", String.format("%,d회", s.killCount())),
                 new ShareDtos.Record("활동한 날", String.format("%,d일", s.activeDays())));
         long score = mine != null ? mine.score() : s.currentScore(); // 접속 중이면 방의 실시간 값
         Optional<ProfileDtos.Art> art = profiles.equippedArt(p.getId()); // 픽셀 그림(4.9)

@@ -192,7 +192,7 @@ public class ShareCardRenderer {
             y += 30;
         }
 
-        // 누적 기록 4칸
+        // 기록 4칸(보유 키워드·추가수·처치·활동한 날)
         List<ShareDtos.Record> recs = d.records();
         int cols = Math.max(1, recs.size());
         double gap = 16, cw = (W - 128 - gap * (cols - 1)) / cols;

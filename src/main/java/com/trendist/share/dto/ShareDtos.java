@@ -6,7 +6,7 @@ import java.util.List;
 public final class ShareDtos {
     private ShareDtos() {}
 
-    /** 누적 기록 한 칸(이름, 보이는 값) */
+    /** 기록 한 칸(이름, 보이는 값) */
     public record Record(String name, String value) {}
 
     /**
