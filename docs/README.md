@@ -22,6 +22,9 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 201판 (2026-11-06)
+- **설정 `collision_cooldown_seconds` 삭제**(4.3, 13.3): 관리자가 바꿀 일이 없는 값이라 설정에서 뺐다. 같은 두 원이 계속 겹쳐 있을 때 튕김·싸움을 0.5초에 한 번만 판정하는 동작은 그대로 두고 값만 `Room.PAIR_COOLDOWN_SECONDS`(0.5, 고정값)로 코드에 넣었다. `Room.Tuning`에서 값을 빼고 이미 만든 DB의 행은 **마이그레이션 V13**이 지운다. 이동·충돌 그룹은 6개 → 5개
+
 ### 200판 (2026-11-06)
 - **설정 그룹을 DB 테이블로, 설정마다 단위**(13.3, 17): 그룹이 코드에만 있던 것을 그룹 테이블 `setting_groups`(이름 유일, 순서 `sort_order`)로 옮기고, `settings.group_id`가 외래 키(`fk_settings_group`, 필수)로 가리킨다. 설정에 단위 칸 `settings.unit`(초·분·시간·px·px/s·배·%·명·개·점·EXP·레벨·콤보·회 등, 최대 20자, 단위 없는 값은 비움)도 추가했다. 관리자 [설정] 화면은 **값 입력칸 바로 뒤에 단위**를 보여 주고 범위·기본값·[기본값으로]에도 붙인다(`/api/admin/settings` 항목에 `unit` 추가, `group`은 그룹 이름). 그룹 이름·순서와 설정별 그룹·단위는 코드(`SettingKeys.GROUP_ORDER`·`group(...)`·`unit(...)`)가 정하고 시더가 서버를 켤 때 DB를 맞춘다. 설명 속에 중복으로 적혀 있던 단위 표기("(초)", "(px)" 등)는 뺐다. **마이그레이션 V12**가 표·컬럼·외래 키를 만들고 기존 설정을 일단 '기타' 그룹에 두면 시더가 코드의 그룹·단위로 맞춘다. 테스트 `SettingKeysTest`(그룹 없는 설정, 단위 길이, 시간 이름과 단위 일치), `ApiFlowTest.settingsAreGroupedByTheGroupTableAndCarryTheirUnit`
 - **입장 직후 보호 설정 `join_protect_seconds` 삭제**(4.3, 4.31, 4.32, 13.3): 입장과 리스폰은 늘 가운데 세이프존에서 시작하고(안전한 자리), 연결을 끊어 도망치는 것은 끊겨도 원이 `offline_keep_seconds`(60초) 동안 남는 것으로 이미 막혀 있어 따로 보호하지 않는다. `Room.Tuning`에서 값을 빼고 `Room.join`의 `respawn` 인자(입장 보호 여부 전용이었다)도 없앴다. 이미 만든 DB의 행은 V12가 지운다. 잃은 뒤 무적(`lose_protect_seconds`, 3초)은 그대로다. 테스트 `RoomOfflineTest`·`RoomTest`를 이 규칙에 맞게 고침

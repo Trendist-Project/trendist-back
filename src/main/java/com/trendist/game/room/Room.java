@@ -25,7 +25,7 @@ public class Room {
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
-                         double cooldownSeconds, double loseProtectSeconds,
+                         double loseProtectSeconds,
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
                          int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap) {}
 
@@ -174,6 +174,8 @@ public class Room {
     public static final int MAX_SPECTATORS = 10;
     private volatile int spectatorSize;
     private final Map<Long, Set<Member>> holders = new HashMap<>();
+    /** 같은 두 원이 계속 겹쳐 있어도 튕김·싸움 판정은 이 시간(초)에 한 번만 한다(틱마다 되풀이되지 않게). 설정이 아니라 고정값이다 */
+    private static final double PAIR_COOLDOWN_SECONDS = 0.5;
     private final Map<Long, Double> pairCooldown = new HashMap<>();
     private volatile double offlineKeepSeconds = 60; // 연결이 끊겨도 원이 아레나에 남아 있는 시간(초, 4.32). 0이면 바로 뺀다
     private final Map<Integer, double[]> orbs = new LinkedHashMap<>(); // ? 구슬 번호 → {x, y}
@@ -988,7 +990,7 @@ public class Room {
                     if (fresh) { knock(small, sign * nx, sign * ny, Math.min(ratio, tu.knockbackCap()), tu); small.targetX = null; }
                 }
                 if (fresh) {
-                    pairCooldown.put(key, clockSeconds + tu.cooldownSeconds());
+                    pairCooldown.put(key, clockSeconds + PAIR_COOLDOWN_SECONDS);
                     boolean aFlame = isFlame(a), bFlame = isFlame(b);
                     if (aFlame != bFlame) {
                         // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)

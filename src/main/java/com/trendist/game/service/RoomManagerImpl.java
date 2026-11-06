@@ -128,7 +128,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.KNOCKBACK_CAP),
                 settings.getDouble(SettingKeys.KNOCKBACK_SECONDS),
                 settings.getDouble(SettingKeys.KNOCKBACK_DISTANCE),
-                settings.getDouble(SettingKeys.COLLISION_COOLDOWN),
                 settings.getDouble(SettingKeys.LOSE_PROTECT_SECONDS),
                 settings.getInt(SettingKeys.ORB_MAX),
                 settings.getDouble(SettingKeys.ORB_SPAWN_SECONDS),

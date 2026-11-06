@@ -33,7 +33,6 @@ public final class SettingKeys {
     public static final String KNOCKBACK_CAP = "collision_knockback_cap";
     public static final String KNOCKBACK_SECONDS = "collision_knockback_seconds";
     public static final String KNOCKBACK_DISTANCE = "collision_knockback_distance";
-    public static final String COLLISION_COOLDOWN = "collision_cooldown_seconds";
     public static final String LOSE_PROTECT_SECONDS = "lose_protect_seconds";
     public static final String NICKNAME_CHANGE_MINUTES = "nickname_change_minutes";
     public static final String ORB_MAX = "orb_max";
@@ -95,7 +94,6 @@ public final class SettingKeys {
             new Def(KNOCKBACK_SECONDS, "0.5", 0.05, 5, "튕김이 멈출 때까지 걸리는 시간. 처음에 빠르고 점점 느려진다"),
             // 튕기는 거리 = 최대 속도(px/s) × 이 값 × 세기. 1이면 최대 속도로 1초 동안 가는 거리만큼 튕긴다
             new Def(KNOCKBACK_DISTANCE, "0.6", 0, 5, "튕기는 거리: 최대 속도로 몇 초 동안 가는 거리만큼인지(같은 크기끼리 기준)"),
-            new Def(COLLISION_COOLDOWN, "0.5", 0, 10, "같은 상대 연속 충돌 쿨다운(초)"),
             new Def(LOSE_PROTECT_SECONDS, "3", 0, 600, "키워드를 잃은 뒤 무적 시간. 모두의 화면에 카운트다운이 보인다"),
             new Def(NICKNAME_CHANGE_MINUTES, "5", 0, 10080, "닉네임 변경 간격(나라별)"),
             // ? 구슬 목표 개수 = 지금 활동 영역 넓이(100만 px² 단위) × 밀도. 맵이 넓어지면 같은 비율로 늘어난다(4.20).
@@ -146,7 +144,7 @@ public final class SettingKeys {
                 EXTERNAL_CONFIRM_HEAT, EXTERNAL_HOLD_HOURS, PLUS_TTL_HOURS, ACTIVATE_HOLDERS);
         group("성장·경험치·칭호", EXP_SCORE_CAP, EXP_PER_PLUS, ATTACK_EXP, KILL_EXP, RANK_TITLE_MIN_PLAYERS);
         group("맵·크기", WORLD_SIZE, MIN_RADIUS, MAX_DIAMETER, SCORE_CAP, ZOOM_FACTOR, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        group("이동·충돌", MAX_SPEED, BIG_RATIO, KNOCKBACK_CAP, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, COLLISION_COOLDOWN);
+        group("이동·충돌", MAX_SPEED, BIG_RATIO, KNOCKBACK_CAP, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE);
         group("보호·접속", LOSE_PROTECT_SECONDS, OFFLINE_KEEP_SECONDS);
         group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
         group("? 구슬", ORB_DENSITY, ORB_MAX, ORB_SPAWN_SECONDS, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT);
@@ -168,7 +166,7 @@ public final class SettingKeys {
     private static final java.util.Map<String, String> UNIT_OF = new java.util.HashMap<>();
     private static void unit(String unit, String... names) { for (String n : names) UNIT_OF.put(n, unit); }
     static {
-        unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, COLLISION_COOLDOWN, LOSE_PROTECT_SECONDS,
+        unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
                 ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, DASH_COOLDOWN_SECONDS, COMBO_MAX_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
