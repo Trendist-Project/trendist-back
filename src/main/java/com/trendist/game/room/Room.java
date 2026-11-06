@@ -450,7 +450,11 @@ public class Room {
         if (m == null) return;
         boolean levelUp = level > m.level;
         m.score = score; m.level = level; m.radius = radiusFor(score);
-        if (levelUp) broadcastRoster();
+        if (levelUp) {
+            broadcastRoster();
+            // 레벨업 이펙트(4.30): 모두에게 같은 빛기둥(고정). 모든 원에서 그 원이 보이는 화면에 나온다
+            broadcast(Map.of("type", "levelFx", "e", m.entityNo, "level", m.level));
+        }
     }
 
     /** 키워드 트렌드 값 변화: 접속 중인 보유자 모두에게 같은 변화량을 더한다(9.2). */

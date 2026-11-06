@@ -67,6 +67,7 @@
 - 관리자 관전(13.13): 클라이언트가 `auth` 대신 `spectate{token, country}`를 보내면 관리자 토큰(`AccountGuard.isAdmin`)인지 확인하고 `Room.addSpectator`로 받는다. 관전자는 `members`에 넣지 않아 방 크기·활동 영역·충돌·봇 수·랭킹(`liveView`)·접속 인원에 영향이 없고, 방이 모두에게 보내는 스냅샷(`me` 표시 0)·미니맵·`roster`·`orbs`·`orbSpawn`·`orbEaten`·`safeZones`·`chat`·`emote`·`combo`·`dashFx`·`shield`·`tuning`만 받는다. 입장할 때 `roster`·`orbs`·`safeZones`·`chatHistory`를 받고 서버는 `spectating{country, spectators}`로 알린다. 받은 입력(`input`·`move`·`chat`·`emote`)은 모두 버리고 `ping`·`bye`만 받는다. 90초 동안 신호가 없으면 정리하고(`dropSilent`), 방마다 10명까지다. 관리자가 아니거나 토큰이 틀리면 `1008 AUTH_FAILED`로 닫고, 가득 차면 `1008 SPECTATORS_FULL`이다.
 - 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
 - 대시(4.27): 클라이언트가 `dash`를 보내면 방(`Room.dash`)이 쿨타임(`Member.dashReadyAt`)과 움직이는 중인지를 보고, 되면 `dashUntil`까지 `advance`의 최대 속도에 `Room.DashTuning.multiplier`를 곱하고 본인에게 `dash{ms, cooldownMs, mult}`를 보낸다. 클라이언트 예측(`Arena.startDash`)은 같은 배수로 가고, 보정 허용 오차도 배수를 곱한다. 설정은 1초마다 다시 읽는다(`RoomManagerImpl.dashTuning`).
+- 레벨업 이펙트(4.30): `Room.applyScore`가 레벨이 오른 사람의 `levelFx{e, level}`를 방 전체(관전 포함)에 보낸다(고정 연출 빛기둥, 설정·꾸미기 없음).
 - 긴급 안내(4.29): 관리자가 올리거나 끝내면 `EmergencyEvents.Changed`를 내보내고, 커밋된 뒤 `RoomManagerImpl`이 모든 나라 방의 큐에 `Room.announce`를 넣어 접속 중인 모두(관전 포함)에게 `{type: "emergency", notice: {…}|null}`를 보낸다(notice가 null이면 걷는다). 서버를 다시 켜도 DB에서 읽으므로 진행 중인 안내가 이어진다.
 - 연속 빼앗기 콤보(4.25): 작업 스레드가 빼앗기·잃기를 끝내면 방 큐에 결과를 넣고, 틱 스레드가 이긴 사람의 콤보 +1, 잃은 사람의 콤보 0을 하고 `combo{e, nickname, combo, event, flameAt, by, byE}`를 방 전체에 보낸다. 불꽃은 클라이언트가 `combo >= flameAt`일 때 그린다(명단 `roster`에도 `flameAt`). 설정은 1초마다 다시 읽는다(`Room.ComboTuning`). 불꽃인 사람이 불꽃 없는 사람과 부딪히면 방이 `Outbox.requestWipe`로 작업 스레드에 넘기고(`KeywordService.loseAll`), 끝나면 방 큐에서 `fightResult`와 `dropPrizeOrbs`로 ! 구슬을 떨어뜨린다. ! 구슬은 `orbSpawn{prize:true}`로 알리고 `orbs` 목록 항목의 마지막 값이 1이다.
 - 채팅(4.13)도 게임 WebSocket으로 받는다(`chat{text}`). 검사는 받는 스레드에서, 저장은 작업 스레드에서 하고, 저장이 끝나면 방에 넣어 틱 스레드가 방 전체에 `chat{id, e, nickname, text, at}`을 보낸다. 방은 최근 50개를 메모리에 두고 들어오는 사람에게 `chatHistory`로 보낸다. 보낸 사람은 세션 엔티티 번호(`e`)로만 가리킨다.
@@ -430,7 +431,7 @@ record TrendBox(
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만). 표시 순서는 종류별(`sort_order`). 영어 칸은 위 `EnglishBackfill`이 채운다 |
-| `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 12개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
+| `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 16개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 시드 글을 고쳐도 이미 들어간 DB는 바꾸지 않는다(관리자 화면에서 고친다) |
 | `users` | 공지·가이드 작성자로 쓰는 운영자 계정(`role` = ADMIN, 로그인 수단 없음) 1개, 없을 때만 |

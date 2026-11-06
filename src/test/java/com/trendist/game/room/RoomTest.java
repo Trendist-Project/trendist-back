@@ -54,6 +54,21 @@ class RoomTest {
     }
 
     @Test
+    void levelUpBroadcastsPillarSignalToEveryone() {
+        // 4.30: 레벨이 오르면 그 원에서 빛기둥이 나오도록 방 전체에 알린다(꾸미기와 무관한 고정 연출). 레벨이 그대로면 보내지 않는다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        r.join(2, "s2", "b", 1, 0, List.of());
+        r.applyScore(1L, 5, 1); // 점수만 바뀜
+        assertThat(out.texts).noneMatch(m -> "levelFx".equals(m.get("type")));
+        r.applyScore(1L, 9, 2);
+        assertThat(out.texts.stream().filter(m -> "levelFx".equals(m.get("type"))))
+                .hasSize(2) // 두 사람 모두에게
+                .allMatch(m -> m.get("e").equals(a.entityNo) && m.get("level").equals(2));
+    }
+
+    @Test
     void radiusFollowsDocumentCurve() {
         Room r = new Room(1, T, new Out());
         assertThat(r.radiusFor(0)).isEqualTo(16);
