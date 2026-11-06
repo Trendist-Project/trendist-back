@@ -11,7 +11,7 @@ public interface KeywordActivityService {
      * 그 칸이 속한 현지 날짜의 하루 행을 다시 만든 뒤 180일이 지난 하루 행을 지운다.
      *
      * @param hourStart 끝난 시간의 시작(UTC 정시)
-     * @param searched  그 시간에 DB로 옮긴 검색 수(키워드 번호 → 수)
+     * @param searched  그 시간에 DB로 옮긴 검색수(키워드 번호 → 수)
      */
     void recordHour(Instant hourStart, Map<Long, Long> searched);
 

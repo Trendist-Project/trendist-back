@@ -40,7 +40,7 @@ public class User extends BaseTimeEntity {
 
     /**
      * 운영자 계정. 공지·가이드의 작성자(notices.user_id, guides.user_id)로 쓴다.
-     * 방문자 ID도 OAuth도 없어서 로그인할 수 없고, 관리자 로그인은 관리자 기능과 함께 붙인다.
+     * 방문자 ID도 OAuth도 없어서 로그인할 수 없다(관리자 권한 로그인은 구글 계정으로 한다).
      */
     public static User operator(UserState state) {
         User u = new User();

@@ -35,7 +35,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor(); // DB·외부 호출은 틱 밖에서
     /**
      * 방의 DB 작업(키워드 빼앗기·잃기, 처치 기록, 구슬 보상 등)이 동시에 쓰는 DB 연결 수 상한. 칭호 검사는 커밋 뒤 REQUIRES_NEW로 두 번째 연결을 요구하므로
-     * (TitleServiceImpl.on), 연결을 하나씩 쥔 작업이 풀(기본 10개) 이상으로 몰리면 모두가 두 번째 연결을 기다리며 서버가 멈춘다. 봇이 많아 싸움이 잦을 때 그렇게 멈췄다.
+     * (TitleServiceImpl.on), 연결을 하나씩 쥔 작업이 풀(기본 10개) 이상으로 몰리면 모두가 두 번째 연결을 기다리며 서버가 멈춘다.
      * 넘치는 작업은 가상 스레드에서 차례를 기다린다(방 틱은 막히지 않는다). 작업 하나가 최대 연결 2개를 쓰므로 4개면 풀의 8개 이하이고, HTTP 요청 몫이 남는다.
      */
     private final java.util.concurrent.Semaphore dbSlots = new java.util.concurrent.Semaphore(4);

@@ -18,9 +18,7 @@ public class Room {
     private static final int MINIMAP_TOP = 20;   // 큰 아이콘 상위 20명(4.2)
     /** 목표 속도로 다가가는 빠르기. 50ms마다 차이가 절반이 된다(클라이언트 Arena 예측과 같은 값). */
     static final double ACCEL_RATE = Math.log(2) / 0.05;
-    /** 나간 플레이어의 마지막 위치를 기억하는 시간(초). 서버를 다시 켜도 DB에 저장한 위치를 이 시간 안에는 돌려준다 */
     public static final double ORB_RADIUS = 14; // ? 구슬 반지름(px)
- // 나간 뒤 이 시간 안에 다시 들어오면 마지막 위치에서 이어 간다(4.2)
 
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
@@ -191,7 +189,7 @@ public class Room {
      */
     private double areaNow;
     private volatile double areaGrowSpeed = 300; // 0이면 커질 때 바로
-    private volatile double areaShrinkSpeed; // 0이면 줄 때도 바로(예전 방식)
+    private volatile double areaShrinkSpeed; // 0이면 줄 때도 바로
     private final List<SafeZone> zones = new ArrayList<>();
     private int nextZone = 1;
     private double centerSize, sentCenterSize = -1;
@@ -766,7 +764,7 @@ public class Room {
         return Map.of("type", "safeZones", "center", centerSize, "zones", list);
     }
 
-    /** 처음 온 플레이어의 자리: 가운데 고정 존 안 무작위 위치. */
+    /** 입장·리스폰 위치: 가운데 고정 존 안 무작위 위치. */
     private double[] centerSpawn(double area) {
         double c = Math.min(area / 2, Math.max(zoneTuning.centerMin(), area * zoneTuning.centerRatio()));
         double range = Math.max(0, c / 2 - 60);

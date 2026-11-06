@@ -5,7 +5,7 @@ import com.trendist.profile.dto.ProfileDtos;
 import java.time.Instant;
 import java.util.List;
 
-/** 관리자 사용자 관리(13.10). 사용자 = 계정, 플레이어 = 계정 × 나라(지금은 KR). */
+/** 관리자 사용자 관리(13.10). 사용자 = 계정, 플레이어 = 계정 × 나라(KR·GLOBAL). */
 public final class AdminUserDtos {
     private AdminUserDtos() {}
 

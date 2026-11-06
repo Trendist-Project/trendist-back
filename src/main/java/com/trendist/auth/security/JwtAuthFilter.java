@@ -12,7 +12,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Authorization: Bearer 토큰을 검증해 AuthUser를 넣는다. 금지·탈퇴 확인은 AuthService가 짧은 캐시로 한다. */
+/** Authorization: Bearer 토큰을 검증해 AuthUser를 넣는다. 금지·탈퇴 확인은 AccountGuard가 짧은 캐시로 한다. */
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwt;
     private final AccountGuard guard;

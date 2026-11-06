@@ -4,7 +4,7 @@ import com.trendist.user.dto.AdminUserDtos;
 
 /** 관리자 사용자 관리(13.10): 찾기, 상세, 제재 걸기·풀기, 닉네임 바꾸기, 꾸미기 초기화, 관리자 권한, 강제 퇴장. */
 public interface AdminUserService {
-    /** filter: all / guest / google / admin / banned / withdrawn / online, sort: seen / created / score / level / plus, dir: desc(기본) / asc */
+    /** filter: all / guest / google / admin / banned / withdrawn / online, sort: seen / created / score / level / plus(추가수), dir: desc(기본) / asc */
     AdminUserDtos.Page search(String countryCode, String q, String filter, String sort, String dir, int page);
 
     AdminUserDtos.Detail detail(long userId);

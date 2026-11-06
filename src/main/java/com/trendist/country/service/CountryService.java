@@ -2,7 +2,7 @@ package com.trendist.country.service;
 
 import com.trendist.country.entity.Country;
 
-/** 나라(4.18). 지금은 KR만 열려 있다. */
+/** 나라(4.18). 지금 열린 나라는 KR과 GLOBAL이다. */
 public interface CountryService {
     String DEFAULT_COUNTRY = "KR";
 

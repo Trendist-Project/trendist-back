@@ -5,7 +5,7 @@ import com.trendist.notice.dto.NoticeItem;
 import com.trendist.common.support.Lang;
 import java.util.List;
 
-/** 공지사항(4.16): 조회와 관리자 작성·수정·삭제. 팝업으로 띄우는 것은 아직 없다(설정만 저장한다). */
+/** 공지사항(4.16): 조회와 관리자 작성·수정·삭제. 팝업 여부와 기간은 여기서 저장하고, 띄우는 것은 클라이언트가 한다. */
 public interface NoticeService {
     /** 게시 중인 공지. 고정 공지 먼저, 그다음 최신순(최대 50개). */
     default List<NoticeItem> list() { return list(Lang.KO); }

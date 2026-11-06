@@ -117,7 +117,7 @@ class KeywordPageTest {
                 .contains("<loc>http://localhost:8080/kr/keywords/" + java.net.URLEncoder.encode("사이트맵키워드", StandardCharsets.UTF_8) + "</loc>")
                 .contains("<lastmod>")
                 .doesNotContain(java.net.URLEncoder.encode("사이트맵금지", StandardCharsets.UTF_8));
-        // 예전 별도 파일 주소는 없다
+        // 별도 파일 주소는 없다
         mvc.perform(get("/sitemap-keywords.xml")).andExpect(status().isNotFound());
     }
 }

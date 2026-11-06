@@ -63,7 +63,7 @@ public interface PlayerKeywordRepository extends JpaRepository<PlayerKeyword, Lo
     @Query("delete from PlayerKeyword pk where pk.id = :id and pk.expiresAt <= :now")
     int deleteIfExpired(@Param("id") Long id, @Param("now") Instant now);
 
-    /** 그 시각 뒤에 +되어 아직 남아 있는 행 수. 직전 기록이 없을 때 그 시간의 + 수를 어림한다(9.9). */
+    /** 그 시각 뒤에 +되어 아직 남아 있는 행 수. 직전 기록이 없을 때 그 시간의 추가수를 어림한다(9.9). */
     @Query("select count(pk) from PlayerKeyword pk where pk.keyword.id = :keywordId and pk.createdAt >= :since")
     long countPlusedSince(@Param("keywordId") Long keywordId, @Param("since") Instant since);
 

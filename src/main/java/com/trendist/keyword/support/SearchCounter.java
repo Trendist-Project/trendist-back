@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import org.springframework.stereotype.Component;
 
-/** 검색 수는 메모리 카운터로만 센다. 같은 사용자·같은 키워드는 한 시간에 한 번(9.9). 매시 정각에 DB로 옮긴다. */
+/** 검색수는 메모리 카운터로만 센다. 같은 사용자·같은 키워드는 한 시간에 한 번(9.9). 매시 정각에 DB로 옮긴다. */
 @Component
 public class SearchCounter {
     private final ConcurrentHashMap<Long, LongAdder> counts = new ConcurrentHashMap<>();

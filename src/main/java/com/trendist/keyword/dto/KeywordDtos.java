@@ -25,7 +25,7 @@ public final class KeywordDtos {
 
     /**
      * 활동 그래프의 점 하나(4.12, 9.9). t는 그 구간의 시작(24시간은 정시, 나머지는 나라 현지 자정).
-     * search·plus는 그 구간의 증분, holders는 구간이 끝날 때 가진 사람 수. live면 아직 집계 중인 이번 시간·오늘.
+     * search(검색수)·plus(추가수)는 그 구간의 증분, holders는 구간이 끝날 때 가진 사람 수. live면 아직 집계 중인 이번 시간·오늘.
      */
     public record ActivityPoint(Instant t, long search, long plus, long holders, boolean live) {}
 

@@ -4,7 +4,7 @@ import com.trendist.keyword.service.KeywordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/** 관리자 키워드(13.7). /api/admin/**는 ROLE_ADMIN만 들어온다(SecurityConfig). 지금은 KR만 연다. */
+/** 관리자 키워드(13.7). /api/admin/**는 ROLE_ADMIN만 들어온다(SecurityConfig). 나라를 주지 않으면 KR이다. */
 @RestController
 @RequestMapping("/api/admin/keywords")
 @RequiredArgsConstructor

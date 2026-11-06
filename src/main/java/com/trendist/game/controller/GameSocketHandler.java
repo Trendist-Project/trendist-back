@@ -96,7 +96,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         if (member.session != session.getAttributes().get(ATTR_SAFE)) return; // 같은 계정의 새 연결이 이 원을 이어받았다: 이전 연결의 메시지는 버린다(4.32)
         member.lastHeardNanos = System.nanoTime(); // 살아 있다는 표시(응답 없는 접속 정리에 쓴다)
         if ("bye".equals(type)) {
-            // 페이지를 떠난다(구글 로그인으로 이동, 새로고침, 탭 닫기): 닫힘 신호를 기다리지 않고 바로 방에서 뺀다
+            // 페이지를 떠난다(구글 로그인으로 이동, 새로고침, 탭 닫기): 닫힘 신호를 기다리지 않고 바로 끊김으로 처리한다
             Room room = (Room) session.getAttributes().get(ATTR_ROOM);
             if (room != null) room.submit(r -> r.disconnect(member, session.getAttributes().get(ATTR_SAFE))); // 원은 offline_keep_seconds 동안 남는다(4.32)
             close(session, CloseStatus.NORMAL);
@@ -260,8 +260,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     /**
      * 이동 명령 빈도 제한(9.5). 종류별 토큰 버킷: 초당 rate개씩 채워지고 최대 burst개까지 모인다. 버킷이 비면 무시한다.
      * 클라이언트는 클릭(move)을 초당 10회, 방향키(input)를 누르고 뗄 때마다 바로 보낸다. 고정 1초 창으로 세면 네트워크·프록시가
-     * 메시지를 몰아서 전달할 때 한도를 넘겨 그 창이 끝날 때까지 모든 명령이 버려졌다(화면은 갔다가 되돌아옴).
-     * 버킷은 잠깐 몰려 도착해도 받아 주고, 평균 빈도만 제한한다.
+     * 메시지를 몰아서 전달할 때 한도를 넘겨 창이 끝날 때까지 명령이 모두 버려지므로, 버킷으로 잠깐 몰린 것은 받아 주고 평균 빈도만 제한한다.
      */
     private boolean allowInput(WebSocketSession session, String type) {
         String key = "move".equals(type) || "input".equals(type) || "chat".equals(type) || "emote".equals(type) ? type : "other"; // 모르는 종류는 한 칸으로 묶는다

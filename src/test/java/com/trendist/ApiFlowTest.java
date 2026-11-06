@@ -945,7 +945,7 @@ class ApiFlowTest {
 
     @Test
     void keywordHourlyLogWritesSlot() throws Exception {
-        // 매시 정각 기록(9.9): 지난 시간 칸에 그 시간의 추가 수가 남고, 이번 시간(집계 중)은 그 뒤 변화만 센다
+        // 매시 정각 기록(9.9): 지난 시간 칸에 그 시간의 추가수가 남고, 이번 시간(집계 중)은 그 뒤 변화만 센다
         String t = player("시간기록");
         long id = plusKeyword(t, "시간 기록 키워드");
         java.time.Instant lastHour = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS)

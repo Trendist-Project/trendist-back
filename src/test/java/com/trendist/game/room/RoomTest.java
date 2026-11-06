@@ -680,7 +680,7 @@ class RoomTest {
         Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
         Room r = new Room(1, tu, new Out());
         assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
-        assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역(지금 최소)
+        assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역
         assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
         Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
         assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
@@ -773,7 +773,7 @@ class RoomTest {
         // 1등(사람) 점수를 먼저 되돌린다. 100점이면 봇 상한이 150이라, 기다리는 동안 봇이 상한 정리로 바뀔 수 있다
         bot.x = -2500; bot.y = -2500; human.x = 2500; human.y = 2500;
         human.score = 900; bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(new Room.BotKw(1), new Room.BotKw(2))); bot.score = 80;
-        for (int i = 0; i < 20; i++) r.tick(); // 같은 쌍 쿨다운이 지나게 떨어뜨려 기다린다
+        for (int i = 0; i < 20; i++) r.tick(); // 둘을 떨어뜨린 채 1초 기다린다
         bot.protectUntil = 0; human.protectUntil = 0;
         bot.botExp = 10; bot.botKeywords.clear(); bot.botKeywords.addAll(List.of(new Room.BotKw(1), new Room.BotKw(2)));
         bot.score = 80; human.score = 900;

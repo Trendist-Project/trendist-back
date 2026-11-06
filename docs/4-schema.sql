@@ -1,10 +1,11 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 39개, 외래 키 38개. 설계 기준이다. 개발·테스트에서는 JPA 엔티티가 스키마를 만들고(11.3), 운영은 이 SQL을 기준으로 Flyway 마이그레이션을 만든다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 42개, 외래 키 42개. 사람이 읽는 참고용 전체 스키마이고 실제 스키마는 Flyway 마이그레이션(V1~V14)이 만든다(11.3). 마이그레이션을 추가하면 이 파일도 같이 고친다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- user_notices, setting_histories, blocked_terms, blocked_nicknames는 설계만 있고 엔티티·마이그레이션이 아직 없다(해당 테이블 위에 표시).
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
--- 확인 범위: 88판 스키마는 MariaDB 10.11.14에서 두 번 연속 실행해 확인했다. 이후 판은 DB 접속 권한이 없어 실행하지 못했고, 쉼표·괄호·외래 키 참조 대상·생성 순서만 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다.
+-- 확인 범위: 쉼표·괄호·외래 키 참조 대상·생성 순서는 스크립트로 검사했다. MySQL 8에서는 실행하지 않았다. 실제 스키마의 실행은 Flyway 마이그레이션(V1~V14)을 로컬 MariaDB 10.11에서 확인했다(11.3).
 
 -- Trendist 스키마 (MySQL 8, InnoDB, utf8mb4) - ERD Cloud 가져오기용
 -- 시각은 모두 UTC로 저장한다. 처음 만드는 DB용 설계 기준이다.
@@ -121,16 +122,16 @@ CREATE TABLE players (
   title_id            BIGINT NULL COMMENT '활성 칭호(NULL이면 없음)',
   nickname            VARCHAR(40) NOT NULL COMMENT '닉네임(나라별, 중복 허용). 탈퇴 후에도 유지하고 화면에서만 탈퇴한 사용자로 표시',
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
-  exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, + 횟수로만 쌓이고 줄지 않음)',
+  exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, `+`·공격 성공·처치로 쌓이고 줄지 않음, 4.9)',
   level_id            BIGINT NOT NULL COMMENT '레벨(levels 참조). 누적 EXP로 levels에서 정한 행. 아이콘은 10레벨에서 완성, 꾸미기는 해금 레벨(설정, 기본 10)부터 가능',
   current_score       BIGINT NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기, 정수). min(EXP, 100) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
   hold_count          BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진(만료되지 않은) 트렌드 키워드 개수(player_keywords 행 수 캐시, 0 아래로 내려가지 않음, 1시간마다 실제 행 수로 보정)',
-  add_count    BIGINT NOT NULL DEFAULT 0 COMMENT '추가수(만료 행 재사용 포함, 줄지 않음)',
+  add_count           BIGINT NOT NULL DEFAULT 0 COMMENT '추가수(`+` 횟수, 만료 행 재사용 포함, 줄지 않음)',
   comment_score       BIGINT NOT NULL DEFAULT 0 COMMENT '댓글 점수: 댓글을 쓰면 +1, 삭제하면 -1, 내 댓글이 추천을 받으면 +1, 비추천을 받으면 -1(0 아래로 내려가지 않음)',
   search_count        BIGINT NOT NULL DEFAULT 0 COMMENT '검색수(검색할 때마다 +1, 줄지 않음)',
-  steal_count         BIGINT NOT NULL DEFAULT 0 COMMENT '다른 플레이어에게서 키워드를 빼앗은 횟수(칭호용, 줄지 않음)',
+  steal_count         BIGINT NOT NULL DEFAULT 0 COMMENT '빼앗기 횟수: 공격에 성공한 횟수(칭호용, 줄지 않음, 4.3)',
   bot_win_count       BIGINT NOT NULL DEFAULT 0 COMMENT '봇을 이겨 보상을 받은 횟수(칭호용)',
-  kill_count          BIGINT NOT NULL DEFAULT 0 COMMENT '상대(사람·봇)를 죽인 횟수(칭호용, 4.31)',
+  kill_count          BIGINT NOT NULL DEFAULT 0 COMMENT '처치 횟수: 키워드가 없는 상대(사람·봇)를 쓰러뜨린 횟수(칭호용, 줄지 않음, 4.31)',
   defeat_count        BIGINT NOT NULL DEFAULT 0 COMMENT '패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 칭호용, 4.31)',
   orb_count           BIGINT NOT NULL DEFAULT 0 COMMENT '? 구슬을 먹은 횟수(꽝 포함, 칭호용)',
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
@@ -213,7 +214,7 @@ CREATE TABLE keywords (
   normalized       VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '정규화 키워드(같은 단어 판정용 유일 키, 바이트 비교. NFKC·소문자·공백 제거, 규칙은 4.18)',
   trend_value      BIGINT NOT NULL DEFAULT 0 COMMENT '트렌드 값(0~100 정수, 반올림). 활성 상태면 반영 소스 가중치 × (3 + 47 × g(가진 비율)), 그 외 0. 가진 비율 = holder_count / 그 나라 활동 인원, g는 4.8. 키워드 점수 = trend_value',
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '검색수(매시 메모리 카운터를 더함)',
-  add_count BIGINT NOT NULL DEFAULT 0 COMMENT '추가수(삭제·잃기로 줄지 않음)',
+  add_count        BIGINT NOT NULL DEFAULT 0 COMMENT '추가수(`+` 횟수, 삭제·잃기로 줄지 않음)',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진 사람 수(player_keywords 행 수 캐시)',
   view_count       BIGINT NOT NULL DEFAULT 0 COMMENT '키워드 조회 수: 공개 키워드 페이지와 게임 안 상세 팝업을 연 횟수(같은 방문자 키워드마다 하루 1번, 크롤러 제외, 4.28). 마이그레이션 V2',
   activated_at     DATETIME(6) NULL COMMENT '처음 🔥활성이 된 시각(NULL이면 한 번도 활성 전)',
@@ -251,10 +252,10 @@ CREATE TABLE keyword_log_24h (
   hour_slot        TINYINT UNSIGNED NOT NULL COMMENT '나라 현지 시(0~23). 키워드당 24칸을 덮어씀(행을 지우지 않음)',
   recorded_at      DATETIME NOT NULL COMMENT '이 칸에 마지막으로 기록한 시간의 시작(UTC 정시). 24시간이 지난 칸은 조회에서 무시',
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간이 끝날 때의 검색수(keywords.search_count 스냅샷)',
-  add_count BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간이 끝날 때의 추가수(keywords.add_count 스냅샷)',
+  add_count        BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간이 끝날 때의 추가수(keywords.add_count 스냅샷)',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간이 끝날 때의 가진 사람 수(keywords.holder_count 스냅샷)',
   search_inc       BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간의 검색 증가량',
-  add_inc   BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간의 + 증가량',
+  add_inc          BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간의 추가수 증가량',
   holder_inc       BIGINT NOT NULL DEFAULT 0 COMMENT '그 시간의 가진 사람 증감(음수 가능)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각(칸을 덮어쓸 때 갱신)',
@@ -268,10 +269,10 @@ CREATE TABLE keyword_log_dailies (
   keyword_id       BIGINT NOT NULL COMMENT '키워드 ID',
   record_date      DATE NOT NULL COMMENT '나라 현지 날짜',
   search_count     BIGINT NOT NULL DEFAULT 0 COMMENT '그날 마지막 검색수',
-  add_count BIGINT NOT NULL DEFAULT 0 COMMENT '그날 마지막 추가수',
+  add_count        BIGINT NOT NULL DEFAULT 0 COMMENT '그날 마지막 추가수',
   holder_count     BIGINT NOT NULL DEFAULT 0 COMMENT '그날 마지막 가진 사람 수',
   search_inc       BIGINT NOT NULL DEFAULT 0 COMMENT '그날의 검색 증가량 합',
-  add_inc   BIGINT NOT NULL DEFAULT 0 COMMENT '그날의 + 증가량 합',
+  add_inc          BIGINT NOT NULL DEFAULT 0 COMMENT '그날의 추가수 증가량 합',
   holder_inc       BIGINT NOT NULL DEFAULT 0 COMMENT '그날의 가진 사람 증감 합(음수 가능)',
   created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각(매시간 다시 만듦)',
@@ -373,6 +374,7 @@ CREATE TABLE integration_links (
   UNIQUE KEY uk_integration_links_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 [연동] 바로가기(13.15). 기본 3개는 서버가 켜질 때 없으면 채운다. 마이그레이션 V4';
 
+-- (아직 없음) 공지 팝업 열람 기록(4.16). 아직 없음: 엔티티·마이그레이션이 없고 팝업 열람은 브라우저 저장으로 판단한다
 CREATE TABLE user_notices (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '열람 기록 ID',
   user_id    BIGINT NOT NULL COMMENT '사용자 ID',
@@ -473,7 +475,7 @@ CREATE TABLE share_cards (
   player_id    BIGINT NOT NULL COMMENT '만든 플레이어 ID(players.id)',
   code         VARCHAR(16) NOT NULL COMMENT '공개 코드(무작위 영숫자 10자). 공유 주소 /share/{code}',
   content_hash CHAR(64) NOT NULL COMMENT '카드 값(JSON)의 SHA-256. 같은 플레이어가 같은 값으로 다시 만들면 이 행을 다시 쓴다',
-  data         JSON NOT NULL COMMENT '공유한 순간의 카드 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드, 누적 기록, 꾸미기, 이동 효과). 고치지 않는다',
+  data         JSON NOT NULL COMMENT '공유한 순간의 카드 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드, 기록 4칸(보유 키워드 개수·추가수·처치·활동한 날), 꾸미기, 이동 효과). 고치지 않는다',
   created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
   view_count   BIGINT NOT NULL DEFAULT 0 COMMENT '공유 페이지 조회 수(같은 방문자 카드마다 하루 1번, 크롤러 제외)',
   play_count   BIGINT NOT NULL DEFAULT 0 COMMENT '[플레이 하러 가기] 클릭 수(조회와 같은 규칙)',
@@ -541,8 +543,8 @@ CREATE TABLE site_hourly_stats (
   avg_online      DECIMAL(10,2) NOT NULL COMMENT '평균 동시 접속',
   active_players  BIGINT NOT NULL COMMENT '그 시간에 한 번이라도 방에 있던 플레이어 수',
   new_players     BIGINT NOT NULL COMMENT '새 플레이어(그 나라 닉네임을 처음 정함)',
-  plus_count      BIGINT NOT NULL COMMENT '키워드 추가(+) 수',
-  search_count    BIGINT NOT NULL COMMENT '검색 수',
+  plus_count      BIGINT NOT NULL COMMENT '추가수(`+` 횟수)',
+  search_count    BIGINT NOT NULL COMMENT '검색수',
   orb_count       BIGINT NOT NULL COMMENT '? 구슬을 먹은 수',
   collision_count BIGINT NOT NULL COMMENT '충돌로 키워드를 잃은 수(빼앗김 포함)',
   chat_count      BIGINT NOT NULL COMMENT '채팅 수',
@@ -561,8 +563,8 @@ CREATE TABLE site_daily_stats (
   peak_online     BIGINT NOT NULL COMMENT '그날 최고 동시 접속',
   active_players  BIGINT NOT NULL COMMENT '그날 한 번이라도 방에 있던 플레이어 수(DAU)',
   new_players     BIGINT NOT NULL COMMENT '새 플레이어',
-  plus_count      BIGINT NOT NULL COMMENT '키워드 추가(+) 수',
-  search_count    BIGINT NOT NULL COMMENT '검색 수',
+  plus_count      BIGINT NOT NULL COMMENT '추가수(`+` 횟수)',
+  search_count    BIGINT NOT NULL COMMENT '검색수',
   orb_count       BIGINT NOT NULL COMMENT '? 구슬을 먹은 수',
   collision_count BIGINT NOT NULL COMMENT '충돌로 키워드를 잃은 수',
   chat_count      BIGINT NOT NULL COMMENT '채팅 수',
@@ -589,6 +591,7 @@ CREATE TABLE refresh_tokens (
   CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='갱신 토큰(계정 로그인 세션)';
 
+-- (아직 없음) 차단어. 아직 없음: 엔티티·마이그레이션이 없다(금지 키워드는 keywords의 금지 상태로 막는다, 13.1)
 CREATE TABLE blocked_terms (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
   term       VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '차단어(정규화 값)',
@@ -597,6 +600,7 @@ CREATE TABLE blocked_terms (
   UNIQUE KEY uk_blocked_terms (term)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='차단어(채팅 필터, 키워드 등록 차단 공통)';
 
+-- (아직 없음) 금지 닉네임. 아직 없음: 엔티티·마이그레이션이 없다
 CREATE TABLE blocked_nicknames (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
   term       VARCHAR(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '금지 단어(정규화 값). 닉네임에 포함되면 막음',
@@ -633,6 +637,7 @@ CREATE TABLE settings (
   CONSTRAINT fk_settings_group FOREIGN KEY (group_id) REFERENCES setting_groups (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정값';
 
+-- (아직 없음) 설정 변경 이력. 아직 없음: 엔티티·마이그레이션이 없다(변경은 서버 로그에만 남는다, 13.3)
 CREATE TABLE setting_histories (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '이력 ID',
   setting_id BIGINT NOT NULL COMMENT '설정 ID',

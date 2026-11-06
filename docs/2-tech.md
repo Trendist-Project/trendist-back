@@ -9,10 +9,10 @@
 | 프론트엔드 | React + TypeScript, Vite. 아레나는 Canvas 2D(부족하면 PixiJS) |
 | 백엔드 | Spring Boot 4.1.2, Java 25, Gradle 9.8.2(Kotlin DSL). REST API, WebSocket 게임 서버, 배치를 한 애플리케이션으로 시작 |
 | 실시간 통신 | Spring WebSocket(순수 WebSocket, 바이너리 프레임), 서버 권위. 20Hz 시뮬레이션, 10~15Hz 스냅샷. STOMP 미사용 |
-| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 스키마는 Flyway가 바꾼다(로컬 개발·운영, 11.3). 자동 테스트는 H2에 JPA가 스키마를 만든다. 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB |
+| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 스키마는 Flyway가 바꾼다(로컬 개발·운영, 11.3). 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB에 JPA가 스키마를 만든다 |
 | 캐시 | Caffeine(서버 1대). 여러 대가 되면 Redis |
-| 배치 | Spring `@Scheduled` + ShedLock |
-| 이미지 | S3 호환 객체 저장소(초기에는 로컬 디스크 가능), 자동 검열은 ONNX Runtime(Java) |
+| 배치 | Spring `@Scheduled`. 서버 1대 기준이라 ShedLock은 아직 붙이지 않았다(여러 대가 되면 추가) |
+| 이미지 | 픽셀 그림은 값으로 DB에 두고 서버가 PNG로 그린다. 이미지 업로드용 S3 호환 객체 저장소와 자동 검열(ONNX Runtime)은 업로드를 만들 때 붙인다(아직 없음) |
 | 인증 | 게스트는 방문자 ID, 계정은 Google ID 토큰 서버 검증으로 식별하고 액세스 JWT(15분) + 갱신 토큰(1일, 회전)을 쓴다(Spring Security) |
 | 배포 | Docker, 앞단 Nginx(정적 파일, WebSocket 프록시, TLS). 클라우드 미정 |
 
@@ -37,7 +37,7 @@
 - 날짜·숫자는 `Intl` API, 폰트는 Noto Sans(KR·JP·SC·Devanagari)를 필요한 것만 불러온다. 가이드 본문의 그림 토큰은 한국어 토큰이 기준이고 영어 별칭(`[[controls]]` 등)도 받는다(4.17).
 - 키워드 활동 그래프(4.12): SVG로 직접 그리거나 가벼운 차트 라이브러리(후보 uPlot·Recharts, 버전 고정)를 쓴다. 응답은 TanStack Query로 1분 캐시한다.
 - 성공 알림(토스트): 저장·수정·삭제·복사·신고처럼 요청이 잘 끝나면 화면 위 가운데에 초록 알림을 약 2.4초 띄운다(창 위에 겹쳐 보임, 최대 3개, 같은 문구는 하나만). 어느 화면에서든 `successToast('저장했어요')`를 부르고, 알림 영역(`<Toaster />`)은 게임·관리자 페이지에 하나씩 둔다. 오류는 그 입력 칸·창 안에 보여 준다(무엇을 고쳐야 하는지 그 자리에서 보이게). 아레나의 게임 알림(키워드 잃기·빼앗기 등)은 따로다.
-- 확인 토스트(2026-11-05): 브라우저 기본 확인 창(`window.confirm`)은 쓰지 않는다. `await confirmToast('…할까요?')`(관리자 화면은 `adminConfirm`)이 화면 위 가운데에 노란 토스트로 질문과 **[예]·[아니오]** 버튼을 띄우고 고를 때까지 남아 있다(Esc = 아니오, 새 확인이 뜨면 이전 것은 아니오, 한 번에 하나). 예를 누르면 true. 저장하지 않은 채 프로필 칸·화면을 옮길 때, 꾸미기 [취소], 댓글 삭제, 관리자 제재·권한·닉네임·꾸미기 초기화·강제 퇴장·신고 처리·가이드 편집 버리기가 이것을 쓴다. 링크 주소 입력(`window.prompt`, 관리자 글 편집기)은 입력 칸이 필요해 그대로다.
+- 확인 토스트: 브라우저 기본 확인 창(`window.confirm`)은 쓰지 않는다. `await confirmToast('…할까요?')`(관리자 화면은 `adminConfirm`)이 화면 위 가운데에 노란 토스트로 질문과 **[예]·[아니오]** 버튼을 띄우고 고를 때까지 남아 있다(Esc = 아니오, 새 확인이 뜨면 이전 것은 아니오, 한 번에 하나). 예를 누르면 true. 저장하지 않은 채 프로필 칸·화면을 옮길 때, 꾸미기 [취소], 댓글 삭제, 관리자 제재·권한·닉네임·꾸미기 초기화·강제 퇴장·신고 처리·가이드 편집 버리기가 이것을 쓴다. 링크 주소 입력(`window.prompt`, 관리자 글 편집기)은 입력 칸이 필요해 그대로다.
 - 접근성: 키보드 포커스, 화면 낭독기 라벨(예: "거북이 아이콘 5단계"), 그래프 요약 문장.
 
 ## 9. 백엔드
@@ -49,28 +49,28 @@
 | api | 검색, `+`, 보관함, 댓글, 랭킹, 정보 팝업, 점수 추이, 칭호, 공지, 가이드, 탈퇴 |
 | game | 나라별 방, 입장 인원 검사, 게임 루프, 충돌, 관심 영역, 스냅샷 |
 | trend | 외부 수집, 외부 확인과 반영 소스 결정, 트렌드 값 계산, 상태 전이, 나라 현지 시각 배치 |
-| admin | 금지, 가중치, 밸런스, 칭호, 공지, 가이드, 신고·이미지 검토, 트렌드 키워드 목록 |
+| admin | 키워드 금지·일괄 추가, 밸런스 설정, 공지, 가이드, 긴급 안내, 신고·제재, 사용자·통계·대시보드·관전, 트렌드 키워드 목록, 연동, AI 설명 (소스 가중치·칭호·레벨 편집은 아직 없음) |
 | auth | 방문자 ID 필터, Google 로그인, 권한 |
 
 ### 9.2 게임 서버
 - 방 하나 = `Room` 객체 하나. 방마다 플랫폼 스레드 하나가 20Hz(50ms) 고정 틱을 돈다. 입력은 큐로 받아 틱 시작에 처리하므로 락이 없다. 이동 조작(방향키·클릭)은 도착 시각을 함께 넣고, 틱은 지난 틱부터 지금까지의 구간을 도착 시점마다 나눠 계산한다.
 - `WebSocketHandler`로 직접 받고 스냅샷은 `ByteBuffer` 바이너리(또는 Protocol Buffers)로 보낸다. 스냅샷에는 세션 엔티티 번호, 위치, 반지름, 현재 유행도(4바이트), 레벨, 칭호 번호, 장착 프로필 번호(`profile_id`), 프로필 종류, 바탕색, 테두리 색과 두께만 싣는다(픽셀·이미지 프로필의 그림은 프로필 번호로 내려받는다). 세션 엔티티 번호는 방에 들어올 때 정해져 그 방에서만 유효하고, 정보 팝업·디자인 복사처럼 다른 플레이어를 가리키는 요청은 이 번호로 하며 서버가 방 상태에서 사용자로 바꾼다.
-- 관심 영역(구현, `Room.sendSnapshots`): 클라이언트(`Arena.reportView`)가 화면에 보이는 세계 범위의 가로·세로 절반(`view{hw, hh}`)을 줌이 10% 넘게 바뀔 때마다(300ms 이상 간격, 줌이 바뀌는 중이면 더 넓은 쪽으로) 알리면, 서버가 한도(300~30000px)로 맞춰 `Member.viewHalfW/H`에 두고 **범위 + 30% + 400px 여유**에 걸친 원만 스냅샷에 담는다(내 원은 늘 포함). 서버는 틱마다 1,000px 칸 격자로 원을 나눠 두고 사람마다 칸을 훑는다. 알리기 전 기본 범위는 5,000px이다. 방 전원이 범위 안이면 같은 배열을 나눠 보내고, 관전자·죽어서 구경 중인 사람은 전체를 받는다. 엔티티 수 상한(가까운 순)은 아직 없다. 아래는 처음 설계 추정이다: 화면 주변 엔티티만 보낸다(1000명 전원이면 클라이언트당 초당 약 180KB, 주변 50명이면 약 9KB). 영역은 그 사람의 줌 배율(4.2)에 맞춰 넓히고, 영역 안 엔티티 수에 상한(예: 가까운 순 150명)을 둔다. 반지름이 클수록 보이는 면적이 커져(배율 0.37이면 약 7배, 최대 0.23이면 약 19배) 보낼 엔티티가 늘기 때문이다. 상한 값은 부하 테스트로 정한다. 점수 4바이트를 더하면 엔티티당 스냅샷이 20~30% 커진다(위 추정치 기준 계산이고 부하 테스트로 확인한다).
+- 관심 영역(구현, `Room.sendSnapshots`): 클라이언트(`Arena.reportView`)가 화면에 보이는 세계 범위의 가로·세로 절반(`view{hw, hh}`)을 줌이 10% 넘게 바뀔 때마다(300ms 이상 간격, 줌이 바뀌는 중이면 더 넓은 쪽으로) 알리면, 서버가 한도(300~30000px)로 맞춰 `Member.viewHalfW/H`에 두고 **범위 + 30% + 400px 여유**에 걸친 원만 스냅샷에 담는다(내 원은 늘 포함). 서버는 틱마다 1,000px 칸 격자로 원을 나눠 두고 사람마다 칸을 훑는다. 알리기 전 기본 범위는 5,000px이다. 방 전원이 범위 안이면 같은 배열을 나눠 보내고, 관전자·죽어서 구경 중인 사람은 전체를 받는다. 엔티티 수 상한(가까운 순)은 아직 없다. 설계 추정(부하 테스트 전)은 다음과 같다. 화면 주변 엔티티만 보내면 1000명 전원일 때 클라이언트당 초당 약 180KB, 주변 50명이면 약 9KB다. 반지름이 클수록 보이는 면적이 커져(배율 0.37이면 약 7배, 최대 0.23이면 약 19배) 보낼 엔티티가 늘기 때문에, 영역 안 엔티티 수에 상한(예: 가까운 순 150명)을 두는 것을 검토한다. 상한 값은 부하 테스트로 정한다. 점수 4바이트를 더하면 엔티티당 스냅샷이 20~30% 커진다(위 추정치 기준 계산이고 부하 테스트로 확인한다).
 - 충돌은 공간 격자로 가까운 아이콘끼리만 검사한다. 격자 칸 크기는 일반 크기 기준이고, 큰 아이콘(반지름 300px까지)은 걸치는 칸 모두에 등록한다.
 - 충돌로 키워드 잃기(4.3): 틱에서 충돌을 찾으면 두 사람의 현재 유행도를 메모리 값으로 비교하고, 보호 조건(잃은 뒤 무적, 봇)을 사용자별 보호 종료 시각 하나로 검사한다. 통과하면 "키워드 잃기" 이벤트만 큐에 넣고 틱은 계속 돈다. 실제 처리는 9.4를 따른다.
 - 나가기: 페이지를 떠날 때(구글 로그인으로 이동, 새로고침, 탭 닫기, 로그아웃) 클라이언트가 `bye`를 보내 바로 방에서 빠진다. 네트워크가 끊겼는데 닫힘 신호가 오지 않거나 중간 프록시가 서버 쪽 연결을 남겨 두는 경우를 위해, 90초 동안 아무 메시지(2초마다 보내는 ping 포함)도 없는 접속은 방에서 빼고 연결을 닫는다(백그라운드 탭은 브라우저가 타이머를 1분 간격까지 늦춘다). 그러지 않으면 랭킹·방에 유령 접속자가 남는다.
 - 느린 클라이언트는 송신 버퍼 상한을 넘으면 오래된 스냅샷을 버린다. DB·외부 호출은 틱 스레드 밖에서 가상 스레드로 처리한다.
 - 방 관리자와 입장 라우팅은 인터페이스로 분리해 두고, 나중에 지역당 여러 방·여러 서버로 늘린다.
 - 설정값 전달: 이동 계산은 항상 서버가 `settings`(1분 캐시)의 값으로 한다. 클라이언트가 예측에 쓰는 값(최대 속도, 반지름·줌 곡선 값)은 입장할 때 서버가 보내 주고, 관리자가 바꿔서 설정이 갱신되면 방 안 모든 클라이언트에 다시 보낸다. 그러지 않으면 내 아이콘 예측이 서버 위치와 어긋난다.
-- 끊긴 원 유지(4.32): `GameSocketHandler`가 연결 종료·`bye`에서 `Room.disconnect(member, session)`을 부르면 방이 `Member.offline`을 켜고 `offlineSince`를 적은 뒤 입력을 멈춘다. 원은 `members`에 그대로 있어 충돌·공격·무적·죽음이 그대로 처리되고, `RoomManagerImpl.send/sendText`와 스냅샷 전송은 `offline`인 원을 건너뛴다. 1초마다 `expireOffline`이 `offline_keep_seconds`가 지난 원을 `leave`로 뺀다(설정은 1초마다 다시 읽음). 같은 계정이 다시 `join`하면 `byPlayer`에 남은 원을 `takeOver`로 이어받아 세션만 바꾸고, `Member.session`이 다른 이전 연결의 메시지와 닫힘은 무시한다. 마지막 위치는 저장하지 않는다(예전의 `lastSeen`·`REJOIN_KEEP_SECONDS`·`Resume`·`player_positions`·`room_states`·`RoomStateService`는 마이그레이션 V10과 함께 없앴다). 입장은 늘 `centerSpawn`이다.
-- 활동 영역 서서히 변하기(부드러운 벽): `Room.updateArea`가 목표(`activeArea(원 수)`)보다 작으면 `area_grow_speed`(기본 300px/s), 크면 `area_shrink_speed`(기본 60px/s)만큼씩만 맞춘다(0이면 바로). 입장은 영역을 키우지 않고(방의 첫 입장 때 처음 크기만 정함) 봇 스폰도 지금 영역 안에서 한다. 클라이언트(`Arena`)는 스냅샷의 `half`를 `halfTarget`으로 두고 프레임마다 벽을 부드럽게 따라가게 한다(스냅샷이 초당 10번이라 그대로 쓰면 계단처럼 보인다). 아래는 줄이기 설명이다:  한 변의 목표는 `기준 맵 × √(인원/1000)`(최소 기준 맵의 1/4)이고, `Room`이 지금 영역(`areaNow`)을 따로 들고 있다가 목표가 크면 바로 커지고 작으면 설정 `area_shrink_speed`(px/s, 기본 60, 0이면 바로)만큼씩 줄인다. 구슬·세이프존 개수와 이동 범위(`clamp`)는 이 지금 영역을 쓴다.
+- 끊긴 원 유지(4.32): `GameSocketHandler`가 연결 종료·`bye`에서 `Room.disconnect(member, session)`을 부르면 방이 `Member.offline`을 켜고 `offlineSince`를 적은 뒤 입력을 멈춘다. 원은 `members`에 그대로 있어 충돌·공격·무적·죽음이 그대로 처리되고, `RoomManagerImpl.send/sendText`와 스냅샷 전송은 `offline`인 원을 건너뛴다. 1초마다 `expireOffline`이 `offline_keep_seconds`가 지난 원을 `leave`로 뺀다(설정은 1초마다 다시 읽음). 같은 계정이 다시 `join`하면 `byPlayer`에 남은 원을 `takeOver`로 이어받아 세션만 바꾸고, `Member.session`이 다른 이전 연결의 메시지와 닫힘은 무시한다. 마지막 위치는 저장하지 않는다(`player_positions`·`room_states` 표는 마이그레이션 V10에서 지웠다). 입장은 늘 `centerSpawn`이다.
+- 활동 영역 서서히 변하기(부드러운 벽): `Room.updateArea`가 목표(`activeArea(원 수)`)보다 작으면 `area_grow_speed`(기본 300px/s), 크면 `area_shrink_speed`(기본 60px/s)만큼씩만 맞춘다(0이면 바로). 입장은 영역을 키우지 않고(방의 첫 입장 때 처음 크기만 정함) 봇 스폰도 지금 영역 안에서 한다. 클라이언트(`Arena`)는 스냅샷의 `half`를 `halfTarget`으로 두고 프레임마다 벽을 부드럽게 따라가게 한다(스냅샷이 초당 10번이라 그대로 쓰면 계단처럼 보인다). 한 변의 목표는 `기준 맵 × √(인원/1000)`(최소 기준 맵의 1/4)이고, `Room`이 지금 영역을 따로 들고 있다. 구슬·세이프존 개수와 이동 범위(`clamp`)는 이 지금 영역을 쓴다.
 - 관리자 관전(13.13): 클라이언트가 `auth` 대신 `spectate{token, country}`를 보내면 관리자 토큰(`AccountGuard.isAdmin`)인지 확인하고 `Room.addSpectator`로 받는다. 관전자는 `members`에 넣지 않아 방 크기·활동 영역·충돌·봇 수·랭킹(`liveView`)·접속 인원에 영향이 없고, 방이 모두에게 보내는 스냅샷(`me` 표시 0)·미니맵·`roster`·`orbs`·`orbSpawn`·`orbEaten`·`safeZones`·`chat`·`emote`·`combo`·`dashFx`·`shield`·`tuning`만 받는다. 입장할 때 `roster`·`orbs`·`safeZones`·`chatHistory`를 받고 서버는 `spectating{country, spectators}`로 알린다. 받은 입력(`input`·`move`·`chat`·`emote`)은 모두 버리고 `ping`·`bye`만 받는다. 90초 동안 신호가 없으면 정리하고(`dropSilent`), 방마다 10명까지다. 관리자가 아니거나 토큰이 틀리면 `1008 AUTH_FAILED`로 닫고, 가득 차면 `1008 SPECTATORS_FULL`이다.
 - 이모트(4.26): 클라이언트가 `emote{code}`를 보내면 정해진 코드인지와 빈도(9.5)만 보고 방 전체에 `emote{e, code}`를 보낸다.
 - 대시(4.27): 클라이언트가 `dash`를 보내면 방(`Room.dash`)이 쿨타임(`Member.dashReadyAt`)과 움직이는 중인지를 보고, 되면 `dashUntil`까지 `advance`의 최대 속도에 `Room.DashTuning.multiplier`를 곱하고 본인에게 `dash{ms, cooldownMs, mult}`를 보낸다. 클라이언트 예측(`Arena.startDash`)은 같은 배수로 가고, 보정 허용 오차도 배수를 곱한다. 설정은 1초마다 다시 읽는다(`RoomManagerImpl.dashTuning`).
-- DB 연결 풀(Hikari): 기본 10개였던 것을 `application.yml`에서 최대 20개·최소 유지 5개로 올렸다(환경 변수 `HIKARI_MAX_POOL`, `HIKARI_MIN_IDLE`로 조절). 같은 DB를 다른 앱도 쓰므로 모든 앱의 풀 합이 `max_connections`(151)의 60~70%를 넘지 않게 정한다. 운영에서 지금까지 쓴 최대 연결이 69개여서 올려도 최악 79개(52%)다. 서버를 여러 대 띄우면 서버 수 × 풀 크기로 계산한다.
-- 싸움 DB 부담 줄이기: ① 죽인 횟수·빼앗은 횟수와 EXP는 행을 잠근 트랜잭션에서 한 번에 올리고 점수·레벨을 다시 정한다(`PlayerService.awardAttack`·`awardKill`, 불꽃·죽음처럼 행을 잠그지 않던 경로는 `recordSteal`·`recordKill`이 잠그고 부른다). 처음에는 락 없는 `UPDATE … + 1`로 했으나 EXP를 주려면 점수·레벨을 다시 정해야 해서 잠금이 필요해 되돌렸다. 키워드를 옮기는 싸움은 어차피 그 행을 잠근다. ② 칭호 검사(`TitleServiceImpl.on`)는 싸움 트랜잭션이 끝난 뒤 별도 스레드 하나(`title-check`)가 차례로 하고, 같은 플레이어의 검사가 줄에 있으면 다시 넣지 않는다(몰려도 한 번만). 자동 테스트는 `trendist.titles.sync-check=true`(`application-test.yml`)로 같은 스레드에서 바로 한다. ③ 스냅샷은 받는 사람마다 복사하지 않고 같은 배열을 보낸다. 표시 칸(마지막 1바이트)은 0이고, 클라이언트(`Arena.applySnapshot`)가 `welcome`의 내 번호와 같은 원을 내 원으로 본다.
-- 봇의 공간 격자(4.21): `Room.thinkBots`가 이번 틱에 생각할 봇이 있으면 `BotGrid`를 한 번 만든다(한 변 500px 칸, 원과 구슬을 중심이 속한 칸에 넣음). 봇은 방 전체 대신 `도망·쫓기 범위 + 내 반지름 + 가장 큰 원의 반지름` 안의 칸에 있는 원과 `구슬 탐색 범위` 안의 칸에 있는 구슬만 본다(거리 판단은 예전과 같다). 비용이 봇 수 × 인원에서 봇 수 × 주변 수로 준다.
-- 방 DB 작업 동시 실행 제한: `RoomManagerImpl.db`가 방의 DB 작업(빼앗기·잃기·처치 기록·구슬 보상·입장 등)을 동시에 4개까지만 돌린다. 칭호 검사(`TitleServiceImpl.on`)가 커밋 뒤 `REQUIRES_NEW`로 두 번째 연결을 요구해서, 연결을 쥔 작업이 풀(기본 10개) 이상 몰리면 모두 서로를 기다리며 서버가 멈추기 때문이다(봇을 50명으로 늘려 싸움이 잦을 때 실제로 멈췄다). 넘치는 작업은 가상 스레드에서 차례를 기다리고 방 틱은 막히지 않는다.
+- DB 연결 풀(Hikari): `application.yml`에서 최대 20개·최소 유지 5개로 둔다(Hikari 기본값은 10개, 환경 변수 `HIKARI_MAX_POOL`, `HIKARI_MIN_IDLE`로 조절). 같은 DB를 다른 앱도 쓰므로 모든 앱의 풀 합이 `max_connections`(151)의 60~70%를 넘지 않게 정한다. 운영에서 쓴 최대 연결이 69개여서 20개로 해도 최악 79개(52%)다. 서버를 여러 대 띄우면 서버 수 × 풀 크기로 계산한다.
+- 싸움 DB 부담 줄이기: ① 처치 횟수·빼앗기 횟수와 EXP는 행을 잠근 트랜잭션에서 한 번에 올리고 점수·레벨을 다시 정한다(`PlayerService.awardAttack`·`awardKill`, 불꽃·죽음처럼 행을 잠그지 않던 경로는 `recordSteal`·`recordKill`이 잠그고 부른다). EXP를 주려면 점수·레벨을 다시 정해야 하므로 락 없는 `UPDATE … + 1`은 쓰지 않는다. 키워드를 옮기는 싸움은 어차피 그 행을 잠근다. ② 칭호 검사(`TitleServiceImpl.on`)는 싸움 트랜잭션이 끝난 뒤 별도 스레드 하나(`title-check`)가 차례로 하고, 같은 플레이어의 검사가 줄에 있으면 다시 넣지 않는다(몰려도 한 번만). 자동 테스트는 `trendist.titles.sync-check=true`(`application-test.yml`)로 같은 스레드에서 바로 한다. ③ 스냅샷은 받는 사람마다 복사하지 않고 같은 배열을 보낸다. 표시 칸(마지막 1바이트)은 0이고, 클라이언트(`Arena.applySnapshot`)가 `welcome`의 내 번호와 같은 원을 내 원으로 본다.
+- 봇의 공간 격자(4.21): `Room.thinkBots`가 이번 틱에 생각할 봇이 있으면 `BotGrid`를 한 번 만든다(한 변 500px 칸, 원과 구슬을 중심이 속한 칸에 넣음). 봇은 방 전체 대신 `도망·쫓기 범위 + 내 반지름 + 가장 큰 원의 반지름` 안의 칸에 있는 원과 `구슬 탐색 범위` 안의 칸에 있는 구슬만 본다. 비용이 봇 수 × 인원에서 봇 수 × 주변 수로 준다.
+- 방 DB 작업 동시 실행 제한: `RoomManagerImpl.db`가 방의 DB 작업(빼앗기·잃기·처치 기록·구슬 보상·입장 등)을 동시에 4개까지만 돌린다. 칭호 검사(`TitleServiceImpl.on`)가 커밋 뒤 `REQUIRES_NEW`로 두 번째 연결을 요구해서, 연결을 쥔 작업이 풀 크기(최대 20개) 이상 몰리면 모두 서로를 기다리며 서버가 멈추기 때문이다(봇을 50명으로 늘려 싸움이 잦을 때 실제로 멈췄다). 넘치는 작업은 가상 스레드에서 차례를 기다리고 방 틱은 막히지 않는다.
 - 봇의 실제 키워드(4.21): `Room.Member.botKeywords`는 키워드 번호(`BotKw`)만 들고, 이름·유행도는 방의 `catalog`(`CatalogKw`: 번호·이름·유행도)에서 찾는다. `RoomManagerImpl.loadCatalog`가 방을 만들 때 한 번, 그 뒤 60초마다 `KeywordService.botCatalog(countryId)`(그 나라 🔥 키워드)를 읽어 `Room.setKeywordCatalog`로 넣고, 목록에서 사라진 키워드는 봇에서도 뺀다. 사람이 봇을 이기면 `Outbox.requestBotWin(…, keywordId)` → `KeywordService.gainFromBot(playerId, keywordId)`가 그 키워드를 준다. 봇이 이기면 `Room.botGain`(봇끼리) 또는 `RoomManagerImpl.requestLose`가 `Room.botTakes`로 사람이 잃은 키워드(`LostKeyword.keywordId`)를 봇 메모리에 넣는다. DB에는 쓰지 않는다.
 - 죽음·리스폰(4.31): `Room.collide`가 키워드 없는 사람(봇 포함)이 보호 없이 지면 `Room.die`로 `members`·`byPlayer`에서 빼고 `Member.dead`를 켠 뒤 `died{by, byE}`(본인)·`kill{target}`(죽인 사람)을 보낸다(연결은 유지하고, 죽은 사람은 `spectators` 집합에 넣어 스냅샷·미니맵 등을 관전자처럼 계속 받는다. `spectatorCount`에는 세지 않으며 리스폰·나감·무응답 때 빠진다). `GameSocketHandler`는 `dead`인 연결의 입력·채팅·이모트를 버리고 `respawn`만 받아(인증 때 저장한 사용자 번호 `ATTR_UID`로) 입장과 같은 경로(`join`)로 다시 넣는다. 방은 `diedUntil`(플레이어 → 5분)에 든 사람이 들어오면 저장된 위치와 상관없이 `centerSpawn`에 입장 보호로 둔다. 봇이 죽으면 `botRespawns`를 올리고 `maintainBots`의 `addBot`이 그 수만큼 가운데(`centerSpawn`)에서 새 봇을 만든다. 죽인 쪽이 사람이면 `Outbox.requestKill` → 작업 스레드의 `PlayerService.recordKill`이 `players.kill_count`를 올리고 `TitleCheck`를 낸다(마이그레이션 V6). 프론트는 `died`에서 입력을 끊고 캔버스에 `dead` 클래스(CSS 흑백·어둡게)와 리스폰 오버레이를 띄우며, `welcome`이 오면 걷는다.
 - 레벨업 이펙트(4.30): `Room.applyScore`가 레벨이 오른 사람의 `levelFx{e, level}`를 방 전체(관전 포함)에 보낸다(고정 연출 빛기둥, 설정·꾸미기 없음).
@@ -137,18 +137,19 @@ WHERE p.id IN (/* 500명 */)
 
 | 대상 | 한도 |
 |---|---|
-| API 전반 | 초당 5회 수준(정상 플레이에서 걸리지 않게) |
+| API 전반(아직 없음) | 초당 5회 수준(정상 플레이에서 걸리지 않게) |
 | 이동 명령 | 클릭 이동 초당 10회, 방향키는 바뀔 때마다(16ms에 한 번까지, 클라이언트 기준). 서버는 종류별 토큰 버킷으로 센다: 클릭 초당 12개(최대 24개까지 모임), 방향키 초당 60개(최대 60개), 그 밖의 종류 초당 10개. 고정 1초 창은 네트워크·프록시가 메시지를 몰아서 전달할 때 한도를 넘겨 그 1초 동안 모든 명령을 버리고, 화면만 움직였다가 되돌아오게 해서 쓰지 않는다. `ping`은 세지 않는다 |
 | 이모트 | 게임 WebSocket 연결마다 토큰 버킷: 초당 0.5개(최대 3개 모임). 넘으면 조용히 버린다(4.26) |
-| 채팅 | 1초에 1회(게임 WebSocket 연결마다 토큰 버킷, 넘으면 `chatError` `CHAT_TOO_FAST`) + IP 단위 |
+| 채팅 | 1초에 1회(게임 WebSocket 연결마다 토큰 버킷, 넘으면 `chatError` `CHAT_TOO_FAST`). IP 단위 제한은 아직 없다 |
 | 정보 팝업 조회 | 계정당 초당 2회, 결과 5초 캐시 |
 | 댓글 투표 | 사용자당 분당 20회, 같은 댓글 분당 5회(`vote:comment:{user}:{comment}`) |
 | 색·칭호 변경 | 5초에 1회 |
 | 꾸미기 프로필 저장·장착 | 5초에 1회 |
 | 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 1분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
-| 외부 온디맨드 조회, 새 키워드 생성 | 사용자·IP 단위 분당 제한 |
-| 트렌드 상자 열기 | 초당 2회 |
-| 토큰 발급·갱신·게스트 시작(`/api/auth/*`) | IP 단위 분당 10회 |
+| AI 설명 갱신 요청(4.12) | 플레이어당 1시간에 10회(429 `AI_REQUEST_RATE`) |
+| 외부 온디맨드 조회, 새 키워드 생성(아직 없음) | 사용자·IP 단위 분당 제한 |
+| 트렌드 상자 열기(아직 없음) | 초당 2회 |
+| 토큰 발급·갱신·게스트 시작(`/api/auth/*`, 아직 없음) | IP 단위 분당 10회 |
 | 자랑하기 카드 공유 주소 만들기 | 사용자당 분당 10회(429 `SHARE_TOO_FAST`). 값이 같은 카드는 같은 주소를 돌려주므로 행이 늘지 않는다 |
 
 ### 9.6 API (초안)
@@ -163,11 +164,15 @@ WHERE p.id IN (/* 500명 */)
 | `POST /api/comments/{id}/vote` | `{ "vote": "LIKE" \| "DISLIKE" }`. 응답은 내 상태와 `like_count`, `dislike_count` |
 | `GET /api/keywords/{id}/comments/top` | 추천 상위 3개(10초 캐시) |
 | `GET /api/keywords/{id}/comments?page=&size=` | 최신순, `size` 최대 50 |
-| `GET /api/keywords/{id}/activity?range=24h\|7d\|30d\|180d` | 검색 수·`+` 수·가진 사람 수 증분(24시간은 시간별, 나머지는 현지 하루별)과 누적값(1분 캐시). 이번 시간은 메모리 카운터를 합쳐 "집계 중"으로 표시 |
+| `GET /api/keywords/{id}/activity?range=24h\|7d\|30d\|180d` | 검색수·추가수·가진 사람 수 증분(24시간은 시간별, 나머지는 현지 하루별)과 누적값(1분 캐시). 이번 시간은 메모리 카운터를 합쳐 "집계 중"으로 표시 |
+| `POST /api/players` | `{ "nickname", "countryCode" }`. 그 나라에서 처음 닉네임을 정하고 플레이어를 만든다(4.1) |
+| `GET /api/keywords/search?q=` | 검색(4.4). `{status, keyword}`: 상태와 키워드 카드(없는 단어면 카드 없이 등록 전 상태) |
+| `POST /api/keywords/plus` | `{ "text" }`. `+`(4.4, 9.4). `{keyword, gained, player}` |
+| `GET /api/me/keywords` | 내 보관함(4.5) |
 | `GET /api/me?country=KR\|GLOBAL` | 그 나라 플레이어(없으면 아직 닉네임 전)를 돌려주고 `users.country_id`(마지막으로 플레이한 지역)를 고친다. 모르는 나라·닫힌 나라는 400 |
 | (공통) `Accept-Language: ko\|en` | 없으면 ko. 칭호·가이드·가이드 카테고리·공지·이동/테두리 효과 이름·잠금 사유는 기존 필드에 그 언어 값을 담아 보내고, 영어 값이 비어 있으면 한국어로 대체한다. 서버 오류 메시지는 한국어 그대로이며 화면이 오류 코드로 번역한다(8) |
 | `PATCH /api/me/nickname` | `{ "nickname": "..." }`. 현재 나라 닉네임을 바꾼다(4.1). 규칙 위반 400, 지금과 같으면 400 `NICKNAME_SAME`, 변경 간격 전이면 409 `NICKNAME_TOO_SOON`. 응답은 플레이어 요약이고 `nicknameChangeableAt`(다음 변경 가능 시각, 없으면 바로 가능)을 담는다 |
-| `POST /api/me/profile/copy` | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
+| `POST /api/me/profile/copy` (아직 없음) | `{ "profile_id": 123 }`. 내가 접속한 방 플레이어가 장착 중인 프로필만 복사할 수 있다. 바탕색·테두리 색·테두리 두께를 내 새 프로필(성장형)로 만들어 장착하고(픽셀 그림·업로드 이미지 제외), 레벨 조건에 맞지 않으면 거절한다 |
 | `GET /api/emergency` | 지금 보여 줄 긴급 안내(로그인 없음, 4.29). `{notice: {id, message, messageEn, endsAt, remainingSeconds} \| null}`. `remainingSeconds`는 서버 시계 기준 남은 초라 클라이언트가 끝나는 때를 시계 차이 없이 정한다 |
 | `GET /api/notices` | 공지 목록(고정 먼저, 최신순, 최대 50). `edited`(수정됨), `fresh`(7일 이내, NEW), `popup`(팝업 기간 안, 4.16). 로그인 없이 읽는다 |
 | `GET /api/notices/popup`, `POST /api/notices/popup/seen` | 서버에 남기는 팝업 본 기록(`user_notices`). 아직 없음(지금은 `popup`과 브라우저 저장으로 판단, 4.16) |
@@ -208,14 +213,14 @@ WHERE p.id IN (/* 500명 */)
 | `GET /api/admin/users/{userId}` | 사용자 상세(13.10): 계정·플레이어 값, 누적 수치, 꾸미기, 보관함, 최근 댓글·채팅 10개, 받은 신고 20개, 제재 이력 |
 | `POST /api/admin/users/{userId}/sanctions`, `POST /api/admin/users/sanctions/{id}/release` | 제재 걸기 `{ "type": "BAN" \| "UPLOAD" \| "COMMENT" \| "CHAT", "days": 7, "reason": "…" }`(days가 null이면 영구, 1~3650일, 사유 1~500자, 관리자 계정 금지는 400 `SANCTION_ADMIN`)와 풀기(이미 끝났으면 409 `SANCTION_NOT_ACTIVE`) |
 | `PATCH /api/admin/users/{userId}/nickname`, `POST /{userId}/look/reset`, `PATCH /{userId}/role`, `POST /{userId}/kick` | 닉네임 바꾸기(닉네임 규칙 그대로, 변경 간격은 세지 않음), 꾸미기 초기화, 관리자 권한 `{ "admin": true }`(Google 계정만, 내 권한 빼기 400 `ROLE_SELF`), 강제 퇴장(접속 중이 아니면 409 `NOT_ONLINE`) |
-| `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 누적 기록, 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
+| `POST /api/share-cards` | 자랑하기 카드 공유 주소 만들기(4.24). 본문 없음, 게스트 가능. 서버가 지금 값(닉네임, 칭호, 레벨, 유행도, 순위, 7일 점수, 🔥 키워드 3개, 기록 4칸(보유 키워드 개수·추가수·처치·활동한 날), 꾸미기, 이동 효과)을 모아 저장하고 `{ "code", "url", "imageUrl", "totalViews", "totalPlays" }`을 돌려준다(`total*`는 내가 만든 모든 카드의 조회·클릭 합계). 같은 플레이어의 값이 모두 같은 카드가 있으면 그 주소를 그대로 준다. 닉네임이 없으면 404 `NO_PLAYER`, 분당 10번 429 `SHARE_TOO_FAST` |
 | `GET /share/{code}` | 공유 페이지 HTML(로그인 없음). OG·트위터 카드 태그와 카드 이미지, [플레이 하러 가기]. 없는 코드는 404 페이지. 조회 수를 센다(같은 방문자 카드마다 하루 1번, 크롤러 제외)라서 `Cache-Control: no-cache` |
 | `GET /share/{code}/play` | [플레이 하러 가기]. 클릭 수를 세고(조회와 같은 규칙) `/?ref=share`로 302. 없는 코드도 메인으로 보낸다 |
 | `GET /api/admin/share-cards?sort=views\|plays\|createdAt&page=` | 관리자 공유 통계(13.8): 만든 카드 수, 조회·클릭 합계, 오늘 만든 카드 수, 카드 목록 30개씩(코드, 닉네임, 조회, 클릭, 만든 때, 주소) |
 | `GET /{kr\|global}/keywords/{slug}` | 공개 키워드 페이지 HTML(로그인 없음, 4.28). 금지·없는 키워드는 404. 열 때마다 조회수를 세므로 `no-cache` |
 | `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소, 금지가 아닌 모든 키워드 페이지, 공유 페이지(`/share/{코드}`)를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
-| `GET /api/guide/categories`, `/categories/{code}/articles`, `/articles/{id}`, `/search?q=` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 지금은 앞의 두 개만 있고 글 목록에 본문을 같이 준다 |
+| `GET /api/guide/categories`, `/categories/{code}/articles` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 글 목록에 본문을 같이 준다. 글 한 개 조회(`/articles/{id}`)와 검색(`/search?q=`)은 아직 없다 |
 
 - 투표 토글: 없음 → INSERT, 같은 값 → DELETE, 반대 값 → UPDATE. 조건부 쿼리의 영향 행 수가 1일 때만 `comments.like_count`·`dislike_count`를 바꾸고, 같은 때 작성자의 `comment_score`도 같이 바꾼다(추천 +1, 비추천 −1, 취소·변경은 반대로, `GREATEST(값, 0)`으로 0 아래 방지). 첫 투표 경합은 UNIQUE 오류 후 다시 읽어 처리한다.
 
@@ -225,11 +230,13 @@ WHERE p.id IN (/* 500명 */)
 |---|---|
 | 5초 | 접속 중인 플레이어의 바뀐 점수를 `players.current_score`에 모아서 저장(9.2) |
 | 10초 | 관리자 통계(13.9): 나라별 방 접속 인원 표본(이번 시간·오늘의 최고·평균·활동 인원을 메모리에). 1분마다 접속 중인 플레이어의 `players.last_seen_at`을 고친다 |
-| 1분 | 자랑하기 카드 조회·클릭 수 저장(메모리에 모은 증가분을 `share_cards.view_count`·`play_count`에 더함, 종료 때도 저장, 4.24). 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 나라별 활동 인원을 다시 세고 지금 식과 달라진 🔥 키워드의 트렌드 값 갱신(4.8), 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
+| 1분 | 자랑하기 카드 조회·클릭 수 저장(메모리에 모은 증가분을 `share_cards.view_count`·`play_count`에 더함, 종료 때도 저장, 4.24), 키워드 조회수 저장(`keywords.view_count`, 4.28), AI 한 줄 설명 자동 생성(10.4). 만료된 `+` 삭제와 `holder_count`·`hold_count` 정리, 나라별 활동 인원을 다시 세고 지금 식과 달라진 🔥 키워드의 트렌드 값 갱신(4.8), 트렌드 값이 바뀐 키워드의 접속 중이 아닌 보유자 점수 재합산(9.4) |
 | 매시 정각 | 플레이어 점수 기록(`player_score_24h`의 그 시간 칸과 `player_score_dailies`의 그날 행을 현재 점수로 덮어쓰기), 키워드 카운터 저장(`keywords.search_count` 갱신 후 `keyword_log_24h`의 그 시간 칸 덮어쓰기, 그날의 `keyword_log_dailies` 다시 만들기), 180일이 지난 `keyword_log_dailies` 행 삭제(9.9), 전체 점수 재합산 점검(9.4), 사이트 통계(13.9: 지난 한 시간의 `site_hourly_stats` 행을 쓰고 그날의 `site_daily_stats`를 시간별 행에서 다시 만들기. 서버를 끌 때도 이번 시간 값을 저장) |
-| 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외), 만료된 갱신 토큰 삭제 |
+| 매일 | 30일 지난 채팅 삭제(04:30 KST, 신고된 메시지 제외). 만료된 갱신 토큰 삭제는 아직 없다 |
 
 ### 9.8 트렌드 상자 (4.19)
+아직 구현하지 않았다(코드에 `Room`의 상자 상태·`OPEN_BOX` 메시지·관리자 설정이 없다). 아래는 설계다.
+
 상자는 몇 분만 사는 일회성 데이터라 DB에 저장하지 않고 방(`Room`) 메모리에서만 관리한다. 서버를 다시 켜면 상자는 사라지고 다음 주기에 새로 생긴다.
 
 상태
@@ -279,7 +286,7 @@ record TrendBox(
 | 테이블 | 한 행 | 보관 | 내용 |
 |---|---|---|---|
 | `keyword_log_24h` | 키워드 × 나라 현지 시 0~23의 24칸(`hour_slot`, 매시간 그 칸을 덮어쓴다. `recorded_at` = 그 시간의 시작, UTC 정시) | 키워드당 24칸(행을 지우지 않는다) | 그 시간이 끝날 때의 세 누적값(스냅샷)과 그 시간의 증분(`search_inc`, `add_inc`, `holder_inc`, 음수 가능) |
-| `keyword_log_dailies` | 키워드 × 하루(`recorded_at`의 나라 현지 날짜) | 180일 | 그날 마지막 누적값과 그날의 증분 합 |
+| `keyword_log_dailies` | 키워드 × 하루(`record_date`, 나라 현지 날짜) | 180일 | 그날 마지막 누적값과 그날의 증분 합 |
 
 흐름
 1. 검색은 DB를 건드리지 않고 메모리 카운터만 올린다(키워드별 `LongAdder`). 중복 검사용 (사용자, 키워드) 집합도 메모리에 두고 시간이 바뀌면 비운다. `+`의 `add_count`·`holder_count`는 9.4의 트랜잭션에서 바로 바꾼다.
@@ -288,7 +295,7 @@ record TrendBox(
 4. 대상은 그 시간에 카운터가 바뀌었거나 가진 사람이 1명 이상인 키워드다. 나머지는 행을 만들지 않고 그래프에서 증분 0으로 그린다.
 5. 하루 행을 만든 직후 180일이 지난 `keyword_log_dailies` 행을 지운다. `keyword_log_24h`는 칸을 덮어쓰므로 지우지 않는다.
 - 직전 기록이 없는 키워드(새 키워드, 기록을 시작하기 전부터 있던 키워드)는 그 시간 뒤에 `+`되어 아직 남아 있는 `player_keywords` 행 수를 그 시간의 `+`·가진 사람 증분으로 본다. 옛 누적값이 한 시간에 몰려 그래프가 튀지 않게 하려는 것이다.
-- 대상의 "그 시간에 바뀐 키워드"는 `keywords.updated_at`이 그 시간 안인 행으로 찾는다(`+`, 24시간 삭제, 잃기, 상태 변경이 행을 고친다). 검색 수는 일괄 UPDATE라 `updated_at`이 바뀌지 않으므로 검색 카운터의 키워드 번호를 따로 넣는다.
+- 대상의 "그 시간에 바뀐 키워드"는 `keywords.updated_at`이 그 시간 안인 행으로 찾는다(`+`, 24시간 삭제, 잃기, 상태 변경이 행을 고친다). 검색수는 일괄 UPDATE라 `updated_at`이 바뀌지 않으므로 검색 카운터의 키워드 번호를 따로 넣는다.
 6. `GET /api/keywords/{id}/activity`는 24시간이면 `keyword_log_24h`(조회할 때 `recorded_at`이 24시간이 지난 칸은 무시한다), 7일 이상이면 `keyword_log_dailies`의 증분을 읽고, 이번 시간·오늘은 `keywords` 누적값과 메모리 카운터를 합쳐 "집계 중"으로 만든다. 1분 캐시.
 7. IN은 현지 날짜 경계가 정시가 아니라서 한 시간 행이 날짜를 가로지른다. `recorded_at`의 현지 날짜로 정하고 오차를 허용한다(IN 오픈 때 다시 확인).
 
@@ -365,13 +372,15 @@ record TrendBox(
 ### 11.1 규칙
 - 테이블 이름은 소문자 스네이크 케이스 복수형(마지막 단어만, 기간 접미사 `24h`는 복수형을 쓰지 않는다). 다대다 매핑은 `앞 단수_뒤 복수`(`player_keywords`). 외래 키 컬럼은 `참조 단수_id`이고(복수형의 s를 뗀다) 기본 키 바로 다음에 순서대로 둔다(ERD Cloud에 보이는 순서). 한 테이블에서 같은 테이블을 두 번 참조하는 컬럼은 두지 않는다(그래서 공지·가이드에는 마지막 수정 관리자 컬럼이 없다).
 - 모든 테이블의 기본 키는 `id BIGINT AUTO_INCREMENT` 하나다. 관계는 모두 비식별, 복합 키 없음. "한 번만" 규칙은 `UNIQUE`로 지킨다.
-- 시각 컬럼: 기본은 `created_at`·`updated_at`(`DATETIME(6)`, UTC, DB 기본값 + JPA Auditing). 고치지 않는 기록 테이블(`*_histories`, `user_notices`, `blocked_terms`, `chat_messages`)은 `created_at`만이다. 칸을 덮어쓰거나 매시간 다시 쓰는 `player_score_24h`, `player_score_dailies`, `keyword_log_24h`, `keyword_log_dailies`는 `updated_at`도 둔다. 업무 시각(`expires_at`, `banned_at` 등)은 따로 둔다.
+- 시각 컬럼: 기본은 `created_at`·`updated_at`(`DATETIME(6)`, UTC, DB 기본값 + JPA Auditing). 고치지 않는 기록 테이블(`*_histories`, `user_notices`, `blocked_terms`, `chat_messages`)은 `created_at`만이다(`user_notices`·`blocked_terms`·`setting_histories`는 아직 없음). 칸을 덮어쓰거나 매시간 다시 쓰는 `player_score_24h`, `player_score_dailies`, `keyword_log_24h`, `keyword_log_dailies`는 `updated_at`도 둔다. 업무 시각(`expires_at`, `banned_at` 등)은 따로 둔다.
 - 정수 컬럼은 확장에 대비해 모두 `BIGINT`로 둔다(점수, 인원, 횟수, 순서, 레벨 등). 참/거짓은 `TINYINT(1)`, 0~23 시간 칸 같은 작은 번호는 `TINYINT`로 둔다. JPA 엔티티 필드도 `long`이다.
 - 코드값은 `ENUM` 대신 `VARCHAR` 대문자 코드(`countries`, `users.role` 등) 또는 이름만 있는 코드 테이블(`user_states`, `keyword_states`, `report_types`, `sanction_types`)로 둔다. 허용 값 검증은 `CHECK` 없이 애플리케이션에서 한다.
 - 같은 단어 판정 컬럼(`keywords.normalized`, 차단어)은 `utf8mb4_bin`. 정규화는 애플리케이션에서 한다.
 - JPA 엔티티는 단수형 클래스 + `@Table(name = "users")`. 스키마는 Flyway 마이그레이션(`src/main/resources/db/migration`)으로 바꾸고, 시더가 초기 데이터를 넣는다(11.3). 자동 테스트만 시작할 때 JPA가 H2에 스키마를 만든다.
 
-### 11.2 테이블 (39개, 컬럼은 `4-schema.sql`)
+### 11.2 테이블 (42개, 컬럼은 `4-schema.sql`)
+
+마이그레이션(V1~V14)이 만드는 테이블은 38개다. `user_notices`, `setting_histories`, `blocked_terms`, `blocked_nicknames`는 `4-schema.sql`에만 있는 설계 테이블이고 엔티티와 마이그레이션이 아직 없다(표에 "(아직 없음)"으로 적었다).
 
 | 분류 | 테이블 | 역할 |
 |---|---|---|
@@ -381,11 +390,11 @@ record TrendBox(
 | | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
 | | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
 | | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
-| | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자가 수정) |
+| | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자 편집기는 아직 없고 DB로 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
-| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 검색수·`+` 수, 가진 사람 수, 공개 페이지 조회수(`view_count`) |
+| | `keywords` | 나라별 키워드. 표시용·정규화 단어, 상태, 반영 소스, 트렌드 값, 검색수·추가수, 가진 사람 수, 공개 페이지 조회수(`view_count`) |
 | | `player_keywords` | 보관함. `+` 한 번 = 한 행, 24시간 뒤 삭제 |
 | | `keyword_ai_requests` | AI 설명 갱신 요청(4.12): 키워드 × 요청한 플레이어, 처리 시각(`handled_at`이 NULL이면 처리 전). |
 | | `keyword_ai_comments` | 키워드 AI 한 줄 설명(4.12): 설명, 쓴 쪽(AI/ADMIN), 쓴 시각, 자동 시도 횟수. `keywords.ai_comment_id`가 가리키고(키워드 하나에 행 하나, 처음 만들기를 시도할 때 만듦) 키워드 행은 가볍게 둔다 |
@@ -395,13 +404,14 @@ record TrendBox(
 | | `chat_messages` | 채팅(30일 보관) |
 | | `share_cards` | 자랑하기 카드 공유 주소(4.24). 공개 코드와 공유한 순간의 카드 값(JSON, 고치지 않음), 누적 조회·클릭 수, 영구 보관 |
 | | `report_types`, `reports` | 신고 대상 유형과 신고(대상 유형 + ID) |
-| 운영 | `notices`, `user_notices` | 공지(영어 `title_en`·`body_en`)와 팝업 열람 기록 |
+| 운영 | `notices`, `user_notices`(아직 없음) | 공지(영어 `title_en`·`body_en`)와 팝업 열람 기록 |
 | 운영 | `emergency_notices` | 긴급 안내(4.29): 만든 사람, 내용·영어, 끝 시각, 취소 시각. 마이그레이션 V3 |
 | 운영 | `integration_links` | 관리자 연동 바로가기(13.15): code·이름·주소·순서. 기본 3개는 서버가 채움. 마이그레이션 V4 |
 | | `guide_categories`, `guides` | 게임 가이드(영어 `name_en` / `title_en`·`body_en`) |
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
-| | `settings`, `setting_histories` | 밸런스 설정과 변경 이력 |
-| | `blocked_terms`, `blocked_nicknames` | 차단어, 금지 닉네임 |
+| | `setting_groups`, `settings` | 설정 그룹(이름·표시 순서, V12)과 밸런스 설정(그룹·단위 포함) |
+| | `setting_histories`(아직 없음) | 밸런스 설정 변경 이력 |
+| | `blocked_terms`, `blocked_nicknames`(아직 없음) | 차단어, 금지 닉네임 |
 | | `sanction_types`, `sanctions` | 제재 타입과 사용자 제재 기록(사유·기간·해제) |
 | | `site_hourly_stats`, `site_daily_stats` | 관리자 통계(13.9). 나라 × 한 시간 / 나라 × 현지 날짜: 최고·평균 동시 접속, 활동 인원, 새 플레이어, 추가·검색·구슬·충돌로 잃기·채팅·댓글·자랑하기 카드 수 |
 
@@ -424,8 +434,8 @@ record TrendBox(
 초기 데이터
 - 시작할 때마다 시더(`ApplicationRunner`)가 스키마 반영이 끝난 뒤 필요한 테이블을 검사해서, 비어 있으면 초기값을 자동으로 넣는다. 그래서 `reset` 직후나 새 DB에서도 바로 테스트할 수 있다.
 - 코드가 이름으로 찾는 테이블(`user_states`, `keyword_states`, `data_sources`, `settings`, `report_types`, `sanction_types`, `countries`, `levels`)은 없는 행만 채운다(고유 이름·번호 기준, 기존 값은 덮어쓰지 않는다). 코드를 고쳐 새 설정이나 상태가 늘어도 다음 실행에 채워진다.
-- 영어 값(`name_en` 등)은 `seed/EnglishSeed.java`에 있다(칭호 61개, 가이드 카테고리 7개와 글 38개, 효과 21개와 효과 종류 2개). `EnglishBackfill`이 시작할 때마다 영어 칸이 NULL인 행만 채우고(칭호는 한국어 이름, 효과는 코드, 카테고리는 코드, 글은 (카테고리 코드, 한국어 제목)으로 짝지음) 이미 있는 값은 덮어쓰지 않는다. 알려진 한계: 관리자가 영어 칸을 비우면 다음 재시작에 다시 채워진다.
-- 운영에서 지우거나 고치는 데이터(`titles`, `guide_categories`, `blocked_nicknames`, `blocked_terms`)는 테이블이 비어 있을 때만 넣는다. 관리자가 일부러 지운 행이 다시 생기지 않게 하려는 것이다.
+- 영어 값(`name_en` 등)은 `seed/EnglishSeed.java`에 있다(칭호 61개, 가이드 카테고리 7개와 글 36개, 효과 21개와 효과 종류 2개). `EnglishBackfill`이 시작할 때마다 영어 칸이 NULL인 행만 채우고(칭호는 한국어 이름, 효과는 코드, 카테고리는 코드, 글은 (카테고리 코드, 한국어 제목)으로 짝지음) 이미 있는 값은 덮어쓰지 않는다. 알려진 한계: 관리자가 영어 칸을 비우면 다음 재시작에 다시 채워진다.
+- 운영에서 지우거나 고치는 데이터(`titles`, `guide_categories`, `guides`)는 테이블이 비어 있을 때만 넣는다. 관리자가 일부러 지운 행이 다시 생기지 않게 하려는 것이다.
 - ID 순서가 번역 키가 되는 테이블(`titles`, `keyword_states`, `user_states`)은 시드 순서를 고정해서 `reset`을 해도 같은 ID가 나오게 한다.
 
 | 테이블 | 넣는 값 |
@@ -435,12 +445,12 @@ record TrendBox(
 | `data_sources` | google 1, admin 1, internal 1 (10.3) |
 | `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
-| `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만), 죽인 횟수 칭호 5개와 패배 횟수 칭호 5개(4.31)는 `kill_count`·`defeat_count` 칭호가 하나도 없을 때 각각 한 번 더 넣는다. 표시 순서는 종류별(`sort_order`). 영어 칸은 위 `EnglishBackfill`이 채운다 |
+| `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만), 처치 횟수 칭호 5개와 패배 횟수 칭호 5개(4.31)는 `kill_count`·`defeat_count` 칭호가 하나도 없을 때 각각 한 번 더 넣는다. 표시 순서는 종류별(`sort_order`). 영어 칸은 위 `EnglishBackfill`이 채운다 |
 | `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 16개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |
 | `report_types`, `sanction_types` | 키워드 / 댓글 / 아이콘 이미지 / 플레이어 / 채팅, 계정 금지 / 이미지 업로드 정지 / 댓글 작성 정지 (13.5) |
 | `guide_categories`, `guides` | 4.17의 초기 카테고리와 놀이 방법 글(각 테이블이 비어 있을 때만). 시드 글을 고쳐도 이미 들어간 DB는 바꾸지 않는다(관리자 화면에서 고친다) |
 | `users` | 공지·가이드 작성자로 쓰는 운영자 계정(`role` = ADMIN, 로그인 수단 없음) 1개, 없을 때만 |
-| `blocked_nicknames`, `blocked_terms` | 기본 금지어 소수(비어 있어도 동작) |
+| `blocked_nicknames`, `blocked_terms` | 아직 없음(테이블을 만들 때 기본 금지어 소수를 넣는다. 비어 있어도 동작) |
 
 ## 12. 빌드와 배포
 - Gradle Wrapper, Kotlin DSL, Java Toolchain 25.
@@ -460,17 +470,17 @@ java {
   - Gradle: 9.8.2. Java 25는 Gradle 9.1.0부터 지원하고, Spring Boot 4.1.2는 Gradle 8.14 이상 또는 9.x를 지원한다.
   - 내장 서버: Tomcat 11.0.x(Servlet 6.1).
   - Spring Boot 4는 Jackson 3(`tools.jackson`), Hibernate 7.x, Spring Security 7.x를 쓴다. 4.1.0 기준 Hibernate 7.4, Spring Security 7.1.0, Flyway 12.4.0이고, 4.1.2가 관리하는 정확한 버전은 BOM을 따른다.
-- 주요 의존성: spring-boot-starter-webmvc, starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(운영용, 개발·테스트에서는 끈다), MySQL JDBC, ShedLock, Caffeine, Google API Client, ONNX Runtime, Testcontainers(MySQL).
+- 주요 의존성: spring-boot-starter-webmvc, starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(테스트에서는 끈다), Caffeine, spring-security-oauth2-jose(구글 ID 토큰 검증), MariaDB·MySQL JDBC, 테스트용 H2. ShedLock·ONNX Runtime·Testcontainers는 아직 쓰지 않는다.
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
 - 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
 - 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 스키마는 Flyway가 바꾸므로 로컬은 `ddl-auto=validate`, 운영은 `ddl-auto=none`이다(11.3, 16.1).
 - 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 운영 환경 변수는 GitHub 시크릿 `ENV_FILE`을 배포 때 서버 `/home/ubuntu/trendist/.env`로 보내고(WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`, 기본 `https://trendist.kr`), 실행 설정(포트 4001, 네트워크)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
 - 카카오톡 공유(4.24): 카카오 앱의 JavaScript 키(공개 키, 브라우저에 그대로 실린다)는 `trendist-front/src/kakaoShare.ts`에 기본값으로 둔다. 다른 키를 쓰려면 빌드 환경 변수 `VITE_KAKAO_JS_KEY`로 덮어쓴다(로컬은 git 제외 파일 `.env.local`). GitHub 저장소 변수는 쓰지 않는다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.
-- 검색엔진 최적화: 메인 `index.html`의 description·canonical·`og:`·twitter 메타(이미지는 절대 주소), `public/robots.txt`(`/admin/`·`/api/` 제외, `/share/`는 미리보기 수집기를 위해 막지 않음), `public/sitemap.xml`(메인 주소), `<noscript>` 소개 본문. 관리자 화면 `admin/index.html`은 `noindex, nofollow`. 공유 카드 페이지는 카드별 `og:` 태그와 `noindex`를 백엔드가 만든다(4.24). 서버 렌더링은 쓰지 않는다(로그인 없는 캔버스 게임이라 검색 노출 대상이 메인 화면뿐).
-- 공개 키워드 페이지·사이트맵(4.28): `/kr/keywords/**`, `/global/keywords/**`, `/sitemap.xml`은 백엔드가 준다. **운영 nginx에 `location ~ ^/(kr|global)/keywords/ { proxy_pass http://trendist-back:4001; }`와 `location = /sitemap.xml { proxy_pass http://trendist-back:4001; }`를 `/share/`와 같은 헤더(Host·X-Forwarded)로 추가해야 한다.** `location =`가 정적 파일(`root`)보다 먼저 맞으므로 남은 정적 `sitemap.xml`보다 우선하지만, 혼란을 막으려고 프론트의 `public/sitemap.xml`은 지웠다. 로컬은 Vite가 같은 주소를 백엔드로 넘긴다(`vite.config.ts`). 사이트 주소는 `trendist.share.base-url`을 쓴다. 이미 제출한 `https://trendist.kr/sitemap.xml`은 그대로 쓰면 되고, 새로 제출할 주소는 없다.
+- 검색엔진 최적화: 메인 `index.html`의 description·canonical·`og:`·twitter 메타(이미지는 절대 주소), `public/robots.txt`(`/admin/`·`/api/` 제외, `/share/`는 미리보기 수집기를 위해 막지 않음, `Sitemap:`은 백엔드가 만드는 `/sitemap.xml`), `<noscript>` 소개 본문. 관리자 화면 `admin/index.html`은 `noindex, nofollow`. 공유 카드 페이지는 카드별 `og:` 태그를 백엔드가 만든다(검색에도 노출하고 없는 카드의 404만 `noindex`, 4.24). 서버 렌더링은 쓰지 않는다(로그인 없는 캔버스 게임이라 검색 노출 대상이 메인 화면뿐).
+- 공개 키워드 페이지·사이트맵(4.28): `/kr/keywords/**`, `/global/keywords/**`, `/sitemap.xml`은 백엔드가 준다. **운영 nginx에 `location ~ ^/(kr|global)/keywords/ { proxy_pass http://trendist-back:4001; }`와 `location = /sitemap.xml { proxy_pass http://trendist-back:4001; }`를 `/share/`와 같은 헤더(Host·X-Forwarded)로 추가해야 한다.** `location =`가 정적 파일(`root`)보다 먼저 맞으므로 정적 `sitemap.xml`보다 우선하고, 프론트의 `public/`에는 `sitemap.xml`을 두지 않는다. 로컬은 Vite가 같은 주소를 백엔드로 넘긴다(`vite.config.ts`). 사이트 주소는 `trendist.share.base-url`을 쓴다. 이미 제출한 `https://trendist.kr/sitemap.xml`은 그대로 쓰면 되고, 새로 제출할 주소는 없다.
 - DB 마이그레이션(Flyway, 11.3): 의존성 `spring-boot-starter-flyway`·`flyway-mysql`. 운영 배포 전에 **DB를 백업**한다(처음 Flyway가 켜지면 `flyway_schema_history`가 새로 생기고 V2가 운영 DB에 적용된다). 마이그레이션이 실패하면 애플리케이션이 시작하지 않는다(단일 컨테이너 중단 배포라 이전 컨테이너가 이미 내려가 있다).
-- 접속 분석: 메인 `index.html`의 `<head>` 바로 다음에 Google 태그(GTM-WRFP5PLN)를 한 번 둔다. 백엔드가 그리는 공개 페이지(키워드 페이지 `/kr/keywords/…`·`/global/keywords/…`, 공유 카드 페이지 `/share/{코드}`)에는 표준 GTM 코드(`<head>` 스크립트와 `<body>` `<noscript>`, `AnalyticsTag`)를 같은 컨테이너로 넣어 검색에서 들어온 방문도 한곳에서 본다(2026-11-06). 관리자 화면(`admin/`)에는 넣지 않는다(운영자 접속이 수치에 섞이지 않게). 공유 유입은 자체 공유 통계로도 본다(13.8).
+- 접속 분석: 메인 `index.html`의 `<head>` 바로 다음에 Google 태그(GTM-WRFP5PLN)를 한 번 둔다. 백엔드가 그리는 공개 페이지(키워드 페이지 `/kr/keywords/…`·`/global/keywords/…`, 공유 카드 페이지 `/share/{코드}`)에는 표준 GTM 코드(`<head>` 스크립트와 `<body>` `<noscript>`, `AnalyticsTag`)를 같은 컨테이너로 넣어 검색에서 들어온 방문도 한곳에서 본다. 관리자 화면(`admin/`)에는 넣지 않는다(운영자 접속이 수치에 섞이지 않게). 공유 유입은 자체 공유 통계로도 본다(13.8).
 - 자랑하기 카드 공유 주소(4.24): `/share/**`는 백엔드가 준다. 운영 nginx에 `location /share/ { proxy_pass http://trendist-back:4001; }`(Host·X-Forwarded 헤더는 `/api`와 같게)를 둬야 하고, 로컬은 Vite가 `/share/`를 백엔드로 넘긴다. OG 태그·공유 주소에 쓰는 사이트 주소는 설정 `trendist.share.base-url`(운영 환경 변수 `PROD_SITE_URL`, 기본 `https://trendist.kr`, 로컬 `http://localhost:8080`)이다. 요청의 Host 헤더로 만들지 않는다(헤더 위조로 다른 주소가 OG에 들어가지 않게). 조회 수의 방문자 구분에 실제 접속 IP가 필요해서 운영은 `server.forward-headers-strategy: native`로 nginx의 `X-Forwarded-For`를 읽는다(nginx가 이 헤더를 넣어야 한다).
 - 저장소: 프론트엔드와 백엔드를 GitHub 저장소 두 개로 따로 관리한다(`Trendist-Project/trendist-front`, `Trendist-Project/trendist-back`).
 - 기획·기술·운영·SQL 문서는 백엔드 저장소의 `docs/`에서만 관리한다.
