@@ -121,7 +121,7 @@ class ApiFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nickname").value("새이름"))
                 .andExpect(jsonPath("$.nicknameChangeableAt").isNotEmpty());
-        // 1시간 안에 다시 바꾸면 거절
+        // 변경 간격(기본 5분) 안에 다시 바꾸면 거절
         mvc.perform(patch("/api/me/nickname").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"또다른이름\"}"))
                 .andExpect(status().isConflict())
@@ -575,8 +575,8 @@ class ApiFlowTest {
     }
 
     @Test
-    void profilesUnlockAtLevelElevenAndSlotOneIsEquippedByDefault() throws Exception {
-        // 꾸미기 프로필(4.9): 1~3번 칸, 아무것도 저장하지 않았으면 1번 칸(기본 모습)을 장착. 꾸미기는 11레벨부터
+    void profilesUnlockAtLevelTenAndSlotOneIsEquippedByDefault() throws Exception {
+        // 꾸미기 프로필(4.9): 1~3번 칸, 아무것도 저장하지 않았으면 1번 칸(기본 모습)을 장착. 꾸미기는 10레벨부터
         String t = player("프로필시험");
         mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.unlocked").value(false)).andExpect(jsonPath("$.equippedSlot").value(1))
@@ -584,7 +584,7 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$.slots[0].saved").value(false)).andExpect(jsonPath("$.colors.length()").value(24));
         String good = "{\"background\":\"#FF6B6B\",\"borderColor\":\"#ffffff\",\"borderWidth\":4,\"nameColor\":\"#ffd166\",\"nameStyle\":\"ribbon\"}";
         saveProfile(t, 1, good).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CUSTOMIZE_LOCKED"));
-        level(t, 11);
+        level(t, 10);
         saveProfile(t, 1, "{\"background\":\"#222b38\"}").andExpect(status().isBadRequest()); // 바닥색과 거의 같다
         saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"borderWidth\":9}").andExpect(status().isBadRequest());
         saveProfile(t, 1, "{\"background\":\"#ff6b6b\",\"nameStyle\":\"sparkle\"}").andExpect(status().isBadRequest());
@@ -596,7 +596,7 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$.equippedSlot").value(1)); // 2번 칸을 저장해도 장착은 그대로
         saveProfile(t, 1, good).andExpect(status().isTooManyRequests()); // 5초에 한 번
         String other = player("장착시험");
-        level(other, 11);
+        level(other, 10);
         mvc.perform(put("/api/me/profiles/equipped").header("Authorization", "Bearer " + other).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"slot\":3}")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.equippedSlot").value(3)).andExpect(jsonPath("$.slots[2].equipped").value(true))
@@ -605,13 +605,13 @@ class ApiFlowTest {
 
     @Test
     void effectsNeedLevelElevenAndGoogleLogin() throws Exception {
-        // 이동·테두리 효과는 꾸미기의 하나: 11레벨부터, Google 로그인 사용자만(4.9, 4.23)
+        // 이동·테두리 효과는 꾸미기의 하나: 10레벨부터, Google 로그인 사용자만(4.9, 4.23)
         String member = loggedInPlayer("효과회원");
         mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
-                .andExpect(jsonPath("$.trails[0].unlocked").value(false)).andExpect(jsonPath("$.trails[0].lockReason").value("11레벨부터 쓸 수 있어요"));
-        level(member, 11);
+                .andExpect(jsonPath("$.trails[0].unlocked").value(false)).andExpect(jsonPath("$.trails[0].lockReason").value("10레벨부터 쓸 수 있어요"));
+        level(member, 10);
         String guest = player("효과게스트");
-        level(guest, 11);
+        level(guest, 10);
         mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + guest))
                 .andExpect(jsonPath("$.borders[0].unlocked").value(false));
         String body = mvc.perform(get("/api/me/profiles").header("Authorization", "Bearer " + member))
@@ -639,11 +639,11 @@ class ApiFlowTest {
 
     @Test
     void pixelArtIsSavedInProfileAndServedAsPng() throws Exception {
-        // 픽셀 그림(4.9): 11레벨 + Google 로그인만, 프로필 칸에 저장하고 PNG로 받는다. 변경 간격(기본 10분)
+        // 픽셀 그림(4.9): 10레벨 + Google 로그인만, 프로필 칸에 저장하고 PNG로 받는다. 변경 간격(기본 10분)
         String guest = player("그림게스트");
         String t = loggedInPlayer("그림작가");
-        level(guest, 11);
-        level(t, 11);
+        level(guest, 10);
+        level(t, 10);
         String pixels = "0".repeat(10) + ".".repeat(1024 - 20) + "1".repeat(10);
         String art = "\"art\":{\"palette\":[\"#FF0000\",\"#00ff00\",\"#0000ff\"],\"pixels\":\"" + pixels + "\"}";
         saveProfile(guest, 1, "{\"background\":\"#ff6b6b\",\"inner\":\"PIXEL\"," + art + "}")
@@ -887,6 +887,29 @@ class ApiFlowTest {
         assertThatThrownBy(() -> settingService.update(1, SettingKeys.BOT_PLAYERS, "abc")).hasMessageContaining("숫자");
         assertThat(settingService.list()).anyMatch(i -> i.name().equals(SettingKeys.BOT_PLAYERS) && "10".equals(i.defaultValue()));
         settingService.update(1, SettingKeys.BOT_PLAYERS, "10");
+    }
+
+    @Test
+    void settingsAreGroupedByTheGroupTableAndCarryTheirUnit() {
+        // 설정은 그룹 테이블(setting_groups)을 외래 키로 가리키고, 단위(unit)를 함께 내려 준다(13.3)
+        var items = settingService.list();
+        assertThat(items).isNotEmpty().allMatch(i -> i.group() != null && !i.group().isBlank());
+        assertThat(items).noneMatch(i -> i.name().equals("join_protect_seconds"));
+        var offline = items.stream().filter(i -> i.name().equals(SettingKeys.OFFLINE_KEEP_SECONDS)).findFirst().orElseThrow();
+        assertThat(offline.group()).isEqualTo("보호·접속");
+        assertThat(offline.unit()).isEqualTo("초");
+        var plain = items.stream().filter(i -> i.name().equals(SettingKeys.COMBO_BOT_COUNTS)).findFirst().orElseThrow();
+        assertThat(plain.unit()).isNull();
+        // 그룹 순서(그룹 테이블의 sort_order)대로 붙어 있다: 한 번 지나간 그룹이 다시 나오지 않는다
+        var seen = new java.util.ArrayList<String>();
+        for (var i : items) {
+            if (seen.isEmpty() || !seen.get(seen.size() - 1).equals(i.group())) {
+                assertThat(seen).as("그룹이 흩어져 있다: " + i.group()).doesNotContain(i.group());
+                seen.add(i.group());
+            }
+        }
+        assertThat(seen).isSubsetOf(SettingKeys.GROUP_ORDER);
+        assertThat(seen.stream().map(SettingKeys.GROUP_ORDER::indexOf).toList()).isSorted();
     }
 
     private static String uncheckedBody(MvcResult r) {

@@ -54,7 +54,7 @@ public class EffectRules {
     }
 
     /**
-     * 아직 얻지 못했으면 조건 안내, 얻었으면 null. 효과는 꾸미기의 하나라 꾸미기 해금 레벨(기본 11)부터, Google로 로그인한 사용자만 쓴다.
+     * 아직 얻지 못했으면 조건 안내, 얻었으면 null. 효과는 꾸미기의 하나라 꾸미기 해금 레벨(기본 10)부터, Google로 로그인한 사용자만 쓴다.
      * 그 위에 효과마다 조건을 더 붙일 수 있다. 결제(PURCHASE)는 아직 없어서 고를 수 없다.
      */
     private String lockReason(Player p, Effect e, Lang lang) {

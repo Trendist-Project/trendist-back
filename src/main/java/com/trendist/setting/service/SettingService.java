@@ -8,9 +8,9 @@ public interface SettingService {
 
     void invalidate();
 
-    /** 관리자 화면의 설정 한 줄(13.3). defaultValue는 코드의 기본값. */
+    /** 관리자 화면의 설정 한 줄(13.3). defaultValue는 코드의 기본값, group은 설정 그룹 이름, unit은 값 뒤에 붙일 단위(없으면 null). */
     record Item(String name, String value, String type, java.math.BigDecimal min, java.math.BigDecimal max, String description,
-                String defaultValue, java.time.Instant updatedAt, String group) {}
+                String defaultValue, java.time.Instant updatedAt, String group, String unit) {}
 
     /** 모든 설정(코드의 기본값 순서대로). */
     java.util.List<Item> list();

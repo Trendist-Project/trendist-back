@@ -57,16 +57,16 @@ public class SettingServiceImpl implements SettingService {
     @Transactional(readOnly = true)
     public List<Item> list() {
         Map<String, Setting> rows = new HashMap<>();
-        for (Setting s : repository.findAll()) rows.put(s.getName(), s);
-        List<Item> out = new ArrayList<>();
+        for (Setting s : repository.findAllWithGroup()) rows.put(s.getName(), s);
+        List<Setting> ordered = new ArrayList<>();
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
             Setting s = rows.remove(d.name());
-            if (s != null) out.add(item(s));
+            if (s != null) ordered.add(s);
         }
-        rows.values().stream().sorted(Comparator.comparing(Setting::getName)).forEach(s -> out.add(item(s))); // 코드에 없는 옛 설정
-        // 그룹 순서대로 묶는다(같은 그룹 안에서는 코드의 순서 그대로, 안정 정렬)
-        out.sort(Comparator.comparingInt(i -> SettingKeys.GROUP_ORDER.indexOf(i.group())));
-        return out;
+        rows.values().stream().sorted(Comparator.comparing(Setting::getName)).forEach(ordered::add); // 코드에 없는 옛 설정
+        // 그룹 테이블의 순서대로 묶는다(같은 그룹 안에서는 코드의 순서 그대로, 안정 정렬)
+        ordered.sort(Comparator.comparingLong(s -> s.getGroup().getSortOrder()));
+        return ordered.stream().map(this::item).toList();
     }
 
     @Override
@@ -100,7 +100,7 @@ public class SettingServiceImpl implements SettingService {
 
     private Item item(Setting s) {
         String def = SettingKeys.DEFAULTS.stream().filter(d -> d.name().equals(s.getName())).map(SettingKeys.Def::value).findFirst().orElse(null);
-        return new Item(s.getName(), s.getValue(), s.getValueType(), s.getMinValue(), s.getMaxValue(), s.getDescription(), def, s.getUpdatedAt(), SettingKeys.groupOf(s.getName()));
+        return new Item(s.getName(), s.getValue(), s.getValueType(), s.getMinValue(), s.getMaxValue(), s.getDescription(), def, s.getUpdatedAt(), s.getGroup().getName(), s.getUnit());
     }
 
     private static String plain(BigDecimal v) { return v == null ? "" : v.stripTrailingZeros().toPlainString(); }

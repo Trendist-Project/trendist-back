@@ -22,7 +22,7 @@ final class EnglishSeed {
             t("트렌드 장인", "Trend Artisan", "Added 2,000 keywords"),
             t("트렌드 전설", "Trend Legend", "Added 10,000 keywords"),
             t("완전체", "Fully Grown", "Your icon is fully grown (level 10)"),
-            t("스타일리스트", "Stylist", "Customization unlocked (level 11)"),
+            t("스타일리스트", "Stylist", "Customization unlocked (level 10)"),
             t("일취월장", "Rising Fast", "Reached level 20"),
             t("베테랑", "Veteran", "Reached level 30"),
             t("마스터", "Master", "Reached level 50"),
@@ -276,7 +276,7 @@ final class EnglishSeed {
                             - The moment you earn a title, a **🏅 New title alert** pops up at the top of the screen. It disappears on its own after 6 seconds, and pressing **Equip** puts that title right under your name.
                             - In **My info → 🏅 Titles** you can pick one of your titles and **equip** it. The equipped title shows at the top of the list as "Equipped", and appears in yellow under your nickname in the arena. **Unequip** it to hide it.
                             - You can also check the conditions and progress bars of titles you haven't earned yet."""),
-                    new Article("Customizing your orb (from level 11)", """
+                    new Article("Customizing your orb (from level 10)", """
                             Customize your orb in **My info → 🎨 Customize**. Your looks are saved separately in **3 profiles**, and you **equip** one of them. At first, profile 1 (the default look) is equipped.
 
                             - **Fill and border**: Besides the 24 suggested colors, you can pick any color you like. Dark colors too close to the floor can't be chosen.
@@ -296,7 +296,7 @@ final class EnglishSeed {
 
                             - Choose from afterimage, stardust, flame, bubbles, rainbow, footprints (turtle, cat, dog, bird, bear, rabbit), petals, hearts, music notes, lightning, smoke, and snowflakes.
                             - When you pick one, the preview shows your orb moving with the effect. Save it to the equipped profile and everyone in the room sees it.
-                            - Available from level 11, when customization unlocks, and only for players **signed in with Google**."""),
+                            - Available from level 10, when customization unlocks, and only for players **signed in with Google**."""),
                     new Article("Bragging card", """
                             In **My info → 📸 Bragging card**, you can turn your record into a single image.
 
@@ -327,7 +327,7 @@ final class EnglishSeed {
                     new Article("Where is my progress saved?", """
                             If you start without signing in, your progress stays in this browser. If you clear your browser data or switch browsers, you'll start over, so sign in with Google if you plan to play for a while."""),
                     new Article("I want to change my nickname.", """
-                            You can change it in **My info**. After changing it once, you can change it again after 1 hour.
+                            You can change it in **My info**. After changing it once, you can change it again after 5 minutes.
 
                             You can mix English letters and numbers with one other writing system (for example, Korean). If there are characters you can't use, we'll tell you which ones."""),
                     new Article("I saw an inappropriate nickname, comment, or chat.", """

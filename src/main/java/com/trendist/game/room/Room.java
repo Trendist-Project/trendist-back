@@ -25,7 +25,7 @@ public class Room {
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
     public record Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
-                         double cooldownSeconds, double loseProtectSeconds, double joinProtectSeconds,
+                         double cooldownSeconds, double loseProtectSeconds,
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
                          int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap) {}
 
@@ -259,16 +259,16 @@ public class Room {
     // ------------------------------------------------------------ 틱 스레드에서만 부른다
 
     public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds) {
-        return join(playerId, session, nickname, level, score, keywordIds, Appearance.DEFAULT, false);
+        return join(playerId, session, nickname, level, score, keywordIds, Appearance.DEFAULT);
     }
 
     /**
-     * 입장(4.22, 4.32): 언제나 가운데 고정 세이프존 안 무작위 위치에서 시작한다(마지막 위치는 기억하지 않는다). 입장 보호(무적)를 주지만,
-     * 죽은 뒤 리스폰(respawn)은 안전한 자리라 주지 않는다. 연결이 끊겨도 원이 남아 있는 동안(offline_keep_seconds) 같은 계정이 다시 들어오면
+     * 입장·리스폰(4.22, 4.31, 4.32): 언제나 가운데 고정 세이프존 안 무작위 위치에서 시작한다(마지막 위치는 기억하지 않는다). 세이프존이 안전한 자리라
+     * 입장 보호(무적)는 따로 주지 않는다. 연결이 끊겨도 원이 남아 있는 동안(offline_keep_seconds) 같은 계정이 다시 들어오면
      * 새 원을 만들지 않고 그 원을 이어받는다(위치·보호·콤보 그대로).
      */
     public Member join(long playerId, Object session, String nickname, int level, double score, Collection<Long> keywordIds,
-                       Appearance look, boolean respawn) {
+                       Appearance look) {
         Member old = byPlayer.get(playerId);
         if (spectators.removeIf(s -> s.dead && s.playerId == playerId)) refreshSpectatorSize(); // 죽어서 구경하던 연결이 다시 들어온다(리스폰, 4.31)
         if (old != null) return takeOver(old, session, nickname, keywordIds, look);
@@ -281,7 +281,6 @@ public class Room {
         double area = currentArea();
         double[] spawn = centerSpawn(area);
         m.x = spawn[0]; m.y = spawn[1];
-        if (!respawn) m.protectUntil = clockSeconds + tuning.joinProtectSeconds();
         m.keywords.addAll(keywordIds);
         for (Long k : keywordIds) holders.computeIfAbsent(k, x -> new HashSet<>()).add(m);
         members.put(m.entityNo, m);
@@ -1283,7 +1282,6 @@ public class Room {
         double[] spawn = respawn ? centerSpawn(area) : findSpawn(area);
         if (respawn) botRespawns--;
         m.x = spawn[0]; m.y = spawn[1];
-        if (!respawn) m.protectUntil = clockSeconds + tu.joinProtectSeconds(); // 죽어서 다시 나온 봇은 안전한 가운데에서 시작하므로 보호를 주지 않는다(4.31)
         members.put(m.entityNo, m);
         broadcastRoster();
     }

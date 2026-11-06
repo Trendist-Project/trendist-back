@@ -121,7 +121,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
         }
         if ("respawn".equals(type)) {
             // 리스폰(4.31): 죽은 상태에서만 받는다. 방은 죽은 사람이 다시 들어오면 가운데 세이프존에서 시작하게 한다
-            if (member.dead && allowInput(session, type) && session.getAttributes().get(ATTR_UID) instanceof Long uid) join(session, uid, true);
+            if (member.dead && allowInput(session, type) && session.getAttributes().get(ATTR_UID) instanceof Long uid) join(session, uid);
             return;
         }
         if (member.dead) return; // 죽은 동안에는 다른 입력을 받지 않는다
@@ -175,11 +175,11 @@ public class GameSocketHandler extends TextWebSocketHandler {
         Optional<Long> uid = jwt.verify(token).filter(guard::accepts).map(JwtService.Verified::userId);
         if (uid.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("AUTH_FAILED")); return; }
         session.getAttributes().put(ATTR_UID, uid.get());
-        join(session, uid.get(), false);
+        join(session, uid.get());
     }
 
-    /** 방에 들어간다(접속과 리스폰이 같은 길, respawn이면 입장 보호를 주지 않는다). 들어가면 welcome을 보낸다. */
-    private void join(WebSocketSession session, long userId, boolean respawn) {
+    /** 방에 들어간다(접속과 리스폰이 같은 길). 들어가면 welcome을 보낸다. */
+    private void join(WebSocketSession session, long userId) {
         rooms.submitWork(() -> {
             try {
                 Optional<PlayerService.JoinInfo> info = playerService.joinInfo(userId);
@@ -191,7 +191,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 room.submit(r -> {
                     if (!session.isOpen()) return;
                     Room.Member m = r.join(player.playerId(), safe, player.nickname(), player.level(), player.score(), keywordIds,
-                            new Room.Appearance(player.title(), player.skin(), player.trail()), respawn);
+                            new Room.Appearance(player.title(), player.skin(), player.trail()));
                     session.getAttributes().put(ATTR_ROOM, r);
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),

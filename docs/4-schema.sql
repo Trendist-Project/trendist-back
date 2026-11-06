@@ -122,7 +122,7 @@ CREATE TABLE players (
   nickname            VARCHAR(40) NOT NULL COMMENT '닉네임(나라별, 중복 허용). 탈퇴 후에도 유지하고 화면에서만 탈퇴한 사용자로 표시',
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
   exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, + 횟수로만 쌓이고 줄지 않음)',
-  level_id            BIGINT NOT NULL COMMENT '레벨(levels 참조). 누적 EXP로 levels에서 정한 행. 아이콘은 10레벨에서 완성, 11레벨부터 꾸미기 가능(설정)',
+  level_id            BIGINT NOT NULL COMMENT '레벨(levels 참조). 누적 EXP로 levels에서 정한 행. 아이콘은 10레벨에서 완성, 꾸미기는 해금 레벨(설정, 기본 10)부터 가능',
   current_score       BIGINT NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기, 정수). min(EXP, 100) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
   hold_count          BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진(만료되지 않은) 트렌드 키워드 개수(player_keywords 행 수 캐시, 0 아래로 내려가지 않음, 1시간마다 실제 행 수로 보정)',
   total_plus_count    BIGINT NOT NULL DEFAULT 0 COMMENT '누적 + 횟수(만료 행 재사용 포함, 줄지 않음)',
@@ -606,18 +606,31 @@ CREATE TABLE blocked_nicknames (
   UNIQUE KEY uk_blocked_nicknames (term)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='금지 닉네임';
 
+CREATE TABLE setting_groups (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '설정 그룹 ID',
+  name       VARCHAR(50) NOT NULL COMMENT '그룹 이름(유일). 관리자 설정 화면의 묶음 제목',
+  sort_order BIGINT NOT NULL COMMENT '화면에 보이는 순서(작을수록 위)',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_setting_groups_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정 그룹';
+
 CREATE TABLE settings (
   id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '설정 ID',
+  group_id    BIGINT NOT NULL COMMENT '설정 그룹(setting_groups 참조). 관리자 화면에서 묶어 보여 줌',
   name        VARCHAR(100) NOT NULL COMMENT '설정 이름(유일)',
   value       VARCHAR(2000) NOT NULL COMMENT '설정 값(문자열로 저장)',
   value_type  VARCHAR(20) NOT NULL COMMENT '값 유형(INT/DECIMAL/JSON)',
   min_value   DECIMAL(18,6) NULL COMMENT '허용 최솟값',
   max_value   DECIMAL(18,6) NULL COMMENT '허용 최댓값',
+  unit        VARCHAR(20) NULL COMMENT '값 뒤에 붙일 단위(초, 분, 시간, px, 배, % 등). 단위 없는 값은 NULL',
   description VARCHAR(500) NULL COMMENT '설정 설명(한글, 관리자 화면용)',
   created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_settings_name (name)
+  UNIQUE KEY uk_settings_name (name),
+  CONSTRAINT fk_settings_group FOREIGN KEY (group_id) REFERENCES setting_groups (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정값';
 
 CREATE TABLE setting_histories (

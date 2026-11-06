@@ -16,6 +16,8 @@ import com.trendist.player.repository.LevelRepository;
 import com.trendist.report.entity.ReportType;
 import com.trendist.report.repository.ReportTypeRepository;
 import com.trendist.setting.entity.Setting;
+import com.trendist.setting.entity.SettingGroup;
+import com.trendist.setting.repository.SettingGroupRepository;
 import com.trendist.setting.repository.SettingRepository;
 import com.trendist.setting.support.SettingKeys;
 import com.trendist.effect.entity.Effect;
@@ -58,6 +60,7 @@ public class DataSeeder implements ApplicationRunner {
     private final SanctionTypeRepository sanctionTypes;
     private final DataSourceRepository dataSources;
     private final SettingRepository settings;
+    private final SettingGroupRepository settingGroups;
     private final LevelRepository levels;
     private final TitleRepository titles;
     private final EffectRepository effects;
@@ -107,18 +110,30 @@ public class DataSeeder implements ApplicationRunner {
         for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio")) {
             settings.findByName(old).ifPresent(settings::delete);
         }
+        // 설정 그룹(13.3): 이름과 순서는 코드(SettingKeys.GROUP_ORDER)가 정한다. 설정이 외래 키로 가리키므로 설정보다 먼저 만든다
+        java.util.Map<String, SettingGroup> groupByName = new java.util.HashMap<>();
+        for (int i = 0; i < SettingKeys.GROUP_ORDER.size(); i++) {
+            String name = SettingKeys.GROUP_ORDER.get(i);
+            SettingGroup g = settingGroups.findByName(name).orElse(null);
+            if (g == null) { g = settingGroups.save(new SettingGroup(name, i + 1)); added++; }
+            else if (g.getSortOrder() != i + 1) { g.changeSortOrder(i + 1); settingGroups.save(g); }
+            groupByName.put(name, g);
+        }
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
-            if (settings.findByName(d.name()).isEmpty()) {
-                String type = d.value().contains(".") ? "DECIMAL" : "INT";
-                settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description()));
+            SettingGroup group = groupByName.get(SettingKeys.groupOf(d.name()));
+            String unit = SettingKeys.unitOf(d.name());
+            String type = d.value().contains(".") ? "DECIMAL" : "INT";
+            Setting s = settings.findByName(d.name()).orElse(null);
+            if (s == null) {
+                settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description(), unit, group));
                 added++;
             } else {
-                Setting s = settings.findByName(d.name()).get();
                 boolean changed = false;
-                // 설명과 값 형식은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
+                // 설명·값 형식·단위·그룹은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
                 if (!d.description().equals(s.getDescription())) { s.changeDescription(d.description()); changed = true; }
-                String type = d.value().contains(".") ? "DECIMAL" : "INT";
                 if (!type.equals(s.getValueType())) { s.changeValueType(type); changed = true; }
+                if (!java.util.Objects.equals(unit, s.getUnit())) { s.changeUnit(unit); changed = true; }
+                if (!group.getId().equals(s.getGroup().getId())) { s.changeGroup(group); changed = true; }
                 if (changed) settings.save(s);
             }
         }
@@ -352,7 +367,7 @@ public class DataSeeder implements ApplicationRunner {
             {"트렌드 장인", "키워드를 2,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":2000}"},
             {"트렌드 전설", "키워드를 10,000번 추가했어요", "METRIC", "{\"metric\":\"total_plus_count\",\"gte\":10000}"},
             {"완전체", "아이콘이 다 자랐어요(10레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":10}"},
-            {"스타일리스트", "꾸미기가 열렸어요(11레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":11}"},
+            {"스타일리스트", "꾸미기가 열렸어요(10레벨)", "METRIC", "{\"metric\":\"level\",\"gte\":10}"},
             {"베테랑", "30레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":30}"},
             {"마스터", "50레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":50}"},
             {"레전드", "100레벨에 도달했어요", "METRIC", "{\"metric\":\"level\",\"gte\":100}"},

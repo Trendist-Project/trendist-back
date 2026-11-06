@@ -199,7 +199,7 @@ public class ProfileServiceImpl implements ProfileService {
                 .map(t -> t.plus(Duration.ofMinutes(settings.getInt(SettingKeys.ART_CHANGE_MINUTES)))).orElse(null);
     }
 
-    /** 꾸미기(프로필 저장·장착, 효과 포함)는 해금 레벨(기본 11)부터 */
+    /** 꾸미기(프로필 저장·장착, 효과 포함)는 해금 레벨(기본 10)부터 */
     private Player requireUnlocked(long userId) {
         Player p = playerService.requireCurrent(userId);
         int unlock = settings.getInt(SettingKeys.CUSTOMIZE_UNLOCK_LEVEL);

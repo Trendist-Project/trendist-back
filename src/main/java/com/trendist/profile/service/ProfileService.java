@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * 꾸미기 프로필(4.9): 1~3번 칸에 모습(색·테두리·이름표·원 안에 그릴 것과 그림)과 효과(이동·테두리)를 저장하고, 한 칸을 장착한다.
- * 꾸미기는 해금 레벨(기본 11)부터이고, 그림과 효과는 그중에서도 Google로 로그인한 사용자만. 장착한 칸을 저장하면 방에 바로 반영된다.
+ * 꾸미기는 해금 레벨(기본 10)부터이고, 그림과 효과는 그중에서도 Google로 로그인한 사용자만. 장착한 칸을 저장하면 방에 바로 반영된다.
  */
 public interface ProfileService {
     default ProfileDtos.Box box(long userId) { return box(userId, Lang.KO); }

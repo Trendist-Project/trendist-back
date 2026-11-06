@@ -10,9 +10,6 @@ import org.junit.jupiter.api.Test;
  * 시간이 지나면 진짜로 빠지고, 그 뒤 접속하면 늘 가운데 세이프존에서 시작한다. 마지막 위치는 기억하지 않는다.
  */
 class RoomOfflineTest {
-    /** 입장 보호 5초가 있는 설정(RoomTest.T는 입장 보호가 0이다) */
-    static final Room.Tuning PROTECT = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 0.5, 10, 5, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
-
     private static void seconds(Room r, int s) { for (int i = 0; i < 20 * s; i++) r.tick(); }
 
     @Test
@@ -37,9 +34,10 @@ class RoomOfflineTest {
     @Test
     void reconnectWithinTheTimeTakesOverTheSameCircle() {
         RoomTest.Out out = new RoomTest.Out();
-        Room r = new Room(1, PROTECT, out);
+        Room r = new Room(1, RoomTest.T, out);
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         a.x = 1234; a.y = -567;
+        a.protectUntil = 1e9;                            // 잃은 뒤 무적이 걸려 있던 중에 끊겼다고 본다
         double protectUntil = a.protectUntil;
         Object oldSession = a.session;
         r.disconnect(a, oldSession);
@@ -48,7 +46,7 @@ class RoomOfflineTest {
         assertThat(back).isSameAs(a);                    // 새 원이 아니라 남아 있던 원을 이어받는다
         assertThat(back.offline).isFalse();
         assertThat(back.session).isEqualTo("s1b");
-        assertThat(back.x).isEqualTo(1234);              // 위치·보호 그대로(보호를 다시 받지 않는다)
+        assertThat(back.x).isEqualTo(1234);              // 위치·보호 그대로
         assertThat(back.y).isEqualTo(-567);
         assertThat(back.protectUntil).isEqualTo(protectUntil);
         r.disconnect(back, oldSession);                  // 이전 연결이 뒤늦게 닫혀도 이어받은 원에는 영향이 없다
@@ -58,9 +56,9 @@ class RoomOfflineTest {
     }
 
     @Test
-    void joinAfterTheTimeAlwaysStartsInTheCenterZoneAndRespawnHasNoProtection() {
+    void joinAfterTheTimeAlwaysStartsInTheCenterZoneWithoutProtection() {
         RoomTest.Out out = new RoomTest.Out();
-        Room r = new Room(1, PROTECT, out);
+        Room r = new Room(1, RoomTest.T, out);
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         a.x = 3000; a.y = 3000;
         r.disconnect(a, a.session);
@@ -69,11 +67,7 @@ class RoomOfflineTest {
         Room.Member later = r.join(1, "s2", "a", 1, 0, List.of());
         assertThat(later).isNotSameAs(a);
         assertThat(r.inSafeZone(later.x, later.y)).isTrue();   // 마지막 위치(3000, 3000)가 아니라 가운데 세이프존
-        assertThat(later.protectUntil).isGreaterThan(0);       // 접속하면 입장 보호
-        // 죽은 뒤 리스폰은 안전한 자리라 보호가 없다
-        Room.Member respawned = r.join(2, "s3", "b", 1, 0, List.of(), Room.Appearance.DEFAULT, true);
-        assertThat(r.inSafeZone(respawned.x, respawned.y)).isTrue();
-        assertThat(respawned.protectUntil).isZero();
+        assertThat(later.protectUntil).isZero();               // 세이프존이 안전한 자리라 입장 보호는 따로 주지 않는다
     }
 
     @Test
