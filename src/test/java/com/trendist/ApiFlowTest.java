@@ -175,7 +175,7 @@ class ApiFlowTest {
         long playerId = ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
         keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("구슬테스트"));
-        // 50%는 🔥 키워드를 얻고(이미 가진 키워드면 만료시간만 갱신), 나머지는 가진 키워드 하나를 잃는다. 가진 게 없으면 꽝
+        // 70%(기본값)는 🔥 키워드를 얻고(이미 가진 키워드면 만료시간만 갱신), 나머지는 가진 키워드 하나를 잃는다. 가진 게 없으면 꽝
         int gained = 0, lost = 0, miss = 0;
         for (int i = 0; i < 300; i++) {
             var r = keywordService.openOrb(playerId);
@@ -188,7 +188,7 @@ class ApiFlowTest {
         }
         assertThat(gained).isPositive();
         assertThat(lost).isPositive();
-        assertThat(lost + miss).isBetween(100, 200); // 잃기 쪽으로 간 것은 약 절반
+        assertThat(lost + miss).isBetween(55, 125); // 잃기 쪽으로 간 것은 약 30%(300번 중 90번 안팎)
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(gained - lost));
     }
 
