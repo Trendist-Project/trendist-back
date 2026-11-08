@@ -124,7 +124,7 @@ LEFT JOIN (
   WHERE pk.player_id IN (/* 500명 */) AND pk.expires_at > NOW(6) AND k.keyword_state_id = /* 활성 상태 번호 */
   GROUP BY pk.player_id
 ) t ON t.player_id = p.id
-SET p.current_score = LEAST(p.exp, 100) + COALESCE(t.score, 0)           -- 100은 EXP 점수 반영 상한(설정값)
+SET p.current_score = LEAST(p.exp, :expScoreCap) + COALESCE(t.score, 0) -- exp_score_cap(설정값, 기본 0 = EXP는 점수에 넣지 않는다)
 WHERE p.id IN (/* 500명 */)
   AND p.current_score <> LEAST(p.exp, 100) + COALESCE(t.score, 0);
 ```
@@ -141,9 +141,9 @@ WHERE p.id IN (/* 500명 */)
 | 이동 명령 | 클릭 이동 초당 10회, 방향키는 바뀔 때마다(16ms에 한 번까지, 클라이언트 기준). 서버는 종류별 토큰 버킷으로 센다: 클릭 초당 12개(최대 24개까지 모임), 방향키 초당 60개(최대 60개), 그 밖의 종류 초당 10개. 고정 1초 창은 네트워크·프록시가 메시지를 몰아서 전달할 때 한도를 넘겨 그 1초 동안 모든 명령을 버리고, 화면만 움직였다가 되돌아오게 해서 쓰지 않는다. `ping`은 세지 않는다 |
 | 이모트 | 게임 WebSocket 연결마다 토큰 버킷: 초당 0.5개(최대 3개 모임). 넘으면 조용히 버린다(4.26) |
 | 채팅 | 1초에 1회(게임 WebSocket 연결마다 토큰 버킷, 넘으면 `chatError` `CHAT_TOO_FAST`). IP 단위 제한은 아직 없다 |
-| 정보 팝업 조회 | 계정당 초당 2회, 결과 5초 캐시 |
+| 정보 팝업 조회 | 계정당 초당 3회(더블탭·더블클릭으로 자주 열 수 있게 완화, 이전 초당 2회), 같은 원의 결과는 클라이언트가 5초 캐시 |
 | 댓글 투표 | 사용자당 분당 20회, 같은 댓글 분당 5회(`vote:comment:{user}:{comment}`) |
-| 색·칭호 변경 | 5초에 1회 |
+| 꾸미기(색) 변경 | 5초에 1회 (칭호 변경은 제한 없음) |
 | 꾸미기 프로필 저장·장착 | 5초에 1회 |
 | 픽셀 그림 변경 | 모든 칸을 합쳐 `art_change_minutes`(기본 1분)에 1회(DB의 `image_changed_at`으로 확인, 재시작해도 유지, 409 `ART_TOO_SOON`). 이미지 업로드를 붙이면 1시간에 1회 |
 | AI 설명 갱신 요청(4.12) | 플레이어당 1시간에 10회(429 `AI_REQUEST_RATE`) |
@@ -219,6 +219,7 @@ WHERE p.id IN (/* 500명 */)
 | `GET /{kr\|global}/keywords/{slug}` | 공개 키워드 페이지 HTML(로그인 없음, 4.28). 금지·없는 키워드는 404. 열 때마다 조회수를 세므로 `no-cache` |
 | `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소, 금지가 아닌 모든 키워드 페이지, 공유 페이지(`/share/{코드}`)를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
+| `GET /api/skills` | 스킬 목록(4.33): 코드·아이콘·종류·기본 단축키·쿨타임·해금 레벨(이름·설명은 프론트엔드 번역 파일). 로그인 없이, 사용 여부가 켜진 것만 표시 순서대로. DB 값은 서버가 10초 기억한다 |
 | `GET /api/guide/categories`, `/categories/{code}/articles` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 글 목록에 본문을 같이 준다. 글 한 개 조회(`/articles/{id}`)와 검색(`/search?q=`)은 아직 없다 |
 
 - 투표 토글: 없음 → INSERT, 같은 값 → DELETE, 반대 값 → UPDATE. 조건부 쿼리의 영향 행 수가 1일 때만 `comments.like_count`·`dislike_count`를 바꾸고, 같은 때 작성자의 `comment_score`도 같이 바꾼다(추천 +1, 비추천 −1, 취소·변경은 반대로, `GREATEST(값, 0)`으로 0 아래 방지). 첫 투표 경합은 UNIQUE 오류 후 다시 읽어 처리한다.
@@ -354,6 +355,7 @@ WHERE p.id IN (/* 500명 */)
 | | `users` | 계정(게스트 포함). 방문자 ID, OAuth 종류·ID, 상태, 권한, UI 언어, 계정 금지·업로드 정지 만료 시각, 탈퇴 시각 |
 | | `players` | 플레이어 = 사용자 × 나라. 닉네임, 검색수, EXP·레벨, 활성 칭호, 현재 유행도(실시간 점수), 보유 키워드 수, 마지막 접속 시각, 추가수, 댓글 점수 |
 | | `profiles` | 꾸미기 프로필(4.9): 플레이어 × 1~3번 칸. 바탕·테두리 색과 두께, 이름표 글자색·모양, 원 안에 그릴 것(성장 캐릭터 / 픽셀 그림)과 그 칸의 그림 값, 이동 효과·테두리 효과 번호. 한 칸만 장착 |
+| | `skills` | 스킬(4.33): 코드·아이콘·종류·기본 단축키(`default_key`, KeyboardEvent.code)·쿨타임(`cooldown_seconds`)·해금 레벨(`required_level`)·사용 여부·순서. 이름·설명은 번역이 필요한 화면 문구라 DB가 아니라 프론트엔드 번역 파일(`skills.<코드>_name`·`_desc`)에 둔다. 스킬을 늘리거나 쿨타임·기본 키를 고칠 때는 DB를 바꾼다(관리자 편집기는 만들지 않는다). 없는 코드의 행만 시더가 채운다 |
 | | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
 | | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
 | | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자 편집기 없이 DB로 수정) |

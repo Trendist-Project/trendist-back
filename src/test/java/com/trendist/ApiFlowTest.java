@@ -54,6 +54,8 @@ class ApiFlowTest {
     @Autowired ChatService chatService;
     @Autowired com.trendist.report.service.ReportService reportService;
     @Autowired com.trendist.setting.service.SettingService settingService;
+    @Autowired com.trendist.skill.service.SkillCatalog skillCatalog;
+    @Autowired com.trendist.skill.repository.SkillRepository skillRepository;
     @Autowired PlayerService playerService;
     @Autowired ScoreHistoryService scoreHistory;
     @Autowired KeywordActivityService activityService;
@@ -385,7 +387,7 @@ class ApiFlowTest {
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
         java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
-        assertThat(all).hasSize(61);
+        assertThat(all).hasSize(70);
         // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
         assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
     }
@@ -698,10 +700,10 @@ class ApiFlowTest {
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔 깐루\"}"))
                 .andExpect(status().isConflict());
-        // 점수 = EXP 1 + 외부 키워드 1명 trend_value 12(활동 인원이 최소 인원 20보다 적어 1/20로 계산) = 13, 정수
+        // 점수 = 외부 키워드 1명 trend_value 12(활동 인원이 최소 인원 20보다 적어 1/20로 계산), 정수. EXP는 점수에 넣지 않는다(exp_score_cap 기본 0)
         MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
         Object score = JsonPath.read(me.getResponse().getContentAsString(), "$.player.currentScore");
-        assertThat(score).isEqualTo(13);
+        assertThat(score).isEqualTo(12);
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
         // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다
@@ -919,7 +921,16 @@ class ApiFlowTest {
     @Test
     void scoreHistoryRecordsOnlyChangedHours() throws Exception {
         String t = player("점수기록");
-        plusKeyword(t, "점수 기록 키워드"); // 💤 키워드: EXP 1 → 유행도 1
+        settingService.update(1, SettingKeys.EXP_SCORE_CAP, "100"); // 점수가 생기도록 이 테스트에서만 EXP를 점수에 넣는다(기본은 0)
+        try {
+            scoreHistoryRecordsOnlyChangedHoursBody(t);
+        } finally {
+            settingService.update(1, SettingKeys.EXP_SCORE_CAP, "0");
+        }
+    }
+
+    private void scoreHistoryRecordsOnlyChangedHoursBody(String t) throws Exception {
+        plusKeyword(t, "점수 기록 키워드"); // 💤 키워드: EXP 1 → 유행도 1(이 테스트에서만)
         java.time.Instant lastHour = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS)
                 .minus(1, java.time.temporal.ChronoUnit.HOURS);
         assertThat(scoreHistory.recordHour(lastHour)).isPositive();
@@ -1101,5 +1112,68 @@ class ApiFlowTest {
         mvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + jwtToken).cookie(refresh)).andExpect(status().isNoContent());
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + jwtToken)).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/auth/session").cookie(refresh)).andExpect(status().isUnauthorized());
+    }
+    @Test
+    void skillsAreReadFromDbWithDefaultKeysAndCooldownsAndRespectEnabledFlag() throws Exception {
+        // 4.33: 스킬 코드·아이콘·종류·기본 단축키·쿨타임은 DB에서 온다(이름·설명은 프론트엔드 번역 파일). 로그인 없이 읽는다
+        skillCatalog.invalidate();
+        mvc.perform(get("/api/skills"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[0].code").value("shield"))      // 해금 레벨 순서 = 키 순서 = 버튼 순서
+                .andExpect(jsonPath("$[0].defaultKey").value("Digit1"))
+                .andExpect(jsonPath("$[0].cooldownSeconds").value(30.0))
+                .andExpect(jsonPath("$[0].category").value("DEFENSE"))
+                .andExpect(jsonPath("$[0].icon").value("🛡"))
+                .andExpect(jsonPath("$[0].requiredLevel").value(10))   // 방패 10레벨
+                .andExpect(jsonPath("$[1].code").value("hook"))
+                .andExpect(jsonPath("$[1].defaultKey").value("Digit2"))
+                .andExpect(jsonPath("$[1].requiredLevel").value(15))   // 갈고리 15레벨
+                .andExpect(jsonPath("$[2].code").value("shockwave"))
+                .andExpect(jsonPath("$[2].defaultKey").value("Digit3"))
+                .andExpect(jsonPath("$[2].requiredLevel").value(20))   // 충격파 20레벨
+                .andExpect(jsonPath("$[3].code").value("stealth"))
+                .andExpect(jsonPath("$[3].defaultKey").value("Digit4"))
+                .andExpect(jsonPath("$[3].requiredLevel").value(25))   // 은신 25레벨
+                .andExpect(jsonPath("$[0].name").doesNotExist())
+                .andExpect(jsonPath("$[4].code").value("dash")) // 대시는 스킬 4개 뒤
+                .andExpect(jsonPath("$[4].defaultKey").value("Space"))
+                .andExpect(jsonPath("$[4].requiredLevel").value(1));  // 대시는 기본 스킬 // 이름·설명은 프론트엔드 번역 파일이 코드로 찾는다
+        // DB 값을 고치면(캐시를 버린 뒤) 쿨타임·사용 여부가 바로 읽힌다
+        var hook = skillRepository.findByCode("hook").orElseThrow();
+        try {
+            skillCatalog.invalidate();
+            assertThat(skillCatalog.cooldownSeconds("hook", 99)).isEqualTo(30.0);
+            org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", false);
+            skillRepository.saveAndFlush(hook);
+            skillCatalog.invalidate();
+            assertThat(skillCatalog.disabledCodes()).contains("hook");
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(4));
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
+            skillRepository.saveAndFlush(hook);
+            skillCatalog.invalidate();
+        }
+    }
+    @Test
+    void gameInfoPublishesOrbOddsAndLevelRequirementsWithoutLogin() throws Exception {
+        // 4.17, 4.20: 가이드가 보여 주는 구슬 확률(기본 60/40)과 레벨별 필요 EXP는 운영 값(설정·levels)에서 바로 읽는다
+        mvc.perform(get("/api/game-info/orb-odds"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gainPercent").value(60))
+                .andExpect(jsonPath("$.losePercent").value(40));
+        mvc.perform(get("/api/game-info/level-exp").param("levels", "10,15,20,25,999,0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['10']").value(100))
+                .andExpect(jsonPath("$['15']").value(225))
+                .andExpect(jsonPath("$['20']").value(400))
+                .andExpect(jsonPath("$['25']").value(625))
+                .andExpect(jsonPath("$['999']").doesNotExist());
+        mvc.perform(get("/api/game-info/levels"))                       // 모든 레벨의 필요 EXP
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(100))
+                .andExpect(jsonPath("$[0].level").value(1))
+                .andExpect(jsonPath("$[99].level").value(100))
+                .andExpect(jsonPath("$[99].requiredExp").value(10000));
     }
 }

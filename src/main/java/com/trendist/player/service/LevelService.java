@@ -18,6 +18,9 @@ public interface LevelService {
     /** color: #RRGGBB 또는 null(기본 거북이 색), alpha: 진하기 0~100(%), rainbow: true면 무지개 그라데이션 */
     record Badge(int level, String color, int alpha, boolean rainbow) {}
 
+    /** 레벨표 전체(1~100레벨 순서대로). 가이드가 레벨별 필요 EXP를 공개하는 데 쓴다 */
+    java.util.List<Level> all();
+
     /** 다음 레벨에 필요한 누적 EXP. 최고 레벨이면 -1. */
     long nextRequired(long level);
 }

@@ -63,6 +63,7 @@ public class DataSeeder implements ApplicationRunner {
     private final SettingGroupRepository settingGroups;
     private final LevelRepository levels;
     private final TitleRepository titles;
+    private final com.trendist.skill.repository.SkillRepository skills;
     private final EffectRepository effects;
     private final EffectTypeRepository effectTypes;
     private final GuideCategoryRepository guideCategories;
@@ -152,6 +153,7 @@ public class DataSeeder implements ApplicationRunner {
             added++;
         }
         added += seedTitles();
+        added += seedSkills();
         // 효과 종류와 효과(4.9, 4.23): 그림이 코드에 있으므로 코드에 있는데 DB에 없는 것만 넣는다(이름·조건·순서는 운영에서 고친다)
         for (String[] t : EFFECT_TYPES) {
             if (effectTypes.findByCode(t[0]).isEmpty()) { effectTypes.save(new EffectType(t[0], t[1])); added++; }
@@ -184,6 +186,75 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         if (guides.count() == 0) added += insertGuideArticles();
+        added += insertAddedGuideCategories();
+        added += insertAddedGuideArticles();
+        added += applyGuideFixes();
+        return added;
+    }
+
+    /** 나중에 더한 카테고리(GuideSeed.ADDED_CATEGORIES): 같은 코드가 없을 때만, afterCode 카테고리 바로 뒤에 끼워 넣는다(뒤 카테고리는 순서를 하나씩 민다) */
+    private int insertAddedGuideCategories() {
+        int added = 0;
+        for (GuideSeed.AddedCategory c : GuideSeed.ADDED_CATEGORIES) {
+            if (guideCategories.existsByCode(c.code())) continue;
+            List<GuideCategory> all = guideCategories.findAllByOrderBySortOrderAscIdAsc();
+            GuideCategory after = all.stream().filter(x -> x.getCode().equals(c.afterCode())).findFirst().orElse(null);
+            long at = after != null ? after.getSortOrder() + 1 : all.stream().mapToLong(GuideCategory::getSortOrder).max().orElse(0) + 1;
+            for (GuideCategory x : all) if (x.getSortOrder() >= at) x.changeSortOrder(x.getSortOrder() + 1);
+            GuideCategory created = new GuideCategory(c.code(), c.name(), c.displayType(), (int) at);
+            created.changeNameEn(c.nameEn());
+            guideCategories.save(created);
+            added++;
+        }
+        return added;
+    }
+
+    private static String norm(String s) { return s == null ? "" : s.replace("\r\n", "\n").trim(); }
+
+    /**
+     * 가이드 글 고치기(GuideSeed.FIXES): DB의 본문이 처음 시드 그대로일 때만 새 본문(CATEGORIES·EnglishSeed의 같은 제목 글)으로 바꾼다. 영어도 함께.
+     * 관리자가 고친 글은 건드리지 않는다.
+     */
+    private int applyGuideFixes() {
+        int n = 0;
+        for (GuideSeed.Fix fix : GuideSeed.FIXES) {
+            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(fix.categoryCode()).orElse(null);
+            if (category == null) continue;
+            int ci = -1;
+            for (int i = 0; i < GuideSeed.CATEGORIES.size(); i++) if (GuideSeed.CATEGORIES.get(i).code().equals(fix.categoryCode())) ci = i;
+            if (ci < 0) continue;
+            GuideSeed.Category koCat = GuideSeed.CATEGORIES.get(ci);
+            int ai = -1;
+            for (int i = 0; i < koCat.articles().size(); i++) if (koCat.articles().get(i).title().equals(fix.title())) ai = i;
+            if (ai < 0) continue;
+            String newBody = koCat.articles().get(ai).body();
+            String newBodyEn = EnglishSeed.GUIDE.get(ci).articles().get(ai).bodyEn();
+            for (com.trendist.guide.entity.Guide g : guides.findByGuideCategoryId(category.getId())) {
+                if (!g.getTitle().equals(fix.title()) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
+                g.changeBody(newBody);
+                g.changeEnglish(g.getTitleEn(), newBodyEn);
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** 나중에 더한 글(GuideSeed.ADDED): 같은 카테고리에 같은 제목이 없을 때만 맨 뒤에 한 번 넣는다. 영어도 함께 넣는다 */
+    private int insertAddedGuideArticles() {
+        int added = 0;
+        User author = null;
+        for (GuideSeed.Added a : GuideSeed.ADDED) {
+            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(a.categoryCode()).orElse(null);
+            if (category == null) continue;
+            List<com.trendist.guide.entity.Guide> existing = guides.findByGuideCategoryId(category.getId());
+            if (existing.stream().anyMatch(g -> g.getTitle().equals(a.title()))) continue;
+            if (author == null) author = operator();
+            int next = existing.stream().mapToInt(g -> (int) g.getSortOrder()).max().orElse(0) + 1;
+            com.trendist.guide.entity.Guide g = new com.trendist.guide.entity.Guide(category, author, a.title(), a.body(), next);
+            g.changeEnglish(a.titleEn(), a.bodyEn());
+            guides.save(g);
+            added++;
+        }
         return added;
     }
 
@@ -251,6 +322,51 @@ public class DataSeeder implements ApplicationRunner {
         if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("defeat_count"))) {
             for (String[] t : DEFEAT_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
+        // 콤보 칭호(4.10, 4.25): 최고 콤보·불꽃 끈 횟수. 같은 방식으로 한 번 넣는다
+        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("max_combo"))) {
+            for (String[] t : COMBO_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("flame_out_count"))) {
+            for (String[] t : FLAME_OUT_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        // 나중에 더한 콤보 칭호: 같은 조건(metric·값)의 칭호가 없을 때만 넣는다(이미 만든 DB에도 한 번 들어간다)
+        for (String[] t : COMBO_EXTRA_TITLES) {
+            if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
+        return added;
+    }
+
+    private static final java.util.regex.Pattern METRIC_COND = java.util.regex.Pattern.compile("\"metric\"\\s*:\\s*\"([a-z_]+)\"");
+    private static final java.util.regex.Pattern GTE_COND = java.util.regex.Pattern.compile("\"gte\"\\s*:\\s*(\\d+)");
+
+    /** 두 칭호 조건(JSON)이 같은 metric·값인지. DB가 JSON의 공백·키 순서를 바꿔 저장해도 같게 본다. */
+    private static boolean sameCondition(String a, String b) {
+        var ma = METRIC_COND.matcher(a); var mb = METRIC_COND.matcher(b);
+        var ga = GTE_COND.matcher(a); var gb = GTE_COND.matcher(b);
+        return ma.find() && mb.find() && ga.find() && gb.find() && ma.group(1).equals(mb.group(1)) && ga.group(1).equals(gb.group(1));
+    }
+
+    /**
+     * 스킬(4.33): 코드가 있는데 DB에 없는 스킬만 채운다(운영에서 고친 쿨타임·기본 키는 건드리지 않는다). 스킬을 늘릴 때는 여기에 한 줄을 더하거나 DB에 행을 넣고,
+     * 동작은 Room.SKILLS와 Room.skill에, 이름·설명은 프론트엔드 번역 파일(skills.<코드>_name·_desc)에 더한다. 기본 단축키는 KeyboardEvent.code(Space, Digit1, KeyQ …).
+     * 필드: 코드, 아이콘, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬).
+     */
+    private static final String[][] SKILL_ROWS = {
+            {"shield", "🛡", "DEFENSE", "Digit1", "30", "10"},   // 해금 레벨 순서 = 키 순서 = 버튼 순서
+            {"hook", "🪝", "ATTACK", "Digit2", "30", "15"},
+            {"shockwave", "💥", "ATTACK", "Digit3", "30", "20"},
+            {"stealth", "👻", "STEALTH", "Digit4", "30", "25"},
+            {"dash", "⚡", "MOVE", "Space", "30", "1"}, // 기본 스킬. 버튼은 스킬 4개 뒤(오른쪽)
+    };
+
+    private int seedSkills() {
+        int added = 0;
+        for (int i = 0; i < SKILL_ROWS.length; i++) {
+            String[] r = SKILL_ROWS[i];
+            if (skills.findByCode(r[0]).isPresent()) continue;
+            skills.save(new com.trendist.skill.entity.Skill(r[0], r[1], r[2], r[3], Double.parseDouble(r[4]), Integer.parseInt(r[5]), (i + 1) * 10L));
+            added++;
+        }
         return added;
     }
 
@@ -310,6 +426,27 @@ public class DataSeeder implements ApplicationRunner {
             {"끝없는 도전자", "1,000번 패배해도 멈추지 않았어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":1000}"},
     };
 
+    /** 최고 콤보 칭호(4.25) 5개: 연속으로 빼앗을수록 불꽃이 거세진다 */
+    private static final String[][] COMBO_TITLES = {
+            {"연속 타격", "연속으로 3번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":3}"},
+            {"불꽃 점화", "연속으로 5번 빼앗아 불꽃을 붙였어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":5}"},
+            {"연쇄 반응", "연속으로 10번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":10}"},
+            {"폭주 기관차", "연속으로 20번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":20}"},
+            {"멈추지 않는 불꽃", "연속으로 40번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":40}"},
+    };
+
+    /** 나중에 더한 최고 콤보 칭호(4.25): 100 콤보 */
+    private static final String[][] COMBO_EXTRA_TITLES = {
+            {"100 콤보", "연속으로 100번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":100}"},
+    };
+
+    /** 불꽃 끄기 칭호(4.25) 3개: 불타는 상대를 쓰러뜨린 사람 */
+    private static final String[][] FLAME_OUT_TITLES = {
+            {"불 끄미", "상대의 불꽃을 처음 꺼뜨렸어요", "METRIC", "{\"metric\":\"flame_out_count\",\"gte\":1}"},
+            {"소방관", "상대의 불꽃을 10번 꺼뜨렸어요", "METRIC", "{\"metric\":\"flame_out_count\",\"gte\":10}"},
+            {"화재 진압 대장", "상대의 불꽃을 50번 꺼뜨렸어요", "METRIC", "{\"metric\":\"flame_out_count\",\"gte\":50}"},
+    };
+
     /** 칭호함에 보이는 순서: 종류별로 쉬운 것부터 */
     private static final List<String> TITLE_ORDER = List.of(
             "트렌드 워처", "트렌드 탐험가", "트렌드 수집가", "트렌드 사냥꾼", "트렌드 장인", "트렌드 전설",
@@ -325,6 +462,9 @@ public class DataSeeder implements ApplicationRunner {
             "오뚝이", "불굴",
             "첫 처치", "해결사", "저승사자", "아레나의 지배자", "최후의 승자",
             "첫 패배", "칠전팔기", "백전노장", "불사조", "끝없는 도전자",
+            "연속 타격", "불꽃 점화", "연쇄 반응", "폭주 기관차", "멈추지 않는 불꽃",
+            "100 콤보",
+            "불 끄미", "소방관", "화재 진압 대장",
             "새내기", "단골", "터줏대감", "산증인");
 
     /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */

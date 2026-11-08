@@ -28,6 +28,10 @@ class RoomTest {
         public void requestDefeat(Room room, Room.Member loser) { defeats.add(loser.playerId); }
         final List<Long> steals = new ArrayList<>();
         public void requestSteal(Room room, Room.Member attacker) { steals.add(attacker.playerId); }
+        final List<long[]> comboRecords = new ArrayList<>(); // {플레이어, 콤보}
+        public void requestCombo(Room room, Room.Member winner, int combo) { comboRecords.add(new long[]{winner.playerId, combo}); }
+        final List<Long> flameOuts = new ArrayList<>();
+        public void requestFlameOut(Room room, Room.Member by) { flameOuts.add(by.playerId); }
         final List<Long> kills = new ArrayList<>();
         public void requestKill(Room room, Room.Member killer) { kills.add(killer.playerId); }
         final List<Long> botWinners = new ArrayList<>();
@@ -906,5 +910,321 @@ class RoomTest {
         assertThat(r.members().stream().filter(m -> m.bot)).isNotEmpty();
         assertThat(r.botCap(avg)).isEqualTo(300.0);
         assertThat(r.members().stream().filter(m -> m.bot)).allMatch(m -> m.score <= 300);
+    }
+    /** 스킬 테스트: 가운데 세이프존 밖(800, 800)에 두 사람을 놓는다. 키워드가 없으면 충돌해도 잃을 것이 없다. */
+    private static Room skillRoom(Out out, Room.SkillTuning tuning) {
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        r.setSkillTuning(tuning);
+        return r;
+    }
+
+    private static long count(Out out, String type, String id) {
+        return out.texts.stream().filter(m -> type.equals(m.get("type")) && (id == null || id.equals(m.get("id")))).count();
+    }
+
+    /** 방 전체에 보낸 메시지는 받는 사람마다 한 번씩 기록되므로 같은 메시지는 하나로 센다 */
+    private static long countFx(Out out, String type, String id) {
+        return out.texts.stream().filter(m -> type.equals(m.get("type")) && (id == null || id.equals(m.get("id")))).distinct().count();
+    }
+
+    @Test
+    void shockwaveSpreadsFromCastPointAtSetSpeedAndPushesOnlyWhatItReaches() {
+        // 4.33: 쓴 순간 내 원 크기로 시작해 반지름의 3배까지 최대 속도 × 2로 퍼진다. 닿은 원만 밀려나고, 쿨타임은 30초
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        Room.Member near = r.join(2, "s2", "b", 1, 0, List.of());
+        Room.Member far = r.join(3, "s3", "c", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        double r0 = a.displayRadius;
+        near.x = 800 + r0 + near.displayRadius + 10; near.y = 800; // 가장자리 사이 10px
+        far.x = 800 - (r0 * 5 + far.displayRadius + 40); far.y = 800; // 범위(반지름 5배) 밖(밀려난 near와 부딪히지 않게 반대쪽)
+        r.tick();
+        r.skill(a, "shockwave", Double.NaN, Double.NaN);
+        var fx = out.texts.stream().filter(m -> "skillFx".equals(m.get("type")) && "shockwave".equals(m.get("id"))).findFirst().orElseThrow();
+        assertThat(fx.get("x")).isEqualTo(800.0);
+        assertThat((double) fx.get("r0")).isEqualTo(r0);
+        assertThat((double) fx.get("rMax")).isEqualTo(r0 * 5);
+        assertThat((double) fx.get("speed")).isEqualTo(960.0); // 최대 속도 240 × 4(대시 속도의 2배)
+        for (int i = 0; i < 6; i++) r.tick();
+        assertThat(near.kbTime).isGreaterThan(0);  // 닿아서 바깥쪽으로 밀렸다
+        assertThat(near.x).isGreaterThan(800 + r0 + near.displayRadius + 10);
+        assertThat(far.kbTime).isZero();
+        assertThat(count(out, "skill", "shockwave")).isEqualTo(1);
+        r.skill(a, "shockwave", Double.NaN, Double.NaN); // 쿨타임 중
+        assertThat(count(out, "skill", "shockwave")).isEqualTo(1);
+        for (int i = 0; i < 20 * 30; i++) r.tick();
+        r.skill(a, "shockwave", Double.NaN, Double.NaN);
+        assertThat(count(out, "skill", "shockwave")).isEqualTo(2);
+    }
+
+    @Test
+    void shockwaveRangeSpeedAndCooldownComeFromTuning() {
+        Out out = new Out();
+        Room r = skillRoom(out, new Room.SkillTuning(1, 5, 1.5, 7, 5, 0.3, 0.3, 20, 3, 30, 5, 40));
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "shockwave", 0, 0);
+        var fx = out.texts.stream().filter(m -> "skillFx".equals(m.get("type"))).findFirst().orElseThrow();
+        assertThat((double) fx.get("rMax")).isEqualTo(a.displayRadius * 5);
+        assertThat((double) fx.get("speed")).isEqualTo(240.0);
+        var skill = out.texts.stream().filter(m -> "skill".equals(m.get("type"))).findFirst().orElseThrow();
+        assertThat(skill.get("cooldownMs")).isEqualTo(7000L);
+    }
+
+    @Test
+    void offensiveSkillsCannotBeUsedInsideSafeZone() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 0; a.y = 0; // 가운데 세이프존
+        r.tick();
+        r.skill(a, "shockwave", 1, 0);
+        r.skill(a, "hook", 100, 0);
+        assertThat(count(out, "skillFail", "shockwave")).isEqualTo(1);
+        assertThat(count(out, "skillFail", "hook")).isEqualTo(1);
+        assertThat(count(out, "skill", null)).isZero();
+    }
+
+    @Test
+    void hookCatchesFirstCircleOnLineLosesOneKeywordAndPullsItIntoAForcedCollision() {
+        // 4.33: 갈고리가 사거리(반지름 3배) 안의 원을 맞히면 키워드 1개를 잃고 0.3초 동안 끌려와 무조건 부딪힌다(여기서는 점수가 낮아 한 번 더 잃는다)
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 50, List.of(100L)); // 점수가 높다: 부딪히면 이긴다
+        Room.Member b = r.join(2, "s2", "b", 1, 10, List.of(200L));
+        a.x = 800; a.y = 800;
+        double r0 = a.displayRadius;
+        b.x = 800 + r0 * 2.5; b.y = 800;
+        r.tick();
+        r.skill(a, "hook", b.x, b.y);
+        assertThat(out.texts).anyMatch(m -> "skillFx".equals(m.get("type")) && "hook".equals(m.get("id")) && m.get("ms").equals(150L) && (double) m.get("range") == r0 * 5);
+        for (int i = 0; i < 4; i++) r.tick();
+        assertThat(out.loses).hasSize(1); // 맞는 순간 키워드 1개
+        assertThat(out.loses.get(0)).containsExactly(2L, 1L);
+        assertThat(out.texts).anyMatch(m -> "pull".equals(m.get("type")) && m.get("ms").equals(300L));
+        assertThat(countFx(out, "skillFx", "hookHit")).isEqualTo(1);
+        for (int i = 0; i < 10; i++) r.tick();
+        assertThat(out.loses).hasSize(2); // 끌려와서 부딪혀 한 번 더(점수가 낮은 쪽이 진다)
+        assertThat(b.hookedBy).isNull();
+        assertThat(b.protectUntil).isGreaterThan(0); // 다 끌려온 뒤 잃은 뒤 무적이 시작됐다
+    }
+
+    @Test
+    void hookMissesWhenTargetIsOutOfRangeOrOffTheLine() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 50, List.of(100L));
+        Room.Member far = r.join(2, "s2", "b", 1, 10, List.of(200L));
+        Room.Member off = r.join(3, "s3", "c", 1, 10, List.of(300L));
+        a.x = 800; a.y = 800;
+        double r0 = a.displayRadius;
+        far.x = 800 + r0 * 5 + far.displayRadius + 30; far.y = 800; // 사거리 밖
+        off.x = 800 + r0 * 2; off.y = 800 + 200;                    // 선에서 벗어남
+        r.tick();
+        r.skill(a, "hook", 5000, 800);
+        for (int i = 0; i < 10; i++) r.tick();
+        assertThat(out.loses).isEmpty();
+        assertThat(countFx(out, "skillFx", "hookHit")).isZero();
+        assertThat(countFx(out, "skillFx", "hookEnd")).isEqualTo(1);
+    }
+
+    @Test
+    void hookedCircleCannotUseSkillsAndOnlyCollidesWithTheHooker() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 50, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 10, List.of(200L));
+        Room.Member d = r.join(3, "s3", "d", 1, 90, List.of(300L)); // 더 큰 원
+        a.x = 800; a.y = 800;
+        b.x = 800 + a.displayRadius * 2.5; b.y = 800;
+        d.x = -800; d.y = -800;
+        r.tick();
+        r.skill(a, "hook", b.x, b.y);
+        for (int i = 0; i < 4; i++) r.tick();
+        assertThat(b.hookedBy).isSameAs(a);
+        long skills = count(out, "skill", null);
+        r.skill(b, "shield", 0, 0);   // 끌려오는 중: 스킬 불가
+        r.dash(b);
+        assertThat(count(out, "skill", null)).isEqualTo(skills);
+        assertThat(b.protectUntil).isZero();
+        out.loses.clear();
+        d.x = b.x; d.y = b.y;         // 끌려오는 b와 겹친다: 충돌은 무효
+        r.tick();
+        assertThat(out.loses.stream().noneMatch(l -> (l[0] == 2L && l[1] == 3L) || (l[0] == 3L && l[1] == 2L))).isTrue(); // b와 d 사이의 싸움은 없다(d가 닿은 a와의 싸움은 따로)
+    }
+
+    @Test
+    void hookedCircleKeepsNoProtectionUntilPullEndsAndDeadOwnerReleasesIt() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 50, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 10, List.of(200L));
+        a.x = 800; a.y = 800;
+        b.x = 800 + a.displayRadius * 2.5; b.y = 800;
+        r.tick();
+        r.skill(a, "hook", b.x, b.y);
+        for (int i = 0; i < 4; i++) r.tick();
+        assertThat(b.hookedBy).isSameAs(a);
+        assertThat(b.protectUntil).isZero();
+        r.leave(a); // 쓴 사람이 나갔다
+        r.tick();
+        assertThat(b.hookedBy).isNull();
+    }
+
+    @Test
+    void shieldSkillGivesProtectionAndUsesCooldown() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "shield", 0, 0);
+        assertThat(a.protectUntil).isGreaterThan(0);
+        assertThat(out.texts).anyMatch(m -> "shield".equals(m.get("type")) && m.get("ms").equals(3000L) && m.get("e").equals(a.entityNo));
+        assertThat(out.texts).anyMatch(m -> "skill".equals(m.get("type")) && "shield".equals(m.get("id")) && m.get("cooldownMs").equals(30000L));
+    }
+
+    @Test
+    void stealthHidesFromMinimapAndEndsWhenAttackSkillIsUsed() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 100, List.of());
+        Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
+        a.x = 800; a.y = 800; b.x = -800; b.y = -800;
+        r.tick();
+        r.skill(a, "stealth", 0, 0);
+        assertThat(out.texts).anyMatch(m -> "skillFx".equals(m.get("type")) && "stealth".equals(m.get("id")) && m.get("ms").equals(5000L));
+        out.sent.clear();
+        for (int i = 0; i < 20; i++) r.tick();
+        ByteBuffer mm = out.sent.stream().filter(x -> x.get(0) == 2).findFirst().orElseThrow();
+        assertThat(mm.get(1)).isEqualTo((byte) 1); // 은신 중인 a는 빠지고 b만
+        assertThat(mm.getInt(2)).isEqualTo(b.entityNo);
+        r.skill(a, "shockwave", 0, 0); // 공격 스킬을 쓰면 은신이 풀린다
+        assertThat(a.stealthUntil).isZero();
+        assertThat(countFx(out, "skillFx", "stealthEnd")).isEqualTo(1);
+    }
+
+    @Test
+    void unknownSkillAndBotsAreIgnored() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        r.skill(a, "nuke", 0, 0);
+        assertThat(count(out, "skill", null)).isZero();
+    }
+    @Test
+    void comboRecordIsRequestedOnlyWhenItBeatsTheLastSentRecord() {
+        // 4.10, 4.25: 콤보가 오를 때 이 접속에서 보낸 최고 기록을 넘을 때만 저장을 요청한다. 콤보가 끊겼다 다시 쌓여도 기록 이하면 요청하지 않는다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        r.join(1, "s1", "a", 1, 0, List.of());
+        r.join(2, "s2", "b", 1, 0, List.of());
+        for (int i = 0; i < 3; i++) r.fightResult(1L, 2L, false);
+        assertThat(out.comboRecords).extracting(x -> x[1]).containsExactly(1L, 2L, 3L);
+        r.fightResult(2L, 1L, false); // a의 콤보가 끊기고 b의 콤보 1
+        for (int i = 0; i < 3; i++) r.fightResult(1L, 2L, false); // a가 다시 1, 2, 3: 기록(3)을 못 넘는다
+        assertThat(out.comboRecords.stream().filter(x -> x[0] == 1L)).hasSize(3);
+        r.fightResult(1L, 2L, false); // 4: 새 기록
+        assertThat(out.comboRecords.stream().filter(x -> x[0] == 1L).map(x -> x[1]).toList()).containsExactly(1L, 2L, 3L, 4L);
+    }
+
+    @Test
+    void breakingAFlameCountsAsPuttingItOutButAPlainComboDoesNot() {
+        // 4.25: 불꽃(콤보 5 이상)이 붙은 상대를 이겨 꺼뜨린 사람만 센다. 불꽃이 아닌 콤보를 끊거나 사람이 아닌 쪽이 끊은 것은 세지 않는다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        r.join(1, "s1", "a", 1, 0, List.of());
+        r.join(2, "s2", "b", 1, 0, List.of());
+        for (int i = 0; i < 3; i++) r.fightResult(2L, 1L, false); // b 콤보 3(불꽃 아님)
+        r.fightResult(1L, 2L, false);                             // a가 b의 콤보를 끊는다
+        assertThat(out.flameOuts).isEmpty();
+        for (int i = 0; i < 5; i++) r.fightResult(2L, 1L, false); // b 불꽃
+        r.fightResult(1L, 2L, false);                             // a가 불꽃을 끈다
+        assertThat(out.flameOuts).containsExactly(1L);
+    }
+    @Test
+    void comboResetsWhenTheSamePlayerComesBackAfterRefreshOrLeaving() {
+        // 4.25: 새로고침하거나 화면을 떠났다가 원이 남아 있는 동안 다시 들어오면 콤보와 불꽃은 처음부터다(위치·점수는 이어받는다)
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        Room.Member a = r.join(1, "s1", "a", 1, 40, List.of());
+        a.x = 800; a.y = 800;
+        for (int i = 0; i < 6; i++) r.fightResult(a, null, true); // 콤보 6(불꽃)
+        assertThat(a.combo).isEqualTo(6);
+        r.disconnect(a, "s1");
+        Room.Member back = r.join(1, "s2", "a", 1, 40, List.of()); // 같은 계정이 새 연결로 돌아온다
+        assertThat(back).isSameAs(a);
+        assertThat(a.combo).isZero();
+        assertThat(a.x).isEqualTo(800.0); // 위치는 그대로
+        assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "reset".equals(m.get("event")) && m.get("e").equals(a.entityNo) && Integer.valueOf(0).equals(m.get("combo")));
+    }
+    @Test
+    void cooldownsSurviveRefreshAndAreSentAgainToTheReturningPlayer() {
+        // 4.33: 쿨타임은 서버가 들고 있어서 새로고침(이어받기)으로 풀리지 않고, 다시 들어온 사람에게 남은 시간을 알려 준다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        assertThat(r.cooldownsMessage(a)).isNull();           // 쓴 적이 없으면 알릴 것이 없다
+        r.skill(a, "shield", 0, 0);                            // 쿨타임 30초
+        for (int i = 0; i < 20 * 10; i++) r.tick();            // 10초 뒤 새로고침
+        r.disconnect(a, "s1");
+        Room.Member back = r.join(1, "s2", "a", 1, 0, List.of());
+        assertThat(back).isSameAs(a);
+        var cd = r.cooldownsMessage(back);
+        assertThat(cd).isNotNull();
+        @SuppressWarnings("unchecked") var skills = (java.util.Map<String, Long>) cd.get("skills");
+        assertThat(skills.get("shield")).isBetween(19_000L, 20_100L); // 남은 20초쯤
+        int before = (int) out.texts.stream().filter(m -> "skill".equals(m.get("type"))).count();
+        r.skill(back, "shield", 0, 0);                         // 새로고침했다고 바로 다시 쓸 수는 없다
+        assertThat(out.texts.stream().filter(m -> "skill".equals(m.get("type"))).count()).isEqualTo(before);
+    }
+
+    @Test
+    void clientCannotSkipCooldownByRepeatingOrForgingMessages() {
+        // 서버가 판정한다: 같은 틱에 여러 번 보내도 한 번만 되고, 좌표를 NaN·무한대로 보내도 안전하게 처리한다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        for (int i = 0; i < 50; i++) r.skill(a, "shockwave", Double.NaN, Double.POSITIVE_INFINITY);
+        assertThat(out.texts.stream().filter(m -> "skill".equals(m.get("type"))).count()).isEqualTo(1);
+        for (int i = 0; i < 50; i++) r.skill(a, "hook", Double.NaN, Double.NaN);
+        for (int i = 0; i < 20; i++) r.tick();
+        assertThat(a.x).isFinite();
+    }
+    @Test
+    void skillsRequireTheirUnlockLevelAndTheServerEnforcesIt() {
+        // 4.33: 방패 10레벨·갈고리 15레벨·충격파 20레벨·은신 25레벨, 대시는 기본. 레벨이 모자라면 서버가 막고 {skillFail: level}로 필요 레벨을 알린다
+        Out out = new Out();
+        Room r = new Room(1, T, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25));
+        Room.Member a = r.join(1, "s1", "a", 9, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "shield", 0, 0);
+        assertThat(count(out, "skill", null)).isZero();
+        assertThat(out.texts).anyMatch(m -> "skillFail".equals(m.get("type")) && "level".equals(m.get("reason")) && Integer.valueOf(10).equals(m.get("level")) && "shield".equals(m.get("id")));
+        assertThat(a.protectUntil).isZero();                  // 막혔으니 효과도 없다
+        r.applyScore(1, 0, 10);                                // 10레벨이 되면 방패는 쓴다
+        r.skill(a, "shield", 0, 0);
+        assertThat(count(out, "skill", "shield")).isEqualTo(1);
+        r.skill(a, "hook", 5000, 800);                         // 갈고리는 아직(15)
+        r.skill(a, "stealth", 0, 0);                           // 은신도 아직(25)
+        assertThat(count(out, "skill", "hook")).isZero();
+        assertThat(count(out, "skill", "stealth")).isZero();
+        r.dash(a);                                             // 대시는 기본 스킬(레벨 제한 없음): 움직이는 중이 아니라 효과는 없지만 막히지는 않는다
+        assertThat(out.texts.stream().noneMatch(m -> "skillFail".equals(m.get("type")) && "dash".equals(m.get("id")))).isTrue();
     }
 }

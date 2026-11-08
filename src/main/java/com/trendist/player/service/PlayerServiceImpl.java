@@ -140,6 +140,18 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     @Transactional
+    public void recordCombo(long playerId, int combo) {
+        if (players.raiseMaxCombo(playerId, combo) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.10)
+    }
+
+    @Override
+    @Transactional
+    public void recordFlameOut(long playerId) {
+        if (players.incrementFlameOutCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.10)
+    }
+
+    @Override
+    @Transactional
     public void recordDefeat(long playerId) {
         if (players.incrementDefeatCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.31)
     }

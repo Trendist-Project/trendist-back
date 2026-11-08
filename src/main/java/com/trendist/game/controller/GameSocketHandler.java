@@ -134,6 +134,11 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 room.submit(r -> r.setInput(member, dx, dy, receivedNanos));
             }
             case "dash" -> room.submit(r -> r.dash(member)); // 대시(4.27). 쿨타임·움직이는 중인지는 방이 본다
+            case "skill" -> { // 스킬(4.33): 코드와 겨눈 세계 좌표(갈고리). 쿨타임·상태는 방이 본다
+                String id = node.path("id").asString("");
+                double ax = node.path("x").asDouble(Double.NaN), ay = node.path("y").asDouble(Double.NaN);
+                if (Room.SKILLS.contains(id)) room.submit(r -> r.skill(member, id, ax, ay));
+            }
             case "view" -> { // 내 화면에 보이는 세계 범위(관심 영역 전송, 9.2): 가로·세로 절반(px). 방이 범위를 다듬어 쓴다
                 double hw = node.path("hw").asDouble(0), hh = node.path("hh").asDouble(0);
                 if (Double.isFinite(hw) && Double.isFinite(hh) && hw > 0 && hh > 0) room.submit(r -> r.setView(member, hw, hh));
@@ -197,6 +202,8 @@ public class GameSocketHandler extends TextWebSocketHandler {
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),
                             "x", m.x, "y", m.y, "score", m.score, "level", m.level));
                     rooms.sendText(m, rooms.tuningMessage(r.tuning()));
+                    Map<String, Object> cooldowns = r.cooldownsMessage(m); // 이어받은 원이면 스킬·대시 쿨타임을 다시 알린다(새로고침해도 서버의 쿨타임은 그대로)
+                    if (cooldowns != null) rooms.sendText(m, cooldowns);
                 });
             } catch (RuntimeException e) {
                 log.warn("ws join failed", e);

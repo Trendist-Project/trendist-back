@@ -58,6 +58,12 @@ public interface PlayerService {
     /** 패배했다(키워드가 없는 채로 져서 죽음, 4.31): 패배 횟수 +1 하고 칭호를 확인한다. 행을 잠그지 않는다. 방(틱) 밖의 작업 스레드에서 부른다. */
     void recordDefeat(long playerId);
 
+    /** 연속 빼앗기 콤보가 combo가 됐다(4.25): 최고 기록보다 높을 때만 올리고 칭호를 확인한다 */
+    void recordCombo(long playerId, int combo);
+
+    /** 상대의 콤보 불꽃을 꺼뜨렸다(4.25): 횟수를 올리고 칭호를 확인한다 */
+    void recordFlameOut(long playerId);
+
     /** 행을 이미 잠근 트랜잭션 안에서: 죽였다(죽인 횟수 +1, EXP `kill_exp`)를 반영하고 점수·레벨을 다시 정한다(4.31). */
     void awardKill(Player p);
 }

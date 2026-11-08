@@ -32,21 +32,21 @@ final class GuideSeed {
                     new Article("움직이기", """
                             [[조작]]
 
-                            - **클릭·탭**: 빈 바닥을 누르면 그곳으로 가요. 누른 채 끌면 계속 따라가요.
-                            - **방향키·WASD**: 누르는 방향으로 바로 움직여요.
-                            - **모바일 조이스틱**: 화면을 누른 채 끌면 그 방향으로 가요. 덜 끌면 천천히 가요.
-                            - **⚡ 대시**: PC는 `Space`, 모바일은 조이스틱을 쥔 채 **다른 손가락으로 화면 아무 곳이나 탭**하면 돼요. 3초 동안 평소보다 2배 빨라지고, 한 번 쓰면 30초 뒤에 다시 쓸 수 있어요. 움직이는 중에만 써져요. 오른쪽 아래 이모트 버튼 왼쪽의 ⚡에서 남은 시간을 볼 수 있어요.
+                            - **PC 마우스**: **우클릭**한 곳으로 가요(누르고 있으면 계속 따라가요). 다른 원(플레이어·봇)을 **좌클릭**하면 그 원을 자동으로 따라가요.
+                            - **방향키·WASD**: 누르는 방향으로 바로 움직여요. 따라가는 중에 누르면 직접 조종으로 바뀌어요.
+                            - **모바일 조이스틱**: 화면을 누른 채 끌면 그 방향으로 가요. 덜 끌면 천천히 가요. 원을 톡 누르면 그 원을 자동으로 따라가요.
+                            - **⚡ 대시**: PC는 `Space`, 모바일은 아래쪽 ⚡ 버튼으로 써요. 3초 동안 평소보다 2배 빨라지고, 한 번 쓰면 쿨타임이 있어요. 움직이는 중에만 쓸 수 있어요. (자세한 내용은 '⚔️ 스킬'에서)
                             - 손을 떼면 미끄러지듯 멈춰요. 내 거북이는 늘 가는 쪽을 바라봐요."""),
                     new Article("화면 둘러보기", """
-                            - **오른쪽 위 버튼**: 내 정보, 공지사항, 가이드, 미니맵, 리더보드, 채팅을 켜고 끌 수 있어요.
-                            - **오른쪽(모바일은 아래) 패널**: 키워드 **검색**과 내 **보관함**이 있어요.
-                            - **아래쪽**: 내 닉네임, 레벨, 현재 유행도가 보여요. 닉네임을 누르면 내 정보가 열려요.
+                            - **오른쪽 위 버튼**: 내 정보, 공지사항, 가이드, 미니맵, 리더보드, 채팅을 켜고 끌 수 있어요. 켜져 있으면 초록 윤곽으로 보여요. (모바일은 🔍 검색 · 📦 보관함 · ☰ 메뉴)
+                            - **오른쪽 패널(모바일은 🔍·📦 버튼)**: 키워드 **검색**과 내 **보관함**(개수가 탭 옆에 보여요)이 있어요.
+                            - **아래 가운데 줄**: 내 원 모양과 레벨, 닉네임, 경험치, 유행도·키워드 수, 그리고 스킬 버튼과 이모트가 있어요. 초상화나 닉네임을 누르면 내 정보가 열려요.
 
-                            > 단축키: `M` 미니맵, `L` 리더보드, `C` 채팅""")
+                            > 단축키: `M` 미니맵 크게 보기, `E` 이모트, 스킬은 버튼에 적힌 키""")
             )),
             new Category("score-and-size", "⚔️ 점수와 대결", GuideCategory.ARTICLE, List.of(
                     new Article("현재 유행도와 원의 크기", """
-                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 키워드의 점수에, 추가를 많이 할수록 쌓이는 경험치가 더해져요.
+                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 키워드의 점수를 모두 더한 값이에요. **레벨과 경험치는 크기에 영향이 없어요.**
 
                             - 내가 가진 키워드를 다른 사람도 많이 가지면 그 키워드 점수가 올라 내 원도 커져요.
                             - 키워드가 사라지거나 빼앗기면 작아져요.
@@ -123,11 +123,13 @@ final class GuideSeed {
                             - **연두 칸**: 곳곳에 잠깐 생겼다 사라지는 세이프존이에요. 남은 시간이 보이고, 사라지기 30초 전부터 깜빡여요.
                             - 원의 가운데가 세이프존 안에 있으면 아무와도 부딪히지 않아요. 키워드도 잃지 않아요."""),
                     new Article("? 구슬", """
-                            아레나 곳곳에 떠 있는 **?** 구슬에 닿으면 먹을 수 있어요.
+                            아레나 곳곳에 떠 있는 **?** 구슬에 닿으면 먹을 수 있어요. 먹으면 아래 확률로 결과가 정해져요.
 
-                            - 운이 좋으면 지금 🔥인 키워드 하나가 보관함에 들어와요.
-                            - 꽝일 때도 있어요. 이미 가진 키워드가 나오면 그 키워드의 만료시간이 다시 24시간으로 갱신돼요.
-                            - 운이 나쁘면 내가 가진 키워드 하나를 잃기도 해요. 활성이든 비활성이든 가리지 않아요. 얻을 확률과 잃을 확률은 반반이에요.
+                            [[구슬 확률]]
+
+                            - **얻음**: 지금 🔥인 키워드 중 하나가 무작위로 보관함에 들어와요. 이미 가진 키워드가 나오면 그 키워드의 남은 시간이 다시 24시간으로 갱신돼요.
+                            - **잃음**: 내가 가진 키워드 하나를 무작위로 잃어요. 활성이든 비활성이든 가리지 않고, 가진 키워드가 없으면 꽝이에요.
+                            - 확률은 운영 중에 바뀔 수 있어요. 위 막대는 지금 적용 중인 값이에요.
 
                             ## ! 구슬
 
@@ -138,16 +140,16 @@ final class GuideSeed {
 
                             > 구슬을 많이 먹으면 칭호를 받아요."""),
                     new Article("미니맵과 다른 플레이어 정보", """
-                            - **미니맵**(`M`): 오른쪽 아래에 맵 전체와 큰 원들, 세이프존, 내 위치가 보여요.
-                            - **다른 플레이어 정보**: PC는 다른 원을 **우클릭**, 모바일은 🔍을 누른 뒤 원을 탭하면 레벨, 칭호, 점수 추이, 가진 키워드 상위 3개를 볼 수 있어요."""),
+                            - **미니맵**: 오른쪽 아래(모바일 세로는 왼쪽 위)에 맵 전체와 큰 원들, 세이프존, 내 위치가 보여요. 위쪽 🗺 버튼으로 켜고 끄고, 미니맵을 누르거나 `M`을 누르면 크게 볼 수 있어요.
+                            - **다른 플레이어 정보**: 원을 한 번 누르면 왼쪽 위에 이름·레벨·현재 유행도·가진 키워드가 작게 떠요. 이름을 누르면 자세히(신고 포함), PC는 `Shift`+클릭으로도 열려요. 따라가는 중이 아니면 10초 뒤 저절로 닫히고, ✕나 왼쪽으로 밀어서 치울 수 있어요."""),
                     new Article("채팅", """
-                            같은 방 사람들과 이야기할 수 있어요(`C`로 켜고 끄기). `#키워드`처럼 쓰면 누를 수 있는 키워드가 돼요.
+                            같은 방 사람들과 이야기할 수 있어요. 위쪽 💬 버튼으로 켜고 끄고, `Enter`를 누르면 입력할 수 있어요. `#키워드`처럼 쓰면 누를 수 있는 키워드가 돼요.
 
                             > 욕설이나 도배는 제재될 수 있어요. 불편한 채팅은 신고해 주세요."""),
                     new Article("이모트", """
                             채팅 없이도 원 위에 이모지를 띄워 기분을 표현할 수 있어요.
 
-                            - 화면 오른쪽 아래 **😀** 버튼을 누르거나 PC에서 `E`를 눌러 이모트 창을 열고, 누르거나 숫자 `1`~`8`로 골라요. 하나를 보내면 창이 접혀요.
+                            - 아래 가운데 줄의 **😀** 버튼을 누르거나 PC에서 `E`를 눌러 이모트 창을 열고, 누르거나 숫자 `1`~`8`로 골라요. 하나를 보내면 창이 접혀요.
                             - 👋 😂 😎 😭 😡 👍 ❤️ 🔥 여덟 가지가 있고, 같은 방 모두에게 잠깐 보여요.""")
             )),
             new Category("icons-and-titles", "🐢 성장과 꾸미기", GuideCategory.ARTICLE, List.of(
@@ -244,4 +246,212 @@ final class GuideSeed {
                             같은 구글 계정으로 다시 로그인하면 **계정 복구**를 고를 수 있어요. 닉네임, 레벨, 칭호, 꾸미기, 댓글이 그대로 돌아와요.""")
             ))
     );
+
+    /**
+     * 이미 만든 DB의 가이드 글 고치기(4.17): 예전 설명이 지금 게임과 달라졌을 때, **DB의 본문이 처음 시드 그대로일 때만** 새 본문(CATEGORIES·EnglishSeed의 같은 제목 글)으로 바꾼다.
+     * 관리자가 이미 고친 글은 건드리지 않는다. 영어 본문도 함께 바꾼다.
+     */
+    record Fix(String categoryCode, String title, String oldBody) {}
+
+    static final List<Fix> FIXES = List.of(
+            new Fix("getting-started", "움직이기", """
+                            [[조작]]
+
+                            - **클릭·탭**: 빈 바닥을 누르면 그곳으로 가요. 누른 채 끌면 계속 따라가요.
+                            - **방향키·WASD**: 누르는 방향으로 바로 움직여요.
+                            - **모바일 조이스틱**: 화면을 누른 채 끌면 그 방향으로 가요. 덜 끌면 천천히 가요.
+                            - **⚡ 대시**: PC는 `Space`, 모바일은 조이스틱을 쥔 채 **다른 손가락으로 화면 아무 곳이나 탭**하면 돼요. 3초 동안 평소보다 2배 빨라지고, 한 번 쓰면 30초 뒤에 다시 쓸 수 있어요. 움직이는 중에만 써져요. 오른쪽 아래 이모트 버튼 왼쪽의 ⚡에서 남은 시간을 볼 수 있어요.
+                            - 손을 떼면 미끄러지듯 멈춰요. 내 거북이는 늘 가는 쪽을 바라봐요."""),
+            new Fix("getting-started", "화면 둘러보기", """
+                            - **오른쪽 위 버튼**: 내 정보, 공지사항, 가이드, 미니맵, 리더보드, 채팅을 켜고 끌 수 있어요.
+                            - **오른쪽(모바일은 아래) 패널**: 키워드 **검색**과 내 **보관함**이 있어요.
+                            - **아래쪽**: 내 닉네임, 레벨, 현재 유행도가 보여요. 닉네임을 누르면 내 정보가 열려요.
+
+                            > 단축키: `M` 미니맵, `L` 리더보드, `C` 채팅"""),
+            new Fix("score-and-size", "현재 유행도와 원의 크기", """
+                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 키워드의 점수에, 추가를 많이 할수록 쌓이는 경험치가 더해져요.
+
+                            - 내가 가진 키워드를 다른 사람도 많이 가지면 그 키워드 점수가 올라 내 원도 커져요.
+                            - 키워드가 사라지거나 빼앗기면 작아져요.
+                            - 원이 커지면 화면이 조금씩 넓게 보여요. 크기와 관계없이 속도는 모두 같아요."""),
+            new Fix("arena", "? 구슬", """
+                            아레나 곳곳에 떠 있는 **?** 구슬에 닿으면 먹을 수 있어요.
+
+                            - 운이 좋으면 지금 🔥인 키워드 하나가 보관함에 들어와요.
+                            - 꽝일 때도 있어요. 이미 가진 키워드가 나오면 그 키워드의 만료시간이 다시 24시간으로 갱신돼요.
+                            - 운이 나쁘면 내가 가진 키워드 하나를 잃기도 해요. 활성이든 비활성이든 가리지 않아요. 얻을 확률과 잃을 확률은 반반이에요.
+
+                            ## ! 구슬
+
+                            불꽃인 사람에게 키워드를 전부 잃은 사람 둘레에 빨갛게 떨어지는 구슬이에요.
+
+                            - 먹으면 **무조건** 🔥 키워드 하나를 얻어요. 꽝도, 잃는 일도 없어요. (가능하면 내가 안 가진 키워드가 나와요.)
+                            - 주인이 없어서 누구나 먹을 수 있어요. 오래 두면 사라져요.
+
+                            > 구슬을 많이 먹으면 칭호를 받아요."""),
+            new Fix("arena", "미니맵과 다른 플레이어 정보", """
+                            - **미니맵**(`M`): 오른쪽 아래에 맵 전체와 큰 원들, 세이프존, 내 위치가 보여요.
+                            - **다른 플레이어 정보**: PC는 다른 원을 **우클릭**, 모바일은 🔍을 누른 뒤 원을 탭하면 레벨, 칭호, 점수 추이, 가진 키워드 상위 3개를 볼 수 있어요."""),
+            new Fix("arena", "채팅", """
+                            같은 방 사람들과 이야기할 수 있어요(`C`로 켜고 끄기). `#키워드`처럼 쓰면 누를 수 있는 키워드가 돼요.
+
+                            > 욕설이나 도배는 제재될 수 있어요. 불편한 채팅은 신고해 주세요."""),
+            new Fix("arena", "이모트", """
+                            채팅 없이도 원 위에 이모지를 띄워 기분을 표현할 수 있어요.
+
+                            - 화면 오른쪽 아래 **😀** 버튼을 누르거나 PC에서 `E`를 눌러 이모트 창을 열고, 누르거나 숫자 `1`~`8`로 골라요. 하나를 보내면 창이 접혀요.
+                            - 👋 😂 😎 😭 😡 👍 ❤️ 🔥 여덟 가지가 있고, 같은 방 모두에게 잠깐 보여요.""")
+    );
+
+    /**
+     * 나중에 더한 가이드 카테고리와 글(4.17): 가이드는 운영에서 고치는 데이터라 처음에만 넣지만, 새 기능 글은 이미 만든 DB에도 한 번 넣어야 한다.
+     * 카테고리는 같은 코드가 없을 때만 afterCode 카테고리 바로 뒤에 끼워 넣고(뒤 카테고리 순서를 하나씩 밀어서), 글은 같은 카테고리에 같은 제목이 없을 때만 맨 뒤에 넣는다.
+     * 관리자가 고치거나 지운 것을 되살리지는 않는다. 영어도 함께 넣는다. 글 본문의 `[[스킬 …]]`·`[[스킬 해금 표]]`·`[[구슬 확률]]`은 게임 그림(가이드 그림)이다.
+     */
+    record AddedCategory(String code, String name, String nameEn, String displayType, String afterCode) {}
+
+    record Added(String categoryCode, String title, String body, String titleEn, String bodyEn) {}
+
+    static final List<AddedCategory> ADDED_CATEGORIES = List.of(
+            new AddedCategory("skills", "⚔️ 스킬", "⚔️ Skills", GuideCategory.ARTICLE, "icons-and-titles"));
+
+    static final List<Added> ADDED = List.of(
+            new Added("icons-and-titles", "레벨별 필요 경험치", """
+                    레벨은 **경험치(EXP)**가 쌓이면 올라요. 아래 표는 **모든 레벨**에 필요한 **누적 경험치**예요.
+
+                    [[레벨 필요 경험치]]
+
+                    - 경험치는 키워드를 **추가**할 때마다, 공격에 **성공**할 때마다, 상대를 **쓰러뜨릴** 때마다 쌓여요(기본값: 추가 1, 공격 성공 1, 처치 5).
+                    - 1~10레벨은 빠르게 올라가고, 11레벨부터는 레벨이 높을수록 점점 더 많이 필요해요.
+                    - 표의 값은 **지금 적용 중인 값**이에요. 운영 중에 바뀔 수 있어요.
+                    - 경험치는 줄어들지 않고, 레벨은 나라마다 따로 쌓여요.
+
+                    > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 거북이 아이콘이 자라고, 꾸미기와 스킬이 열리는 열쇠예요.""",
+                    "EXP needed per level", """
+                    Your level goes up as you collect **experience (EXP)**. The table below shows the **total EXP** needed for **every level**.
+
+                    [[level exp table]]
+
+                    - You earn EXP each time you **add** a keyword, each time an attack **succeeds**, and each time you **take someone down** (defaults: add 1, successful attack 1, takedown 5).
+                    - Levels 1–10 come quickly; from level 11 on, higher levels need more and more.
+                    - The values in the table are the ones **in use right now**. They can change while the game runs.
+                    - EXP never goes down, and levels are tracked separately for each country.
+
+                    > Your level does not affect keyword score or circle size. It makes your turtle icon grow and unlocks customizing and skills."""),
+            new Added("skills", "스킬 한눈에 보기", """
+                    레벨이 오르면 쓸 수 있는 **스킬**이 늘어나요. **⚡ 대시**는 처음부터 쓸 수 있는 기본 스킬이고, 나머지는 아래 레벨이 되어야 해요. 화면 아래 가운데 줄의 버튼을 누르거나 키보드 키로 써요.
+
+                    [[스킬 해금 표]]
+
+                    - **필요 EXP**는 그 레벨이 되는 데 모아야 하는 **누적 경험치**예요. 경험치는 키워드를 **추가**할 때마다, 공격에 **성공**할 때마다, 상대를 **쓰러뜨릴** 때마다 쌓여요(기본값: 추가 1, 공격 성공 1, 처치 5).
+                    - 위 표의 값(레벨, 필요 EXP, 키, 쿨타임)은 **지금 적용 중인 값**이에요. 운영 중에 바뀔 수 있어요.
+                    - 아직 레벨이 모자란 스킬은 버튼에 **🔒와 필요한 레벨**이 보여요. 레벨이 되면 "스킬을 쓸 수 있어요!" 안내가 떠요.
+                    - 스킬마다 **쿨타임**이 있어요. 쓰면 버튼에 남은 초가 보이고, 새로고침해도 쿨타임은 이어져요.
+                    - PC는 버튼에 마우스를 올리면 설명과 쿨타임, 지금 쓸 수 있는지가 카드로 보여요.
+                    - 갈고리와 충격파는 **세이프존 안에서는 쓸 수 없어요.**
+
+                    > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 스킬을 쓸 수 있게 하는 열쇠예요. 각 스킬이 내 화면과 상대 화면에서 어떻게 보이는지는 아래 글마다 움직이는 그림으로 볼 수 있어요.""",
+                    "Skills at a glance", """
+                    As your level rises, you can use more **skills**. **⚡ Dash** is the default skill you have from the start; the others need the levels below. Use the buttons in the bottom center bar, or press the keys.
+
+                    [[skill unlock table]]
+
+                    - **EXP needed** is the **total experience** you must collect to reach that level. You earn EXP each time you **add** a keyword, each time an attack **succeeds**, and each time you **take someone down** (defaults: add 1, successful attack 1, takedown 5).
+                    - The values in the table (level, EXP needed, key, cooldown) are the ones **in use right now**. They can change while the game runs.
+                    - Skills you haven't unlocked yet show a **🔒 and the level you need** on the button. When you reach it, a "You can now use a skill!" notice appears.
+                    - Each skill has a **cooldown**. After using one, the button shows the seconds left, and it carries over even if you refresh.
+                    - On PC, hover a button to see its description, cooldown and whether it is ready.
+                    - Hook and Shockwave **can't be used inside safe zones.**
+
+                    > Your level does not affect keyword score or circle size. It is the key that unlocks skills. Each article below shows, with a moving picture, how the skill looks on your screen and on the other player's screen."""),
+            new Added("skills", "⚡ 대시", """
+                    움직이는 방향으로 **잠깐 평소의 2배 속도**로 달려요. 처음부터 쓸 수 있는 기본 스킬이고, 움직이는 중에만 쓸 수 있어요.
+
+                    [[스킬 대시]]
+
+                    - **언제 쓸까요**: 큰 원에게 쫓길 때 도망치거나, 도망가는 상대를 따라잡을 때, 구슬을 먼저 먹으러 갈 때 좋아요.
+                    - **내 화면**: 하늘색 빛과 꼬리가 남고 평소보다 빠르게 나아가요.
+                    - **상대 화면**: 상대가 순식간에 멀어져요. 쿨타임이 있으니 대시가 끝난 뒤에 따라잡을 수 있어요.
+                    - 쿨타임 동안에는 다시 쓸 수 없어요. 남은 시간은 버튼에서 볼 수 있어요.""",
+                    "⚡ Dash", """
+                    Dash in the direction you are moving at **twice your normal speed for a moment**. It is the default skill, and only usable while moving.
+
+                    [[skill dash]]
+
+                    - **When to use it**: Escape a bigger circle chasing you, catch up to someone running away, or beat others to an orb.
+                    - **Your screen**: A light-blue glow and trail follow you as you speed ahead.
+                    - **The other player's screen**: You get away in an instant. Since there is a cooldown, you can catch up after the dash ends.
+                    - You can't dash again during the cooldown. The seconds left show on the button."""),
+            new Added("skills", "🛡 방패", """
+                    **잠깐 다른 원과 부딪히지 않고 통과해요.** 해금 레벨은 위 표를 보세요. 키워드를 잃은 뒤의 무적과 같은 상태예요.
+
+                    [[스킬 방패]]
+
+                    - **언제 쓸까요**: 점수가 높은 큰 원이 바로 앞까지 다가왔을 때 빠져나가기, 키워드를 뺏기지 않고 지나가야 할 때 좋아요.
+                    - **내 화면**: 내 원에 점선 보호막과 남은 초가 떠요. 다가오는 원이 내 원을 그냥 통과해요.
+                    - **상대 화면**: 방패를 쓴 원도 보호막이 보여요. 그 원에게는 밀리지도, 키워드를 잃지도 않지만 나도 그 원을 공격할 수 없어요.
+                    - 보호막이 사라지면 다시 평소처럼 부딪혀요.""",
+                    "🛡 Shield", """
+                    **Briefly pass through other circles without colliding.** See the table above for the unlock level. It works like the invulnerability you get after losing a keyword.
+
+                    [[skill shield]]
+
+                    - **When to use it**: Slip away when a high-scoring big circle gets right in front of you, or when you must pass by without losing a keyword.
+                    - **Your screen**: A dashed shield ring and the seconds left appear on your circle. Circles coming at you simply pass through.
+                    - **The other player's screen**: A shielded circle also shows its ring. You are not pushed or robbed by it, but you can't attack it either.
+                    - When the shield ends, collisions work as usual again."""),
+            new Added("skills", "🪝 갈고리", """
+                    겨눈 방향으로 **갈고리를 던져서** 맞은 원의 **키워드 1개를 빼앗고 나에게 끌어와요.** 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 갈고리]]
+
+                    - **겨누는 법**: PC는 마우스가 있는 쪽, 모바일은 조이스틱을 누른 방향(없으면 가던 방향)으로 나가요. 사거리는 내 원 반지름의 5배쯤이고, 범위는 점선으로 먼저 보여요.
+                    - **내 화면**: 갈고리 줄이 뻗어 나가 맞은 원을 붙잡고 끌어당겨요. 끌려온 원과는 바로 부딪혀 평소 규칙대로 가려져요.
+                    - **상대 화면**: 빨간 점선과 줄이 날아오는 게 보여요. 맞으면 **키워드 1개를 잃고**, 끌려오는 동안에는 움직이거나 스킬을 쓸 수 없고 다른 원과도 부딪히지 않아요. 옆으로 움직이면 피할 수 있어요.
+                    - 끌려온 뒤에는 쓴 사람과 반드시 부딪혀요. 점수가 낮은 쪽이 키워드를 하나 더 잃을 수 있으니, 점수가 높은 상대에게는 조심하세요.""",
+                    "🪝 Hook", """
+                    **Throw a hook** toward your aim. The circle it hits **loses one keyword and is pulled to you.** See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill hook]]
+
+                    - **Aiming**: Toward the mouse on PC; on mobile toward the direction you hold on the joystick (or the direction you were heading). The range is about 5 circle radii, shown first as a dotted line.
+                    - **Your screen**: The hook line shoots out, catches the circle and pulls it in. The pulled circle collides with you right away and is settled by the normal rules.
+                    - **The other player's screen**: You see a red dotted line and the rope flying at you. If hit you **lose one keyword**, and while being pulled you can't move, use skills, or touch other circles. Move sideways to dodge.
+                    - After being pulled you always collide with the user. The lower-scoring side can lose one more keyword, so be careful against higher-scoring players."""),
+            new Added("skills", "💥 충격파", """
+                    내 원 둘레로 **충격파를 퍼뜨려 닿은 원을 바깥으로 밀어내요.** 키워드는 잃지 않아요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 충격파]]
+
+                    - **언제 쓸까요**: 여러 원에게 둘러싸였을 때 거리를 벌리거나, 가까이 붙은 상대를 떼어 낼 때 좋아요.
+                    - **내 화면**: 내 원에서 고리가 퍼져 나가요. 고리의 바깥 점선이 닿는 범위예요. 닿은 원은 바깥으로 밀려나요.
+                    - **상대 화면**: 퍼지는 빨간 고리에 닿으면 바깥으로 밀려나요. 키워드를 잃지는 않아요. 고리가 닿기 전에 범위 밖으로 움직이면 피할 수 있어요.
+                    - 세이프존 안의 원이나 방패·무적 중인 원은 밀리지 않아요.""",
+                    "💥 Shockwave", """
+                    **Send a shockwave out around your circle that pushes touched circles outward.** They do not lose keywords. See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill shockwave]]
+
+                    - **When to use it**: Open some distance when surrounded by several circles, or shake off someone stuck to you.
+                    - **Your screen**: A ring spreads out from your circle. The dotted outer line shows the reach. Circles it touches are pushed outward.
+                    - **The other player's screen**: If the red spreading ring touches you, you are pushed outward. You don't lose keywords. Move out of its range before it reaches you to dodge.
+                    - Circles in safe zones, or shielded or invulnerable circles, are not pushed."""),
+            new Added("skills", "👻 은신", """
+                    **잠깐 다른 사람 눈에 배경처럼 안 보여요.** 해금 레벨은 위 표를 보세요. 공격 스킬(갈고리, 충격파)을 쓰면 풀려요.
+
+                    [[스킬 은신]]
+
+                    - **언제 쓸까요**: 큰 원 옆을 몰래 지나가거나, 구슬과 키워드를 노리는 상대의 눈을 피할 때 좋아요.
+                    - **내 화면**: 내 원이 반투명으로 보이고 점선 고리와 남은 초가 떠요. 사라질 때는 서서히 옅어지고 고리가 모여들어요.
+                    - **상대 화면**: 은신한 원은 서서히 사라져 이름, 테두리, 효과까지 배경과 똑같아 보여요(미니맵에서도 빠져요). 대신 **가까이 오면 내 원 위에 빨간 !**가 떠서 조심하라고 알려 줘요.
+                    - 눈에 안 보일 뿐 몸은 그대로라서, 부딪히면 평소처럼 밀리고 키워드를 잃을 수 있어요. 세이프존 안에서는 ! 경고가 뜨지 않아요.""",
+                    "👻 Stealth", """
+                    **Briefly blend into the background for other players.** See the table above for the unlock level. Using an attack skill (Hook, Shockwave) ends it.
+
+                    [[skill stealth]]
+
+                    - **When to use it**: Sneak past a big circle, or avoid the eyes of someone after the same orbs and keywords.
+                    - **Your screen**: Your circle looks faint, with a dashed ring and the seconds left. It fades gradually and the rings gather in as you vanish.
+                    - **The other player's screen**: A stealthed circle gradually disappears, name, border and effects included, and looks just like the background (it also drops off the minimap). But **when it comes near, a red ! appears above your circle** to warn you.
+                    - You are only unseen: your body is still there, so a collision pushes you as usual and you can lose keywords. The ! warning doesn't appear while you stand in a safe zone."""));
 }

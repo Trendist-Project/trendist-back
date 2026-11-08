@@ -42,6 +42,22 @@ CREATE TABLE titles (
   UNIQUE KEY uk_titles_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='칭호';
 
+CREATE TABLE skills (
+  id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '스킬 ID',
+  code             VARCHAR(30) NOT NULL COMMENT '스킬 코드(유일). 동작은 코드(Room.SKILLS)가, 이름·설명(번역)은 프론트엔드 번역 파일(skills.<코드>_name·_desc)이 이 코드로 찾는다: dash, shockwave, hook, shield, stealth …',
+  icon             VARCHAR(20) NULL COMMENT '버튼에 보이는 아이콘(이모지)',
+  category         VARCHAR(20) NOT NULL COMMENT '종류(MOVE 이동, ATTACK 공격, DEFENSE 방어, STEALTH 은신). 툴팁 색과 이름에 쓴다',
+  default_key      VARCHAR(30) NOT NULL COMMENT '기본 단축키(KeyboardEvent.code: Space, Digit1, KeyQ …). 사용자가 바꾼 키는 클라이언트가 덧씌운다',
+  cooldown_seconds DECIMAL(10,2) NOT NULL COMMENT '쿨타임(초). 쓴 때부터 센다. 0이면 없음',
+  required_level   INT NOT NULL DEFAULT 1 COMMENT '해금 레벨. 플레이어 레벨이 이 값 이상이어야 쓴다(1 = 기본 스킬). 서버가 판정한다',
+  sort_order       BIGINT NOT NULL DEFAULT 0 COMMENT '버튼 순서',
+  enabled          TINYINT(1) NOT NULL DEFAULT 1 COMMENT '사용 여부(끄면 목록에서 빠지고 서버도 받지 않는다)',
+  created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_skills_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='스킬(4.33)';
+
 CREATE TABLE effect_types (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '효과 종류 ID',
   code       VARCHAR(20) NOT NULL COMMENT '종류 코드: TRAIL(이동 효과, 4.23) / BORDER(테두리 효과, 4.9). 애플리케이션이 이 값으로 구분한다',

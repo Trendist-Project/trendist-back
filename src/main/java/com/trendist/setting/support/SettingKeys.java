@@ -56,7 +56,14 @@ public final class SettingKeys {
     public static final String ART_CHANGE_MINUTES = "art_change_minutes";
     public static final String DASH_SPEED_MULTIPLIER = "dash_speed_multiplier";
     public static final String DASH_SECONDS = "dash_seconds";
-    public static final String DASH_COOLDOWN_SECONDS = "dash_cooldown_seconds";
+    public static final String SHOCKWAVE_SPEED_MULTIPLIER = "shockwave_speed_multiplier";
+    public static final String SHOCKWAVE_RANGE_RATIO = "shockwave_range_ratio";
+    public static final String SHOCKWAVE_KNOCKBACK = "shockwave_knockback";
+    public static final String HOOK_RANGE_RATIO = "hook_range_ratio";
+    public static final String HOOK_SECONDS = "hook_seconds";
+    public static final String HOOK_PULL_SECONDS = "hook_pull_seconds";
+    public static final String SKILL_SHIELD_SECONDS = "skill_shield_seconds";
+    public static final String STEALTH_SECONDS = "stealth_seconds";
     public static final String COMBO_FLAME_AT = "combo_flame_at";
     public static final String COMBO_WIPE_ORB_PERCENT = "combo_wipe_orb_percent";
     public static final String AI_COMMENT_ENABLED = "ai_comment_enabled";
@@ -74,7 +81,7 @@ public final class SettingKeys {
             new Def(TREND_BASE_RATIO, "3", 0, 100, "기본 비율: 가진 사람이 없는 🔥 키워드의 점수"),
             new Def(TREND_MAX_BASE, "50", 1, 50, "최대 기준값(× 최대 가중치 2 ≤ 100)"),
             new Def(EXTERNAL_CONFIRM_HEAT, "10", 0, 100, "외부 확인 관심도"),
-            new Def(EXP_SCORE_CAP, "100", 0, 1000, "EXP 점수 반영 상한"),
+            new Def(EXP_SCORE_CAP, "0", 0, 1000, "EXP 점수 반영 상한(기본 0 = 레벨·EXP는 원 크기와 싸움 판정에 관여하지 않고 점수는 키워드로만 정해진다)"),
             new Def(PLUS_TTL_HOURS, "24", 1, 168, "+ 삭제 시간"),
             new Def(ACTIVATE_HOLDERS, "3", 1, 1000, "🔥활성 전환 인원"),
             new Def(EXP_PER_PLUS, "1", 0, 100, "+ 한 번의 EXP"),
@@ -107,7 +114,7 @@ public final class SettingKeys {
             new Def(BOT_MIN_PLAYERS, "1", 0, 200, "봇 최소 인원: 사람이 있으면 방 인원과 관계없이 봇을 이 수 이상 둔다(0이면 사람이 많을 때 봇 없음)"),
             new Def(BOT_CAP_RATIO, "1.0", 0.1, 10, "봇 유행도 상한: 그 방에 접속 중인 사람 유행도 평균의 이 배수(1이면 평균)"),
             new Def(RANK_TITLE_MIN_PLAYERS, "10", 1, 1000, "순위 칭호(핫스타·시상대·정상) 최소 접속 인원: 지금 그 나라에 접속 중인 사람이 이 인원 이상일 때만 순위 칭호를 준다"),
-            new Def(ORB_ACTIVE_PERCENT, "70", 0, 100, "? 구슬에서 🔥활성 키워드를 얻을 확률(%). 나머지는 가진 키워드 하나를 잃음(🔥·💤 무관, 없으면 꽝)"),
+            new Def(ORB_ACTIVE_PERCENT, "60", 0, 100, "? 구슬에서 🔥활성 키워드를 얻을 확률(%). 나머지는 가진 키워드 하나를 잃음(🔥·💤 무관, 없으면 꽝)"),
             // 세이프존(4.22): 안에서는 부딪히지 않고(튕김·키워드 잃기 없음) 겹쳐 있을 수 있다
             new Def(SAFE_CENTER_RATIO, "0.09", 0.01, 0.5, "가운데 고정 세이프존 한 변: 활동 영역 한 변의 이 비율"),
             new Def(SAFE_CENTER_MIN, "1800", 100, 5000, "가운데 고정 세이프존 한 변 최소"),
@@ -124,7 +131,15 @@ public final class SettingKeys {
             new Def(AI_COMMENT_GROUNDING, "0", 0, 1, "AI 한 줄 설명에 구글 검색 확인(그라운딩)을 쓸지(1이면 사용). 무료 등급은 검색 한도가 없어 429로 막히므로 결제를 연결한 뒤에 켠다. 끄면 최신 이슈는 모른다고 답할 수 있다"),
             new Def(DASH_SPEED_MULTIPLIER, "2", 1, 5, "대시 속도: 대시 중 최대 속도가 평소의 몇 배인지(1이면 대시가 효과 없음). 서버와 클라이언트 예측이 같은 값을 쓴다"),
             new Def(DASH_SECONDS, "3", 0.5, 30, "대시가 유지되는 시간"),
-            new Def(DASH_COOLDOWN_SECONDS, "30", 1, 600, "대시를 쓴 때부터 다시 쓸 수 있을 때까지의 시간(대시 시간 포함)"),
+            // 스킬(충격파·갈고리·방패·은신·먹물): 테스트하며 조절할 값이라 모두 설정으로 둔다. 쓰는 키는 클라이언트(GameScreen)가 정한다
+            new Def(SHOCKWAVE_SPEED_MULTIPLIER, "4", 0.1, 20, "충격파가 퍼지는 속도: 최대 속도의 몇 배인지(기본 4 = 대시 속도(기본 최대 속도의 2배)의 2배)"),
+            new Def(SHOCKWAVE_RANGE_RATIO, "5", 1, 20, "충격파 범위: 쓴 순간 내 원 반지름의 몇 배까지 퍼지는지(시작은 내 원 크기, 중심은 쓴 자리)"),
+            new Def(SHOCKWAVE_KNOCKBACK, "1.5", 0, 10, "충격파에 맞은 원이 밀려나는 세기(튕김 세기와 같은 단위. 1이면 같은 크기끼리 부딪힐 때만큼)"),
+            new Def(HOOK_RANGE_RATIO, "5", 1, 20, "갈고리 사거리: 내 원 중심에서 내 원 반지름의 몇 배까지 닿는지"),
+            new Def(HOOK_SECONDS, "0.15", 0.05, 5, "갈고리가 끝까지 날아가는 데 걸리는 시간(빗나가면 같은 시간에 걸쳐 돌아온다. 상대가 피할 수 있을 만큼은 걸리게)"),
+            new Def(HOOK_PULL_SECONDS, "0.3", 0.05, 5, "갈고리에 맞은 원이 내게 끌려오는 시간(끌려오는 동안 스킬 사용·이동 불가, 다른 원과의 충돌 무효)"),
+            new Def(SKILL_SHIELD_SECONDS, "3", 0.5, 60, "방패 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
+            new Def(STEALTH_SECONDS, "5", 0.5, 60, "은신(유령)이 유지되는 시간(남에게는 원·이름·테두리·효과가 모두 배경색처럼 안 보이고 미니맵에서도 사라진다. 나에게는 반투명으로 보인다. 충격파·갈고리를 쓰면 풀린다)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(COMBO_WIPE_ORB_PERCENT, "50", 0, 100, "불꽃인 사람에게 부딪혀 키워드를 모두 잃었을 때, 잃은 🔥활성 키워드 개수의 몇 %(올림)만큼 ! 구슬이 그 자리에 떨어지는지(0이면 안 떨어짐). ! 구슬은 먹으면 항상 키워드를 얻는다"),
             new Def(COMBO_MAX_SECONDS, "300", 0, 86400, "콤보 유지시간: 마지막으로 콤보가 오른 때부터 이 시간이 지나면 연속 횟수와 불꽃이 사라진다. 콤보가 추가될 때마다 다시 시작한다(기본 300초 = 5분, 0이면 제한 없음)"),
@@ -135,7 +150,7 @@ public final class SettingKeys {
 
     /** 관리자 설정 화면의 그룹 순서. 새 설정을 만들면 아래 GROUP_OF에서 그룹을 정한다(없으면 "기타"). */
     public static final List<String> GROUP_ORDER = List.of("트렌드·키워드", "성장·경험치·칭호", "맵·크기", "이동·충돌", "보호·접속",
-            "세이프존", "? 구슬", "NPC 봇", "대시", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
+            "세이프존", "? 구슬", "NPC 봇", "대시", "스킬", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
 
     private static final java.util.Map<String, String> GROUP_OF = new java.util.HashMap<>();
     private static void group(String group, String... names) { for (String n : names) GROUP_OF.put(n, group); }
@@ -149,7 +164,10 @@ public final class SettingKeys {
         group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
         group("? 구슬", ORB_DENSITY, ORB_MAX, ORB_SPAWN_SECONDS, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT);
         group("NPC 봇", BOT_PLAYERS, BOT_MIN_PLAYERS, BOT_CAP_RATIO);
-        group("대시", DASH_SPEED_MULTIPLIER, DASH_SECONDS, DASH_COOLDOWN_SECONDS);
+        group("대시", DASH_SPEED_MULTIPLIER, DASH_SECONDS);
+        group("스킬", SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_RANGE_RATIO, SHOCKWAVE_KNOCKBACK,
+                HOOK_RANGE_RATIO, HOOK_SECONDS, HOOK_PULL_SECONDS,
+                SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_WIPE_ORB_PERCENT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
         group("꾸미기·계정", CUSTOMIZE_UNLOCK_LEVEL, ART_CHANGE_MINUTES, NICKNAME_CHANGE_MINUTES);
         group("AI 설명", AI_COMMENT_ENABLED, AI_COMMENT_BATCH_SIZE, AI_COMMENT_DAILY_MAX, AI_COMMENT_GROUNDING);
@@ -167,12 +185,14 @@ public final class SettingKeys {
     private static void unit(String unit, String... names) { for (String n : names) UNIT_OF.put(n, unit); }
     static {
         unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
-                ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, DASH_COOLDOWN_SECONDS, COMBO_MAX_SECONDS);
+                ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, COMBO_MAX_SECONDS,
+                HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
         unit("px", WORLD_SIZE, MIN_RADIUS, MAX_DIAMETER, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER);
+        unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_RANGE_RATIO,
+                HOOK_RANGE_RATIO, SHOCKWAVE_KNOCKBACK);
         unit("%", ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, COMBO_WIPE_ORB_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE);

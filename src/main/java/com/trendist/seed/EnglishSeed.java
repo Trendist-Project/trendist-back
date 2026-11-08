@@ -67,6 +67,15 @@ final class EnglishSeed {
             t("백전노장", "Battle-Hardened", "Lost 50 times but keep challenging"),
             t("불사조", "Phoenix", "Fell 200 times and rose again"),
             t("끝없는 도전자", "Endless Challenger", "Kept going after 1,000 defeats"),
+            t("연속 타격", "Combo Starter", "Took keywords 3 times in a row"),
+            t("불꽃 점화", "Ignition", "Took keywords 5 times in a row and lit the flame"),
+            t("연쇄 반응", "Chain Reaction", "Took keywords 10 times in a row"),
+            t("폭주 기관차", "Runaway Train", "Took keywords 20 times in a row"),
+            t("멈추지 않는 불꽃", "Unstoppable Flame", "Took keywords 40 times in a row"),
+            t("100 콤보", "100 Combo", "Took keywords 100 times in a row"),
+            t("불 끄미", "Flame Snuffer", "Put out an opponent's flame for the first time"),
+            t("소방관", "Firefighter", "Put out opponents' flames 10 times"),
+            t("화재 진압 대장", "Fire Chief", "Put out opponents' flames 50 times"),
             t("행운 탐색자", "Lucky Seeker", "Ate 10 ? orbs"),
             t("구슬 수집가", "Orb Collector", "Ate 100 ? orbs"),
             t("구슬 마니아", "Orb Maniac", "Ate 1,000 ? orbs"),
@@ -128,27 +137,27 @@ final class EnglishSeed {
 
                             > Sign in with Google to continue with the same progress on other devices. Your guest progress carries over too."""),
                     new Article("Moving around", """
-                            [[조작]]
+                            [[controls]]
 
-                            - **Click or tap**: Press an empty spot on the floor and you'll head there. Hold and drag to keep following.
-                            - **Arrow keys / WASD**: Move in the direction you press.
-                            - **Mobile joystick**: Press and drag anywhere on the screen to move that way. Drag less to go slower.
-                            - **⚡ Dash**: Press `Space` on PC. On mobile, keep holding the joystick and **tap anywhere on the screen with another finger**. For 3 seconds you move twice as fast, then it can be used again after 30 seconds. It only works while you're moving. You can see the cooldown at the ⚡ left of the emote button in the bottom right.
-                            - When you let go, you glide to a stop. Your turtle always faces the way it's going."""),
+                            - **PC mouse**: **Right-click** to go there (hold to keep following). **Left-click** another orb (player or bot) to follow it automatically.
+                            - **Arrow keys / WASD**: Move in the direction you press. Pressing them while following switches to manual control.
+                            - **Mobile joystick**: Press and drag anywhere to move that way; drag less to go slower. Tap an orb to follow it automatically.
+                            - **⚡ Dash**: `Space` on PC, the ⚡ button at the bottom on mobile. You move twice as fast for 3 seconds, then it has a cooldown. Only usable while moving. (Details in '⚔️ Skills'.)
+                            - Let go and you glide to a stop. Your turtle always faces the way it's heading."""),
                     new Article("Getting around the screen", """
-                            - **Buttons at the top right**: Toggle your info, notices, the guide, the minimap, the leaderboard, and chat.
-                            - **Panel on the right (at the bottom on mobile)**: Keyword **Search** and your **stash**.
-                            - **Bottom**: Your nickname, level, and current trend score. Tap your nickname to open your info.
+                            - **Buttons at the top right**: Turn your profile, notices, guide, minimap, leaderboard and chat on or off. A green outline means on. (On mobile: 🔍 Search · 📦 Stash · ☰ Menu.)
+                            - **Right panel (on mobile the 🔍 / 📦 buttons)**: Keyword **search** and your **stash** (the count shows next to the tab).
+                            - **Bottom center bar**: Your orb, level, nickname, EXP, trend score and keyword count, plus the skill buttons and emotes. Tap the portrait or name to open your profile.
 
-                            > Shortcuts: `M` minimap, `L` leaderboard, `C` chat""")
+                            > Shortcuts: `M` enlarge the minimap, `E` emotes, skills use the key shown on each button""")
             )),
             new Category("score-and-size", "⚔️ Score and fights", List.of(
                     new Article("Trend score and orb size", """
-                            The size of your orb is set by your **trend score**. It's the points of the keywords you hold, plus the experience you earn the more you add.
+                            Your orb's size is set by your **trend score**: the total of the scores of the keywords you hold. **Your level and EXP do not affect size.**
 
-                            - When other people also hold a keyword you have, its points go up and so does your orb.
+                            - When others also hold a keyword you hold, its score rises and your orb grows.
                             - When a keyword expires or is stolen, your orb shrinks.
-                            - As your orb grows, your view gradually widens. Speed is the same for everyone regardless of size."""),
+                            - As your orb grows, the view zooms out a little. Speed is the same for everyone regardless of size."""),
                     new Article("What happens when orbs collide?", """
                             - Orbs bounce off each other. If the size gap is big, only the smaller one gets knocked far away.
                             - Of the two, the one with the **lower trend score** loses a keyword, and the winner **steals** it.
@@ -221,32 +230,34 @@ final class EnglishSeed {
                             - **Green squares**: Safe zones that pop up here and there and disappear shortly after. The time left is shown, and they blink for the last 30 seconds.
                             - While the center of your orb is inside a safe zone, you can't collide with anyone. You won't lose keywords either."""),
                     new Article("? orbs", """
-                            Touch a **?** orb floating around the arena to eat it.
+                            Touch a **?** orb floating around the arena to eat it. The result is decided by the odds below.
 
-                            - With luck, one of the keywords that's 🔥 right now goes into your stash.
-                            - Sometimes you get nothing. If you get a keyword you already hold, its expiry time resets to 24 hours.
-                            - With bad luck, you lose one of your own keywords, whether it's active or inactive. The chances of gaining and losing are fifty-fifty.
+                            [[orb odds]]
+
+                            - **Gain**: One of the currently 🔥 keywords is added to your stash at random. If it is one you already hold, its remaining time is reset to 24 hours.
+                            - **Lose**: You lose one of your keywords at random, active or inactive alike. If you hold none, it is a miss.
+                            - The odds can change while the game runs. The bar above shows the values in use right now.
 
                             ## ! orbs
 
-                            These are the orbs that drop in red around a player who lost all their keywords to a flame player.
+                            A red orb that drops around someone who lost all their keywords to a flame player.
 
-                            - Eat one and you **always** get one 🔥 keyword. No blanks, and no losing. (If possible, you get a keyword you don't have yet.)
-                            - They have no owner, so anyone can eat them. They disappear if left for a while.
+                            - Eating one **always** gives you a 🔥 keyword. Never a miss, never a loss. (If possible you get one you don't hold yet.)
+                            - It has no owner, so anyone can eat it. It disappears if left too long.
 
-                            > Eating lots of orbs earns you titles."""),
+                            > Eat lots of orbs to earn titles."""),
                     new Article("Minimap and other players' info", """
-                            - **Minimap** (`M`): Shows the whole map, the big orbs, safe zones, and your position at the bottom right.
-                            - **Other players' info**: On PC, **right-click** another orb. On mobile, tap 🔍 and then tap the orb. You'll see their level, title, score history, and top 3 held keywords."""),
+                            - **Minimap**: Shows the whole map, big orbs, safe zones and your position at the bottom right (top left in portrait on mobile). Turn it on or off with the 🗺 button at the top; click or tap the minimap, or press `M`, to enlarge it.
+                            - **Other players' info**: Tap an orb once to see its name, level, trend score and keywords in a small card at the top left. Tap the name for details (with report); `Shift`+click also works on PC. If you are not following that player, the card closes after 10 seconds, or dismiss it with ✕ or by swiping left."""),
                     new Article("Chat", """
-                            You can talk with people in the same room (toggle with `C`). Write something like `#keyword` and it becomes a keyword you can tap.
+                            You can talk with people in the same room. Turn it on or off with the 💬 button at the top, and press `Enter` to type. Writing `#keyword` makes a tappable keyword.
 
-                            > Profanity and spam can get you sanctioned. Please report chat that bothers you."""),
+                            > Abuse or spam may get you sanctioned. Please report uncomfortable chat."""),
                     new Article("Emotes", """
                             Show how you feel with an emoji above your orb, no chat needed.
 
-                            - Press the **😀** button at the bottom right of the screen, or press `E` on PC, to open the emote picker, then tap or press `1`-`8` to choose. It closes after you send one.
-                            - There are eight: 👋 😂 😎 😭 😡 👍 ❤️ 🔥. Everyone in the room sees it briefly.""")
+                            - Tap the **😀** button in the bottom center bar, or press `E` on PC, to open the emote window, then tap one or press `1`–`8`. The window folds after you send one.
+                            - There are eight (👋 😂 😎 😭 😡 👍 ❤️ 🔥), shown briefly to everyone in the room.""")
             )),
             new Category("icons-and-titles", "🐢 Growth and customizing", List.of(
                     new Article("Levels and growth icons", """

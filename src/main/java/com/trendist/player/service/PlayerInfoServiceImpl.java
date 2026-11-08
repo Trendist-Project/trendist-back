@@ -38,7 +38,7 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
     @Override
     @Transactional(readOnly = true)
     public PlayerDtos.PlayerCard card(long userId, int entityNo) {
-        if (!rateLimiter.tryAcquire("info:" + userId, 2, Duration.ofSeconds(1))) {
+        if (!rateLimiter.tryAcquire("info:" + userId, 3, Duration.ofSeconds(1))) {
             throw ApiException.tooMany("INFO_TOO_FAST", "잠시 후 다시 눌러 주세요");
         }
         Room.Live live = target(userId, entityNo);

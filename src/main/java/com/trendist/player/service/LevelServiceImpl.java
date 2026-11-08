@@ -42,6 +42,9 @@ public class LevelServiceImpl implements LevelService {
     }
 
     @Override
+    public List<Level> all() { return cache.get("all"); }
+
+    @Override
     public List<Badge> badges() {
         return cache.get("all").stream()
                 .map(l -> new Badge((int) l.getLevel(), l.getBadgeColor(), l.getBadgeAlpha() == null ? 100 : l.getBadgeAlpha().intValue(), l.isBadgeRainbow()))

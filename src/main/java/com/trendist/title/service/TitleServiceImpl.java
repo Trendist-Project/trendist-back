@@ -1,7 +1,6 @@
 package com.trendist.title.service;
 
 import com.trendist.common.exception.ApiException;
-import com.trendist.common.support.RateLimiter;
 import com.trendist.country.entity.Country;
 import com.trendist.country.repository.CountryRepository;
 import com.trendist.game.event.GameEvents;
@@ -18,7 +17,6 @@ import com.trendist.title.entity.PlayerTitle;
 import com.trendist.title.entity.Title;
 import com.trendist.title.repository.PlayerTitleRepository;
 import com.trendist.title.repository.TitleRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -49,7 +47,6 @@ public class TitleServiceImpl implements TitleService {
     private final PlayerService playerService;
     private final CountryRepository countries;
     private final RoomManager rooms;
-    private final RateLimiter rateLimiter;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
     private final SettingService settings;
@@ -103,6 +100,8 @@ public class TitleServiceImpl implements TitleService {
             case "lose_count" -> p.getLoseCount();
             case "kill_count" -> p.getKillCount();
             case "defeat_count" -> p.getDefeatCount();
+            case "max_combo" -> p.getMaxCombo();
+            case "flame_out_count" -> p.getFlameOutCount();
             case "active_days" -> p.getActiveDays();
             default -> 0;
         };
@@ -133,10 +132,6 @@ public class TitleServiceImpl implements TitleService {
             if (!playerTitles.existsByPlayerIdAndTitleId(p.getId(), titleId)) throw ApiException.badRequest("TITLE_NOT_OWNED", "아직 받지 않은 칭호예요");
             // 방에 보내는 이름표는 그 나라 언어(방 안 모두에게 같은 글)
             name = activeTitleName(titleId, Lang.ofLocale(p.getCountry().getDefaultLocale()));
-        }
-        // 거절된 요청은 세지 않는다(검사를 통과한 변경만 5초에 1번)
-        if (!rateLimiter.tryAcquire("title:" + p.getId(), 1, Duration.ofSeconds(5))) {
-            throw ApiException.tooMany("TITLE_TOO_FAST", "칭호는 5초에 한 번 바꿀 수 있어요");
         }
         p.changeTitle(titleId);
         events.publishEvent(new GameEvents.TitleChanged(p.getCountry().getId(), p.getId(), name));

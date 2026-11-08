@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/api/auth/**").permitAll()
                         // 공지와 가이드는 메인 화면에서도 보므로 로그인 없이 읽을 수 있다(3.1)
-                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/guide/**", "/api/art/**", "/api/emergency").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/skills", "/api/game-info/**", "/api/guide/**", "/api/art/**", "/api/emergency").permitAll()
                         .requestMatchers("/ws").permitAll() // WebSocket은 연결 직후 첫 메시지로 인증한다
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // 관리자 권한이 없으면 403
                         .requestMatchers("/api/**").authenticated()

@@ -190,7 +190,7 @@ public class KeywordServiceImpl implements KeywordService {
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.ORB); // 사이트 통계(13.9)
         p.incOrb(); // 꽝이어도 먹은 횟수는 센다(칭호, 4.10)
         events.publishEvent(new GameEvents.TitleCheck(p.getId()));
-        // ? 구슬: 설정 확률(기본 70%)로 🔥활성 키워드를 얻고, 나머지는 내 키워드 하나를 잃는다(없으면 꽝). ! 구슬(prize)은 항상 얻는다
+        // ? 구슬: 설정 확률(기본 60%)로 🔥활성 키워드를 얻고, 나머지는 내 키워드 하나를 잃는다(없으면 꽝). ! 구슬(prize)은 항상 얻는다
         if (!prize && ThreadLocalRandom.current().nextDouble(100) >= settings.getDouble(SettingKeys.ORB_ACTIVE_PERCENT)) {
             return loseFromOrb(p);
         }

@@ -47,14 +47,17 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         });
     }
     private final SettingService settings;
+    private final com.trendist.skill.service.SkillCatalog skillCatalog;
     private final KeywordService keywordService;
     private final com.trendist.player.service.PlayerService playerService;
     private final LevelService levels;
     private final ObjectMapper json;
 
     public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json,
+                           com.trendist.skill.service.SkillCatalog skillCatalog,
                            @org.springframework.context.annotation.Lazy com.trendist.player.service.PlayerService playerService) {
         this.playerService = playerService;
+        this.skillCatalog = skillCatalog;
         this.settings = settings;
         this.levels = levels;
         this.keywordService = keywordService;
@@ -65,7 +68,13 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.ZoneTuning z = zoneTuning();
                 Room.ComboTuning c = comboTuning();
                 Room.DashTuning dash = dashTuning();
+                Room.SkillTuning skill = skillTuning();
+                java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
+                java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
                 rooms.values().forEach(r -> {
+                    if (!skill.equals(r.skillTuning())) r.setSkillTuning(skill);
+                    r.setDisabledSkills(disabledSkills);
+                    r.setRequiredLevels(requiredLevels);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
                     if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);
                     r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
@@ -100,6 +109,9 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             r.setZoneTuning(zoneTuning());
             r.setComboTuning(comboTuning());
             r.setDashTuning(dashTuning());
+            r.setSkillTuning(skillTuning());
+            r.setDisabledSkills(skillCatalog.disabledCodes());
+            r.setRequiredLevels(skillCatalog.requiredLevels());
             r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
             r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
             r.setOfflineKeepSeconds(settings.getInt(SettingKeys.OFFLINE_KEEP_SECONDS)); // 연결이 끊겨도 원이 남아 있는 시간(4.32)
@@ -143,7 +155,18 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     /** 대시 설정(4.27). */
     private Room.DashTuning dashTuning() {
         return new Room.DashTuning(settings.getDouble(SettingKeys.DASH_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.DASH_SECONDS),
-                settings.getDouble(SettingKeys.DASH_COOLDOWN_SECONDS));
+                skillCatalog.cooldownSeconds("dash", 30));
+    }
+
+    /** 스킬 설정(4.33). */
+    private Room.SkillTuning skillTuning() {
+        return new Room.SkillTuning(
+                settings.getDouble(SettingKeys.SHOCKWAVE_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.SHOCKWAVE_RANGE_RATIO),
+                settings.getDouble(SettingKeys.SHOCKWAVE_KNOCKBACK), skillCatalog.cooldownSeconds("shockwave", 30),
+                settings.getDouble(SettingKeys.HOOK_RANGE_RATIO), settings.getDouble(SettingKeys.HOOK_SECONDS),
+                settings.getDouble(SettingKeys.HOOK_PULL_SECONDS), skillCatalog.cooldownSeconds("hook", 30),
+                settings.getDouble(SettingKeys.SKILL_SHIELD_SECONDS), skillCatalog.cooldownSeconds("shield", 30),
+                settings.getDouble(SettingKeys.STEALTH_SECONDS), skillCatalog.cooldownSeconds("stealth", 30));
     }
 
     /** 연속 빼앗기 콤보 설정(4.25). */
@@ -345,6 +368,30 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 playerService.recordDefeat(playerId);
             } catch (RuntimeException e) {
                 log.warn("record defeat failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestCombo(Room room, Room.Member winner, int combo) {
+        long playerId = winner.playerId;
+        db(() -> {
+            try {
+                playerService.recordCombo(playerId, combo);
+            } catch (RuntimeException e) {
+                log.warn("record combo failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestFlameOut(Room room, Room.Member by) {
+        long playerId = by.playerId;
+        db(() -> {
+            try {
+                playerService.recordFlameOut(playerId);
+            } catch (RuntimeException e) {
+                log.warn("record flame out failed for player {}", playerId, e);
             }
         });
     }

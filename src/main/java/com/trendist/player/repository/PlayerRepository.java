@@ -20,6 +20,16 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     @Query("update Player p set p.defeatCount = p.defeatCount + 1 where p.id = :id")
     int incrementDefeatCount(@org.springframework.data.repository.query.Param("id") Long id);
 
+    /** 최고 콤보를 기록보다 높을 때만 올린다(4.25). 올랐으면 1 */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update Player p set p.maxCombo = :combo where p.id = :id and p.maxCombo < :combo")
+    int raiseMaxCombo(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("combo") long combo);
+
+    /** 상대의 불꽃을 꺼뜨린 횟수를 올린다(4.25) */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update Player p set p.flameOutCount = p.flameOutCount + 1 where p.id = :id")
+    int incrementFlameOutCount(@org.springframework.data.repository.query.Param("id") Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Player p where p.id = :id")
     Optional<Player> findByIdForUpdate(@Param("id") Long id);
