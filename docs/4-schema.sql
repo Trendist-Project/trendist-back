@@ -529,7 +529,7 @@ CREATE TABLE reports (
   id             BIGINT NOT NULL AUTO_INCREMENT COMMENT '신고 ID',
   player_id      BIGINT NOT NULL COMMENT '신고한 플레이어 ID(어느 나라에서 신고했는지 알 수 있다)',
   report_type_id BIGINT NOT NULL COMMENT '신고 대상 유형 ID',
-  report_date    DATE NOT NULL DEFAULT '2000-01-01' COMMENT '플레이어 신고는 신고한 날(신고한 사람 나라 시간대, 같은 대상 하루 한 번), 그 밖의 유형은 고정 값(대상마다 한 번)',
+  report_date    DATE NOT NULL DEFAULT '2000-01-01' COMMENT '신고한 날(신고한 사람 나라 시간대). 같은 대상은 하루에 한 번만 신고할 수 있다. 옛 행은 고정 값 2000-01-01',
   target_id      BIGINT NOT NULL COMMENT '대상 ID(유형에 따라 keywords/comments/profiles/players/chat_messages의 ID, 외래 키 없음)',
   reason         VARCHAR(500) NULL COMMENT '신고 사유',
   status         VARCHAR(20) NOT NULL DEFAULT 'RECEIVED' COMMENT '상태(RECEIVED/RESOLVED/REJECTED)',

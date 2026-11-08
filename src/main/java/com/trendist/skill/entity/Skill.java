@@ -27,6 +27,11 @@ public class Skill extends BaseTimeEntity {
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(nullable = false) private boolean enabled = true;
 
+    /** 관리자가 바꾸는 값(13.3): 쿨타임(초, 0이면 없음), 해금 레벨, 사용 여부 */
+    public void changeCooldown(BigDecimal seconds) { this.cooldownSeconds = seconds; }
+    public void changeRequiredLevel(int level) { this.requiredLevel = level; }
+    public void changeEnabled(boolean enabled) { this.enabled = enabled; }
+
     public Skill(String code, String icon, String category, String defaultKey, double cooldownSeconds, int requiredLevel, long sortOrder) {
         this.code = code; this.requiredLevel = requiredLevel;
         this.icon = icon; this.category = category; this.defaultKey = defaultKey;

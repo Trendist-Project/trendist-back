@@ -56,6 +56,7 @@ class ApiFlowTest {
     @Autowired com.trendist.setting.service.SettingService settingService;
     @Autowired com.trendist.skill.service.SkillCatalog skillCatalog;
     @Autowired com.trendist.skill.repository.SkillRepository skillRepository;
+    @Autowired com.trendist.skill.controller.AdminSkillController adminSkills;
     @Autowired PlayerService playerService;
     @Autowired ScoreHistoryService scoreHistory;
     @Autowired KeywordActivityService activityService;
@@ -709,6 +710,8 @@ class ApiFlowTest {
         // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다
         mvc.perform(get("/api/rankings").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+        // 내 순위도 방에 있을 때만(4.14): 방에 없으면 204
+        mvc.perform(get("/api/rankings/me").header("Authorization", "Bearer " + t)).andExpect(status().isNoContent());
     }
 
     @Test
@@ -855,7 +858,7 @@ class ApiFlowTest {
         long chatId = chatService.save(countryId, playerId, "신고될 채팅").id();
         report(b, "CHAT", chatId, 201);
         report(b, "CHAT", chatId, 409);
-        report(b, "PLAYER", 1, 404);      // 플레이어 신고는 같은 방에 있을 때만(정보 팝업, 4.11)
+        report(b, "PLAYER", 999999, 404); // 없는 플레이어 번호
         // 키워드 신고(키워드 상세 팝업, 4.12): 누구나(보유자도) 한 번만, 없는 키워드는 404
         report(a, "KEYWORD", kid, 201);
         report(a, "KEYWORD", kid, 409);
@@ -1204,15 +1207,39 @@ class ApiFlowTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.nickname").value("인기검색을"))
                 .andExpect(jsonPath("$.entityNo").value(-1)).andExpect(jsonPath("$.createdAt").isNotEmpty()).andExpect(jsonPath("$.me").value(false)).andExpect(jsonPath("$.popularity").value(-1)).andExpect(jsonPath("$.myVote").value(-1));
         // 검색 결과의 상세 보기에서 신고(플레이어 번호): 한 번만, 자기 자신은 안 된다
-        report(a, "PLAYER_ID", bid, 201);
-        report(a, "PLAYER_ID", bid, 409); // 같은 날은 한 번
+        report(a, "PLAYER", bid, 201);
+        report(a, "PLAYER", bid, 409); // 같은 날은 한 번
         jdbc.update("update reports set report_date = dateadd('DAY', -1, report_date) where target_id = ? and report_date > '2000-01-01'", bid);
-        report(a, "PLAYER_ID", bid, 201); // 다음 날은 다시 신고할 수 있다
-        report(a, "PLAYER_ID", bid, 409);
-        report(a, "PLAYER_ID", aid, 400);
-        report(a, "PLAYER_ID", 999999, 404);
+        report(a, "PLAYER", bid, 201); // 다음 날은 다시 신고할 수 있다
+        report(a, "PLAYER", bid, 409);
+        report(a, "PLAYER", aid, 400);
+        report(a, "PLAYER", 999999, 404);
         // 다른 사람은 올릴 수 있다
         mvc.perform(post("/api/players/" + bid + "/popularity").header("Authorization", "Bearer " + player("인기검색병"))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}")).andExpect(jsonPath("$.popularity").value(0));
+    }
+    @Test
+    void adminEditsEachSkillCooldownAndLevelAndItReachesThePublicList() throws Exception {
+        // 13.3: 스킬마다 쿨타임·해금 레벨·사용 여부를 관리자가 따로 고친다. 관리자가 아니면 403
+        String t = player("스킬관리시험");
+        mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
+        assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
+                .containsExactly("shield", "hook", "shockwave", "stealth", "dash");
+        try {
+            var r = adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
+            assertThat(r.cooldownSeconds()).isEqualTo(12.5);
+            assertThat(r.requiredLevel()).isEqualTo(16);
+            assertThat(adminSkills.list().stream().filter(x -> x.code().equals("shield")).findFirst().orElseThrow().cooldownSeconds()).isEqualTo(30.0); // 다른 스킬은 그대로
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$[?(@.code=='hook')].cooldownSeconds").value(12.5))
+                    .andExpect(jsonPath("$[?(@.code=='hook')].requiredLevel").value(16));
+            assertThatThrownBy(() -> adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(-1.0, null, null)))
+                    .hasMessageContaining("쿨타임");
+            assertThatThrownBy(() -> adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(null, 0, null)))
+                    .hasMessageContaining("해금 레벨");
+            assertThatThrownBy(() -> adminSkills.update("nope", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(1.0, null, null)))
+                    .hasMessageContaining("없는 스킬");
+        } finally {
+            adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 15, true));
+        }
     }
 }

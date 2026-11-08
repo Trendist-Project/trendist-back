@@ -366,7 +366,7 @@ final class EnglishSeed {
                             You can mix English letters and numbers with one other writing system (for example, Korean). If there are characters you can't use, we'll tell you which ones."""),
                     new Article("I saw an inappropriate nickname, comment, or chat.", """
                             - **Comments**: Press 🚩 Report on the comment.
-                            - **Players**: Press 🚩 Report in the other player's info window (open it by tapping an orb in the arena, or by tapping a nickname in the 👥 Players search). Pick a reason (cheating with hacks, macros or tools; bug or exploit abuse; inappropriate nickname; abuse; other) and describe what happened. You can report the same player once a day, and you can't report yourself.
+                            - **Players**: Press 🚩 Report in the other player's info window (open it by tapping an orb in the arena, or by tapping a nickname in the 👥 Players search). Pick a reason (cheating with hacks, macros or tools; bug or exploit abuse; inappropriate nickname; abuse; other) and describe what happened. You can report the same target only once a day, and you can't report yourself.
                             - **Chat**: Press report on the chat message.
 
                             Operators review and handle reports. Operators keep checking and banning inappropriate keywords."""),

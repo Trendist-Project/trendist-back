@@ -108,7 +108,7 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
-        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio")) {
+        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size")) {
             settings.findByName(old).ifPresent(settings::delete);
         }
         // 설정 그룹(13.3): 이름과 순서는 코드(SettingKeys.GROUP_ORDER)가 정한다. 설정이 외래 키로 가리키므로 설정보다 먼저 만든다

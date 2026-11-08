@@ -14,10 +14,25 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class RankingServiceImpl implements RankingService {
+    /** 서버는 항상 TOP 10을 준다. 몇 위까지 볼지(1·3·10)는 사람마다 화면에서 고른다 */
     private static final int TOP = 10;
 
     private final CountryService countries;
     private final RoomManager rooms;
+    private final com.trendist.player.service.PlayerService players;
+
+    @Override
+    public RankingEntry mine(long userId) {
+        com.trendist.player.entity.Player me = players.requireCurrent(userId);
+        List<Room.Live> live = rooms.livePlayers(me.getCountry().getId()).stream()
+                .sorted(Comparator.comparingDouble(Room.Live::score).reversed().thenComparingLong(Room.Live::playerId))
+                .toList();
+        for (int i = 0; i < live.size(); i++) {
+            Room.Live l = live.get(i);
+            if (l.playerId() == me.getId()) return new RankingEntry(i + 1, l.playerId(), l.nickname(), l.level(), Math.round(l.score()));
+        }
+        return null;
+    }
 
     @Override
     public List<RankingEntry> top(String countryCode) {
