@@ -146,8 +146,10 @@ final class EnglishSeed {
                             - Let go and you glide to a stop. Your turtle always faces the way it's heading."""),
                     new Article("Getting around the screen", """
                             - **Buttons at the top right**: Turn your profile, notices, guide, minimap, leaderboard and chat on or off. A green outline means on. (On mobile: 🔍 Search · 📦 Stash · ☰ Menu.)
-                            - **Right panel (on mobile the 🔍 / 📦 buttons)**: Keyword **search** and your **stash** (the count shows next to the tab).
+                            - **Right panel (on mobile the 🔍 / 📦 buttons)**: **🔍 Search** (keywords), **📦 Stash** (the count shows next to the tab), and **👥 Players** (find players by nickname).
                             - **Bottom center bar**: Your orb, level, nickname, EXP, trend score and keyword count, plus the skill buttons and emotes. Tap the portrait or name to open your profile.
+- **When windows overlap**: The one you opened or tapped last is shown on top.
+                            - **Mobile**: In portrait the skills sit on their own row at the bottom; in landscape the bottom bar is wide, the minimap is at the top left and the 💬 chat button at the bottom right.
 
                             > Shortcuts: `M` enlarge the minimap, `E` emotes, skills use the key shown on each button""")
             )),
@@ -160,24 +162,39 @@ final class EnglishSeed {
                             - As your orb grows, the view zooms out a little. Speed is the same for everyone regardless of size."""),
                     new Article("What happens when orbs collide?", """
                             - Orbs bounce off each other. If the size gap is big, only the smaller one gets knocked far away.
-                            - Of the two, the one with the **lower trend score** loses a keyword, and the winner **steals** it.
+                            - Of the two, the one with the **lower trend score** loses a keyword, and the winner **steals** it. If the scores are equal, nobody loses anything. Size doesn't decide who wins.
                             - The exception is anyone on **🔥 flame**. Against someone without a flame they win no matter the score, and the other player loses **all** their keywords. (See "Combos and flame" below.)
                             - If the stolen keyword is already in your stash, its remaining time resets to 24 hours.
                             - You can search for a keyword you lost and add it again right away.
+                            - **If you lose while holding no keywords**, you are knocked out. (See 'Knockouts and respawning' below.)
+                            - Inside a **safe zone** you don't collide with anyone.
 
-                            > After losing a keyword you're invincible for 3 seconds (you'll see a 🛡 above your orb). Players who just joined are protected briefly too."""),
+                            ## The result cards at the top of the screen
+
+                            When you gain or lose a keyword, a card appears at the top of the screen. A small tag on the card tells you which kind:
+
+                            - **Stole**: You beat a player or a bot and took a keyword. The points you gained (`+`) are shown too.
+                            - **Stolen**: You lost to a player or a bot and lost a keyword. The points you lost (`-`) are shown too.
+                            - **Gained** / **Lost**: You gained or lost a keyword from a ? orb.
+                            - Wiping out keywords with a flame, losing them all to one, and taking someone down use the same card.
+
+                            > After losing a keyword you're invincible for 3 seconds (you'll see a 🛡 above your orb, and others pass right through you). When you join or respawn you start in the safe zone in the middle, so you're safe."""),
                     new Article("Combos and flame", """
                             Steal keywords **back to back** from collisions and you build a combo. You'll see something like **⚔️ 3 Combo** at the top of the screen.
 
                             - At **5 Combo**, a **🔥 flame** ignites around your orb. Everyone can see it.
                             - Keywords you win from bots count toward the combo too.
-                            - If you get a keyword **stolen** even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
+                            - If you lose a keyword in a fight even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
+                            - If **5 minutes** pass after your last combo gain without a new one, the combo and flame fade away. Every new combo restarts the 5 minutes. The time left shows on the combo card (under the leaderboard at the top right).
+                            - If you refresh or leave and come back, your combo starts again from **0**.
+                            - Bots build combos and get flames too.
 
                             ## 🔥 The power of flame
 
                             - **When a flame player hits a player without a flame**: The flame side wins regardless of trend score, and the other player loses **all** their keywords. The flame side's combo goes up by 1.
                             - **When both have a flame**: As usual, the higher trend score wins. The loser's combo and flame disappear and they lose one keyword.
-                            - Against a **bot**, the usual rules apply even if you have a flame.
+                            - Against a **bot** the same rules apply. If you have a flame and hit a bot without one, you wipe out its keywords; if a flaming bot hits you and you have no flame, you lose all your keywords.
+                            - The flame side stays **in place** when you collide; only the player without a flame is knocked back.
                             - If you lose all your keywords, you're invincible for 3 seconds. Also, as many **red ! orbs** as **half of your lost 🔥 Active keywords** (rounded up, at least 1 if you had any active) drop around that spot. Anyone can pick them up.
 
                             > A flame is both a trophy and a weapon. It doesn't affect your size, but it goes out the moment you lose, so be careful."""),
@@ -185,10 +202,12 @@ final class EnglishSeed {
                             Rooms with few people get red **bots** that move around with you. As people join, bots leave one by one, but at least 1 bot always stays no matter how many people there are.
 
                             - If a bot beats you, you lose a keyword just like when you lose to a player.
-                            - If you beat a bot, you get a random keyword that's 🔥 right now. If you already have it, its remaining time resets to 24 hours.
+                            - If you beat a bot, you take one of the keywords that bot was holding. If you already have it, its remaining time resets to 24 hours.
+                            - If you beat a bot that holds no keywords, you knock it out.
+                            - Bots are named **Bot** and are red. Like players they collect keywords, eat orbs, and build combos and flames.
                             - Bots never grow bigger than the average of the players online."""),
                     new Article("Leaderboard", """
-                            The leaderboard ranks the **trend score** of everyone online in this room right now. The TOP 10 appears at the top right, and you can toggle it with the `L` key.
+                            The leaderboard ranks the **trend score** of everyone online in this room right now. The TOP 10 appears at the top right, and you can toggle it with the 🏆 button at the top.
 
                             > Reaching #1, TOP 3, or TOP 10 on the leaderboard earns you titles.""")
             )),
@@ -226,8 +245,8 @@ final class EnglishSeed {
                     new Article("Safe zones", """
                             [[아레나 표시]]
 
-                            - **Blue square**: The safe zone that's always in the middle of the map.
-                            - **Green squares**: Safe zones that pop up here and there and disappear shortly after. The time left is shown, and they blink for the last 30 seconds.
+                            - **Blue square**: The safe zone that's always in the middle of the map. You start here when you join or respawn.
+                            - **Green squares**: Safe zones that pop up here and there and disappear after 5 minutes. The time left is shown, and they blink for the last 30 seconds.
                             - While the center of your orb is inside a safe zone, you can't collide with anyone. You won't lose keywords either."""),
                     new Article("? orbs", """
                             Touch a **?** orb floating around the arena to eat it. The result is decided by the odds below.
@@ -247,10 +266,13 @@ final class EnglishSeed {
 
                             > Eat lots of orbs to earn titles."""),
                     new Article("Minimap and other players' info", """
-                            - **Minimap**: Shows the whole map, big orbs, safe zones and your position at the bottom right (top left in portrait on mobile). Turn it on or off with the 🗺 button at the top; click or tap the minimap, or press `M`, to enlarge it.
-                            - **Other players' info**: Tap an orb once to see its name, level, trend score and keywords in a small card at the top left. Tap the name for details (with report); `Shift`+click also works on PC. If you are not following that player, the card closes after 10 seconds, or dismiss it with ✕ or by swiping left."""),
+                            - **Minimap**: Shows the whole map, big orbs, safe zones and your position at the bottom right (top left on mobile, in portrait and landscape). Turn it on or off with the 🗺 button at the top; click or tap the minimap, or press `M`, to enlarge it.
+                            - **Other players' info**: Tap an orb once to see its name, level, trend score and keywords in a small card at the top left. Tap the name for details (trend score, level, popularity, creation date, top 3 keywords, popularity +/−, 💬 Share, 🚩 Report); `Shift`+click also works on PC. If you are not following that player, the card closes after 10 seconds, or dismiss it with ✕ or by swiping left."""),
                     new Article("Chat", """
                             You can talk with people in the same room. Turn it on or off with the 💬 button at the top, and press `Enter` to type. Writing `#keyword` makes a tappable keyword.
+
+                            - Press **💬 Share** in a player's info and that player appears in chat as `@nickname`. Tap it to open their info.
+                            - On mobile in portrait, tapping 💬 opens it at 2 lines by default; drag its top edge to change the height.
 
                             > Abuse or spam may get you sanctioned. Please report uncomfortable chat."""),
                     new Article("Emotes", """
@@ -282,7 +304,7 @@ final class EnglishSeed {
 
                             > The picture above shows the colors currently set in the game. These colors can change during operation."""),
                     new Article("Titles", """
-                            You receive titles automatically when you meet their conditions. They cover adding keywords, levels, trend score, the leaderboard, comments, searching, stealing, bots, orbs, knockouts, days played, and more.
+                            You receive titles automatically when you meet their conditions. They cover adding keywords, levels, trend score, the leaderboard, comments, searching, stealing, combos and putting out flames, bots, orbs, knockouts, getting back up after defeats, days played, and more.
 
                             - The moment you earn a title, a **🏅 New title alert** pops up at the top of the screen. It disappears on its own after 6 seconds, and pressing **Equip** puts that title right under your name.
                             - In **My info → 🏅 Titles** you can pick one of your titles and **equip** it. The equipped title shows at the top of the list as "Equipped", and appears in yellow under your nickname in the arena. **Unequip** it to hide it.
@@ -330,6 +352,7 @@ final class EnglishSeed {
                     new Article("I keep getting my keywords stolen.", """
                             - Near big orbs, escape to a safe zone (blue or green squares). Nobody collides inside them.
                             - You're invincible for 3 seconds right after losing a keyword, so slip away during that time.
+                            - The 🛡 Shield skill (from level 10) lets you pass through other circles for a moment.
                             - If you beat a bot or an orb smaller than you, you can get keywords back."""),
                     new Article("Can I continue on another device?", """
                             If you sign in with Google under **My info → Account**, you can continue with the same progress on other devices. Your guest progress carries over to that account too.""")
@@ -343,7 +366,7 @@ final class EnglishSeed {
                             You can mix English letters and numbers with one other writing system (for example, Korean). If there are characters you can't use, we'll tell you which ones."""),
                     new Article("I saw an inappropriate nickname, comment, or chat.", """
                             - **Comments**: Press 🚩 Report on the comment.
-                            - **Players**: Press 🚩 Report in the other player's info window.
+                            - **Players**: Press 🚩 Report in the other player's info window (open it by tapping an orb in the arena, or by tapping a nickname in the 👥 Players search). Pick a reason (cheating with hacks, macros or tools; bug or exploit abuse; inappropriate nickname; abuse; other) and describe what happened. You can report the same player once a day, and you can't report yourself.
                             - **Chat**: Press report on the chat message.
 
                             Operators review and handle reports. Operators keep checking and banning inappropriate keywords."""),
