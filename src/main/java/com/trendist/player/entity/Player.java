@@ -56,6 +56,8 @@ public class Player extends BaseTimeEntity {
     @Column(name = "max_combo", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long maxCombo;
     /** 상대의 콤보 불꽃을 꺼뜨린 횟수(사람·봇의 불꽃 모두, 4.25) */
     @Column(name = "flame_out_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long flameOutCount;
+    /** 인기도(4.34): 다른 플레이어가 올리면 +1, 내리면 -1. 음수도 된다 */
+    @Column(nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long popularity;
     /** 키워드를 얻은 날의 수(나라 시간대 기준으로 서로 다른 날, 처음 만든 날 포함) */
     @Column(name = "active_days", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long activeDays;
 

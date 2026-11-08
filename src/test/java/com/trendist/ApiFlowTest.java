@@ -177,7 +177,7 @@ class ApiFlowTest {
         long playerId = ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
         keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("구슬테스트"));
-        // 70%(기본값)는 🔥 키워드를 얻고(이미 가진 키워드면 만료시간만 갱신), 나머지는 가진 키워드 하나를 잃는다. 가진 게 없으면 꽝
+        // 60%(기본값)는 🔥 키워드를 얻고(이미 가진 키워드면 만료시간만 갱신), 나머지는 가진 키워드 하나를 잃는다. 가진 게 없으면 꽝
         int gained = 0, lost = 0, miss = 0;
         for (int i = 0; i < 300; i++) {
             var r = keywordService.openOrb(playerId);
@@ -190,7 +190,7 @@ class ApiFlowTest {
         }
         assertThat(gained).isPositive();
         assertThat(lost).isPositive();
-        assertThat(lost + miss).isBetween(55, 125); // 잃기 쪽으로 간 것은 약 30%(300번 중 90번 안팎)
+        assertThat(lost + miss).isBetween(80, 160); // 잃기 쪽으로 간 것은 약 40%(기본 얻을 확률 60%, 300번 중 120번 안팎)
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(gained - lost));
     }
 
@@ -1175,5 +1175,44 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$[0].level").value(1))
                 .andExpect(jsonPath("$[99].level").value(100))
                 .andExpect(jsonPath("$[99].requiredExp").value(10000));
+    }
+    @Test
+    void popularityCanBeRaisedOrLoweredOncePerTargetPerDayAndPlayersAreSearchable() throws Exception {
+        // 4.34: 대상마다 하루 한 번(올리기/내리기), 자기 자신 불가, 닉네임 검색(같은 나라, 내 표 표시)
+        String a = player("인기검색갑"), b = player("인기검색을");
+        long bid = playerIdOf(b), aid = playerIdOf(a);
+        String auth = "Bearer " + a;
+        mvc.perform(get("/api/players/search").header("Authorization", auth).param("q", "인기검색"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.playerId==" + bid + ")].popularity").value(0));
+        mvc.perform(post("/api/players/" + aid + "/popularity").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/players/" + bid + "/popularity").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"value\":0}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/players/" + bid + "/popularity").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"value\":-1}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.popularity").value(-1)).andExpect(jsonPath("$.myVote").value(-1));
+        mvc.perform(post("/api/players/" + bid + "/popularity").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}")).andExpect(status().isConflict());
+        Thread.sleep(400); // 검색 초당 3회 제한
+        mvc.perform(get("/api/players/search").header("Authorization", auth).param("q", "인기검색을"))
+                .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].popularity").value(-1))
+                .andExpect(jsonPath("$[0].myVote").value(-1));
+        // 검색 결과의 상세 보기: 접속 중이 아니어도 같은 나라면 번호로 연다
+        Thread.sleep(400);
+        mvc.perform(get("/api/players/" + bid).header("Authorization", auth))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.nickname").value("인기검색을"))
+                .andExpect(jsonPath("$.entityNo").value(-1)).andExpect(jsonPath("$.createdAt").isNotEmpty()).andExpect(jsonPath("$.me").value(false)).andExpect(jsonPath("$.popularity").value(-1)).andExpect(jsonPath("$.myVote").value(-1));
+        // 검색 결과의 상세 보기에서 신고(플레이어 번호): 한 번만, 자기 자신은 안 된다
+        report(a, "PLAYER_ID", bid, 201);
+        report(a, "PLAYER_ID", bid, 409); // 같은 날은 한 번
+        jdbc.update("update reports set report_date = dateadd('DAY', -1, report_date) where target_id = ? and report_date > '2000-01-01'", bid);
+        report(a, "PLAYER_ID", bid, 201); // 다음 날은 다시 신고할 수 있다
+        report(a, "PLAYER_ID", bid, 409);
+        report(a, "PLAYER_ID", aid, 400);
+        report(a, "PLAYER_ID", 999999, 404);
+        // 다른 사람은 올릴 수 있다
+        mvc.perform(post("/api/players/" + bid + "/popularity").header("Authorization", "Bearer " + player("인기검색병"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}")).andExpect(jsonPath("$.popularity").value(0));
     }
 }

@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
-    boolean existsByReportTypeIdAndTargetIdAndPlayerId(Long reportTypeId, long targetId, Long playerId);
+    boolean existsByReportTypeIdAndTargetIdAndPlayerIdAndReportDate(Long reportTypeId, long targetId, Long playerId, java.time.LocalDate reportDate);
 
     /** 관리자 신고 목록(13.5): 상태로 거르고(null이면 전체) 최신순. */
     @Query(value = """

@@ -54,6 +54,16 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     long countByCountryId(Long countryId);
 
+    /** 인기도를 한 문장으로 바꾼다(점수 기록 대상에 끼지 않게 updated_at은 그대로). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Player p set p.popularity = p.popularity + :delta where p.id = :id")
+    int addPopularity(@Param("id") Long id, @Param("delta") long delta);
+
+    /** 플레이어 검색: 같은 나라, 탈퇴한 사용자 제외, 닉네임 일부(소문자, %포함). 인기도 높은 순 */
+    @Query("select p from Player p join fetch p.user u join fetch p.level where p.country.id = :countryId and u.deletedAt is null "
+            + "and lower(p.nickname) like :q order by p.popularity desc, p.currentScore desc, p.id")
+    List<Player> searchByNickname(@Param("countryId") Long countryId, @Param("q") String q, org.springframework.data.domain.Pageable pageable);
+
     /**
      * 관리자 사용자 목록(13.10). q: 닉네임 일부(소문자, %포함) 또는 사용자·플레이어 번호(qid), filter: all / guest / google / admin /
      * banned / withdrawn / online(online에 든 플레이어만).

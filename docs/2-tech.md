@@ -219,6 +219,8 @@ WHERE p.id IN (/* 500명 */)
 | `GET /{kr\|global}/keywords/{slug}` | 공개 키워드 페이지 HTML(로그인 없음, 4.28). 금지·없는 키워드는 404. 열 때마다 조회수를 세므로 `no-cache` |
 | `GET /sitemap.xml` | 사이트맵(로그인 없음, 5분 캐시). 메인 주소, 금지가 아닌 모든 키워드 페이지, 공유 페이지(`/share/{코드}`)를 한 파일로, `lastmod` 포함. 프론트 정적 파일이 아니라 백엔드가 만든다(4.28) |
 | `GET /share/{code}/card.png` | 카드 이미지(로그인 없음). 저장한 값으로 서버가 그린다(Java2D, 글꼴은 jar에 넣은 나눔스퀘어 ac). 그린 결과는 메모리에 최대 64MB 캐시하고, `Cache-Control: public, max-age=31536000, immutable` |
+| `GET /api/players/search?q=` | 플레이어 검색(4.34): 같은 나라, 닉네임 일부, 최대 20명, 인기도 순. 내 오늘 표(`myVote`) 포함. 계정당 초당 3회 |
+| `POST /api/players/{id}/popularity` | 인기도 올리기(1)·내리기(-1)(4.34). 대상마다 하루 한 번(409 `POPULARITY_DONE`), 자기 자신 400 |
 | `GET /api/skills` | 스킬 목록(4.33): 코드·아이콘·종류·기본 단축키·쿨타임·해금 레벨(이름·설명은 프론트엔드 번역 파일). 로그인 없이, 사용 여부가 켜진 것만 표시 순서대로. DB 값은 서버가 10초 기억한다 |
 | `GET /api/guide/categories`, `/categories/{code}/articles` | 가이드(5분 캐시, 수정 시 즉시 삭제). 로그인 없이 읽는다. 글 목록에 본문을 같이 준다. 글 한 개 조회(`/articles/{id}`)와 검색(`/search?q=`)은 아직 없다 |
 

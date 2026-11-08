@@ -7,6 +7,9 @@ public interface PlayerInfoService {
     /** 정보 카드. 계정당 초당 2회(9.5). 그 방에 없는 번호면 404 PLAYER_NOT_IN_ROOM. */
     PlayerDtos.PlayerCard card(long userId, int entityNo);
 
+    /** 검색 결과에서 연 정보 카드: 플레이어 번호로, 같은 나라면 접속 중이 아니어도 볼 수 있다. entityNo는 -1 */
+    PlayerDtos.PlayerCard cardById(long userId, long playerId);
+
     /** 그 플레이어의 최근 7일 점수 추이. */
     PlayerDtos.ScoreHistory week(long userId, int entityNo);
 }

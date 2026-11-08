@@ -42,6 +42,19 @@ CREATE TABLE titles (
   UNIQUE KEY uk_titles_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='칭호';
 
+CREATE TABLE player_popularity_votes (
+  id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '투표 ID',
+  voter_player_id  BIGINT NOT NULL COMMENT '투표한 플레이어',
+  target_player_id BIGINT NOT NULL COMMENT '대상 플레이어',
+  vote_date        DATE NOT NULL COMMENT '투표한 날(투표자 나라 시간대)',
+  value            INT NOT NULL COMMENT '+1 올리기, -1 내리기',
+  created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_popularity_votes (voter_player_id, target_player_id, vote_date),
+  KEY idx_popularity_votes_target (target_player_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어 인기도 투표(4.34)';
+
 CREATE TABLE skills (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '스킬 ID',
   code             VARCHAR(30) NOT NULL COMMENT '스킬 코드(유일). 동작은 코드(Room.SKILLS)가, 이름·설명(번역)은 프론트엔드 번역 파일(skills.<코드>_name·_desc)이 이 코드로 찾는다: dash, shockwave, hook, shield, stealth …',
@@ -151,6 +164,7 @@ CREATE TABLE players (
   defeat_count        BIGINT NOT NULL DEFAULT 0 COMMENT '패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 칭호용, 4.31)',
   orb_count           BIGINT NOT NULL DEFAULT 0 COMMENT '? 구슬을 먹은 횟수(꽝 포함, 칭호용)',
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
+  popularity          BIGINT NOT NULL DEFAULT 0 COMMENT '인기도(다른 플레이어가 하루 한 번 올리면 +1, 내리면 -1, 음수 가능, 4.34)',
   active_days         BIGINT NOT NULL DEFAULT 0 COMMENT '플레이한 날의 수(만든 날·키워드를 얻은 날, 나라 시간대 기준, 칭호용)',
   last_played_at      DATETIME(6) NULL COMMENT '마지막 플레이 시각(만들기·키워드 얻기). active_days를 하루에 한 번만 세는 기준',
   last_seen_at        DATETIME(6) NULL COMMENT '마지막으로 방에 접속해 있던 시각(1분 단위). 관리자 통계의 7일·30일 활동 인원과 사용자 관리(13.9, 13.10)',
@@ -515,13 +529,14 @@ CREATE TABLE reports (
   id             BIGINT NOT NULL AUTO_INCREMENT COMMENT '신고 ID',
   player_id      BIGINT NOT NULL COMMENT '신고한 플레이어 ID(어느 나라에서 신고했는지 알 수 있다)',
   report_type_id BIGINT NOT NULL COMMENT '신고 대상 유형 ID',
+  report_date    DATE NOT NULL DEFAULT '2000-01-01' COMMENT '플레이어 신고는 신고한 날(신고한 사람 나라 시간대, 같은 대상 하루 한 번), 그 밖의 유형은 고정 값(대상마다 한 번)',
   target_id      BIGINT NOT NULL COMMENT '대상 ID(유형에 따라 keywords/comments/profiles/players/chat_messages의 ID, 외래 키 없음)',
   reason         VARCHAR(500) NULL COMMENT '신고 사유',
   status         VARCHAR(20) NOT NULL DEFAULT 'RECEIVED' COMMENT '상태(RECEIVED/RESOLVED/REJECTED)',
   created_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '신고 시각',
   updated_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_reports_once (report_type_id, target_id, player_id),
+  UNIQUE KEY uk_reports_daily (report_type_id, target_id, player_id, report_date),
   KEY idx_reports_status (status, created_at),
   CONSTRAINT fk_reports_player FOREIGN KEY (player_id) REFERENCES players (id),
   CONSTRAINT fk_reports_report_type FOREIGN KEY (report_type_id) REFERENCES report_types (id)

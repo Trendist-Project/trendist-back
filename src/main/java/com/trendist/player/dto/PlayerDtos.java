@@ -7,7 +7,8 @@ public final class PlayerDtos {
 
     public record PlayerSummary(long id, String nickname, String countryCode, long level, long exp, long nextLevelExp,
                                 long currentScore, long holdCount, long addCount, long commentScore, long searchCount,
-                                Instant nicknameChangeableAt, long stealCount, long botWinCount, long activeDays, long killCount, long defeatCount) {}
+                                Instant nicknameChangeableAt, long stealCount, long botWinCount, long activeDays, long killCount, long defeatCount,
+                                long popularity, Instant createdAt) {}
 
     /** 점수 추이의 점 하나(4.15). t는 그 칸의 시작(24시간은 정시, 나머지는 나라 현지 자정), live면 지금 값. */
     public record ScorePoint(Instant t, long score, boolean live) {}
@@ -22,8 +23,17 @@ public final class PlayerDtos {
      * 다른 플레이어 정보 팝업(4.11). 사용자 번호 대신 방 안에서만 쓰는 세션 엔티티 번호로 가리킨다(4.1).
      * title은 활성 칭호 이름(없으면 null), topKeywords는 보관함 중 점수 상위 3개.
      */
-    public record PlayerCard(int entityNo, String nickname, boolean admin, String title, long level, long score,
-                             long commentScore, java.util.List<KeywordTag> topKeywords) {}
+    public record PlayerCard(int entityNo, String nickname, String title, long level, long score,
+                             long commentScore, java.util.List<KeywordTag> topKeywords,
+                             long playerId, long popularity, int myVote, java.time.Instant createdAt, boolean me) {}
+
+    /** 플레이어 검색 결과 한 줄(4.34). myVote: 오늘 내가 준 표(+1, -1, 없으면 0) */
+    public record PlayerHit(long playerId, String nickname, long level, long score, long popularity, boolean me, int myVote) {}
+
+    /** 인기도 투표 결과 */
+    public record PopularityResult(long playerId, long popularity, int myVote) {}
+
+    public record PopularityRequest(int value) {}
 
     public record Me(long userId, boolean guest, PlayerSummary player) {}
 
