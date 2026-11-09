@@ -1180,17 +1180,17 @@ class ApiFlowTest {
     }
     @Test
     void gameInfoPublishesOrbOddsAndLevelRequirementsWithoutLogin() throws Exception {
-        // 4.17, 4.20: 가이드가 보여 주는 구슬 확률(기본 60/40)과 레벨별 필요 EXP는 운영 값(설정·levels)에서 바로 읽는다. level-exp는 그 레벨까지 모은 누적 EXP다
+        // 4.17, 4.20: 가이드가 보여 주는 구슬 확률(기본 60/40)과 레벨별 필요 EXP는 운영 값(설정·levels)에서 바로 읽는다. level-exp는 그 레벨로 올라갈 때 필요한 EXP다
         mvc.perform(get("/api/game-info/orb-odds"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gainPercent").value(60))
                 .andExpect(jsonPath("$.losePercent").value(40));
         mvc.perform(get("/api/game-info/level-exp").param("levels", "10,15,20,25,999,0"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$['10']").value(302))      // 2~10레벨에 필요한 EXP를 모두 더한 값
-                .andExpect(jsonPath("$['15']").value(1157))
-                .andExpect(jsonPath("$['20']").value(2787))
-                .andExpect(jsonPath("$['25']").value(5442))
+                .andExpect(jsonPath("$['10']").value(100))      // 그 레벨로 올라갈 때 필요한 EXP(레벨표 값 그대로)
+                .andExpect(jsonPath("$['15']").value(225))
+                .andExpect(jsonPath("$['20']").value(400))
+                .andExpect(jsonPath("$['25']").value(625))
                 .andExpect(jsonPath("$['999']").doesNotExist());
         mvc.perform(get("/api/game-info/levels"))                       // 모든 레벨의 필요 EXP
                 .andExpect(status().isOk())

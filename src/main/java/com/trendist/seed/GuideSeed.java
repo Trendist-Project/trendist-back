@@ -446,31 +446,51 @@ final class GuideSeed {
 
                     > Your level does not affect keyword score or circle size. It makes your turtle icon grow and unlocks customizing and skills."""),
             new Added("skills", "스킬 한눈에 보기", """
-                    레벨이 오르면 쓸 수 있는 **스킬**이 늘어나요. **⚡ 대시**는 처음부터 쓸 수 있는 기본 스킬이고, 나머지는 아래 레벨이 되어야 해요. 화면 아래 가운데 줄의 버튼을 누르거나 키보드 키로 써요.
+                    레벨이 오르면 쓸 수 있는 **스킬**이 늘어나요. **⚡ 대시**는 처음부터 쓸 수 있는 기본 스킬이고, 나머지는 아래 레벨이 되어야 해요. 화면 아래 가운데 줄의 버튼을 누르거나 키보드 키로 써요. 어떤 스킬을 어느 칸에 둘지는 **스킬창(K 키)**에서 골라요("스킬 장착하기" 글을 보세요).
 
                     [[스킬 해금 표]]
 
-                    - **필요 EXP**는 그 레벨이 되는 데 모아야 하는 **누적 경험치**예요. 경험치는 키워드를 **추가**할 때마다, 공격에 **성공**할 때마다, 상대를 **쓰러뜨릴** 때마다 쌓여요(기본값: 추가 1, 공격 성공 1, 처치 5).
+                    - **필요 EXP**는 그 레벨로 올라갈 때 모아야 하는 **경험치**예요("레벨별 필요 경험치" 표와 같은 값이고, 레벨이 오르면 0부터 다시 모아요). 경험치는 키워드를 **추가**할 때마다, 공격에 **성공**할 때마다, 상대를 **쓰러뜨릴** 때마다 쌓여요(기본값: 추가 1, 공격 성공 1, 처치 5).
                     - 위 표의 값(레벨, 필요 EXP, 키, 쿨타임)은 **지금 적용 중인 값**이에요. 운영 중에 바뀔 수 있어요.
                     - 아직 레벨이 모자란 스킬은 버튼에 **🔒와 필요한 레벨**이 보여요. 레벨이 되면 "스킬을 쓸 수 있어요!" 안내가 떠요.
                     - 스킬마다 **쿨타임**이 있어요. 쓰면 버튼에 남은 초가 보이고, 새로고침해도 쿨타임은 이어져요.
                     - PC는 버튼에 마우스를 올리면 설명과 쿨타임, 지금 쓸 수 있는지가 카드로 보여요.
-                    - 갈고리와 충격파는 **세이프존 안에서는 쓸 수 없어요.**
+                    - 공격 스킬인 **갈고리·충격파·독·암흑은 세이프존 안에서는 쓸 수 없어요.** 정화는 쓸 수 있어요.
+                    - 갈고리·충격파·독·암흑의 **사거리는 모두 내 원 가장자리에서 화면에 보이는 길이**가 기준이라, 원이 작아도 커도 화면에서 비슷한 길이로 나가요.
 
                     > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 스킬을 쓸 수 있게 하는 열쇠예요. 각 스킬이 내 화면과 상대 화면에서 어떻게 보이는지는 아래 글마다 움직이는 그림으로 볼 수 있어요.""",
                     "Skills at a glance", """
-                    As your level rises, you can use more **skills**. **⚡ Dash** is the default skill you have from the start; the others need the levels below. Use the buttons in the bottom center bar, or press the keys.
+                    As your level rises, you can use more **skills**. **⚡ Dash** is the default skill you have from the start; the others need the levels below. Use the buttons in the bottom center bar, or press the keys. Choose which skill goes in which slot in the **skill window (K key)** (see the "Equipping skills" article).
 
                     [[skill unlock table]]
 
-                    - **EXP needed** is the **total experience** you must collect to reach that level. You earn EXP each time you **add** a keyword, each time an attack **succeeds**, and each time you **take someone down** (defaults: add 1, successful attack 1, takedown 5).
+                    - **EXP needed** is the **experience** you must collect to move up to that level (the same value as in the "EXP needed per level" table; after each level-up you start again from 0). You earn EXP each time you **add** a keyword, each time an attack **succeeds**, and each time you **take someone down** (defaults: add 1, successful attack 1, takedown 5).
                     - The values in the table (level, EXP needed, key, cooldown) are the ones **in use right now**. They can change while the game runs.
                     - Skills you haven't unlocked yet show a **🔒 and the level you need** on the button. When you reach it, a "You can now use a skill!" notice appears.
                     - Each skill has a **cooldown**. After using one, the button shows the seconds left, and it carries over even if you refresh.
                     - On PC, hover a button to see its description, cooldown and whether it is ready.
-                    - Hook and Shockwave **can't be used inside safe zones.**
+                    - The attack skills, **Hook, Shockwave, Poison and Darkness, can't be used inside safe zones.** Cleanse can be used.
+                    - The **range of Hook, Shockwave, Poison and Darkness is measured as a length on your screen from your circle's edge**, so it looks about the same whether your circle is small or large.
 
                     > Your level does not affect keyword score or circle size. It is the key that unlocks skills. Each article below shows, with a moving picture, how the skill looks on your screen and on the other player's screen."""),
+            new Added("skills", "스킬 장착하기", """
+                    스킬은 **장착 칸 4개**에 끼운 것만 쓸 수 있어요(⚡ 대시는 늘 쓸 수 있어요). 칸은 처음부터 모두 열려 있고, 레벨이 돼서 풀린 스킬만 끼울 수 있어요. **K 키**나 아래 가운데 줄의 스킬창 버튼으로 **스킬창**을 열어요.
+
+                    - **칸에 넣기**: 오른쪽 목록에서 스킬을 누르면 칸들이 **노랗게 강조되어** 놓을 자리를 알려 줘요. 원하는 칸을 누르면 그 칸에 들어가고, 강조와 선택이 모두 사라져요. 고른 스킬이 이미 있던 칸을 다시 누르면 취소돼요.
+                    - **자리 바꾸기**: 장착한 칸을 누르면 그 칸을 뺀 나머지 칸이 노랗게 강조돼요. 다른 칸을 누르면 두 칸이 서로 바뀌고(빈 칸이면 옮겨져요) 강조가 사라져요. 처음 누른 칸을 다시 누르면 취소돼요. PC는 끌어 놓아도 돼요.
+                    - **[장착]·[해제] 버튼**: 스킬을 고르면 설명 옆에 버튼이 나와요. [장착]을 누르면 칸이 깜빡이고, 원하는 칸을 누르면 들어가요.
+                    - **[자동 장착]·[전체 해제]**: 풀린 스킬을 해금 순서대로 채우거나 모두 비워요. 한 번도 고른 적이 없으면 풀린 스킬이 순서대로 자동으로 채워져요.
+                    - **키 바꾸기**: 칸 아래의 키 모양 버튼을 누르고 원하는 키를 누르면 바뀌어요. 키는 스킬이 아니라 **칸**에 묶여요(기본은 1~4번 키, 대시는 Space). 이미 쓰는 키는 쓸 수 없어요. [키 기본값으로]로 되돌려요.
+                    - 잠긴 스킬(🔒)은 레벨이 되어야 끼울 수 있어요.""",
+                    "Equipping skills", """
+                    You can only use skills you have put in one of the **4 equip slots** (⚡ Dash is always usable). All slots are open from the start, and you can only equip skills you have unlocked by level. Open the **skill window** with the **K key** or the skill-window button in the bottom center bar.
+
+                    - **Putting a skill in a slot**: Tap a skill in the list on the right and the slots are **highlighted in yellow** to show where it can go. Tap the slot you want and it goes in, and the highlight and selection both disappear. Tap the slot the chosen skill was already in to cancel.
+                    - **Swapping places**: Tap an equipped slot and all the other slots are highlighted in yellow. Tap another slot and the two swap (or the skill moves, if it was empty), and the highlight disappears. Tap the first slot again to cancel. On PC you can also drag and drop.
+                    - **[Equip] / [Unequip] button**: When you pick a skill, a button appears next to its description. Press [Equip], then the slots blink and you tap the one you want.
+                    - **[Auto equip] / [Clear all]**: Fill the slots with your unlocked skills in unlock order, or empty them all. If you have never chosen, your unlocked skills are filled in automatically in order.
+                    - **Changing keys**: Press the key-shaped button under a slot, then press the key you want. Keys belong to the **slot**, not the skill (defaults: keys 1–4, Dash is Space). A key already in use can't be taken. Press [Reset keys] to restore the defaults.
+                    - Locked skills (🔒) can only be equipped once you reach the level."""),
             new Added("skills", "⚡ 대시", """
                     움직이는 방향으로 **잠깐 평소의 2배 속도**로 달려요. 처음부터 쓸 수 있는 기본 스킬이고, 움직이는 중에만 쓸 수 있어요.
 
@@ -495,7 +515,7 @@ final class GuideSeed {
                     [[스킬 방패]]
 
                     - **언제 쓸까요**: 점수가 높은 큰 원이 바로 앞까지 다가왔을 때 빠져나가기, 키워드를 뺏기지 않고 지나가야 할 때 좋아요.
-                    - **내 화면**: 내 원에 점선 보호막과 남은 초가 떠요. 다가오는 원이 내 원을 그냥 통과해요.
+                    - **내 화면**: 내 원에 초록 점선 보호막과 남은 초가 떠요. 다가오는 원이 내 원을 그냥 통과해요.
                     - **상대 화면**: 방패를 쓴 원도 보호막이 보여요. 그 원에게는 밀리지도, 키워드를 잃지도 않지만 나도 그 원을 공격할 수 없어요.
                     - 보호막이 사라지면 다시 평소처럼 부딪혀요.""",
                     "🛡 Shield", """
@@ -504,7 +524,7 @@ final class GuideSeed {
                     [[skill shield]]
 
                     - **When to use it**: Slip away when a high-scoring big circle gets right in front of you, or when you must pass by without losing a keyword.
-                    - **Your screen**: A dashed shield ring and the seconds left appear on your circle. Circles coming at you simply pass through.
+                    - **Your screen**: A green dashed shield ring and the seconds left appear on your circle. Circles coming at you simply pass through.
                     - **The other player's screen**: A shielded circle also shows its ring. You are not pushed or robbed by it, but you can't attack it either.
                     - When the shield ends, collisions work as usual again."""),
             new Added("skills", "🪝 갈고리", """
@@ -512,7 +532,7 @@ final class GuideSeed {
 
                     [[스킬 갈고리]]
 
-                    - **겨누는 법**: PC는 마우스가 있는 쪽, 모바일은 조이스틱을 누른 방향(없으면 가던 방향)으로 나가요. 사거리는 내 원 반지름의 5배쯤이고, 범위는 점선으로 먼저 보여요.
+                    - **겨누는 법**: PC는 마우스가 있는 쪽, 모바일은 조이스틱을 누른 방향(없으면 가던 방향)으로 나가요. 사거리는 내 원 가장자리에서 화면 기준 약 300px(설정값)쯤이라 원이 작아도 커도 비슷하게 보이고, 범위는 점선으로 먼저 보여요.
                     - **내 화면**: 갈고리 줄이 뻗어 나가 맞은 원을 붙잡고 끌어당겨요. 끌려온 원과는 바로 부딪혀 평소 규칙대로 가려져요.
                     - **상대 화면**: 빨간 점선과 줄이 날아오는 게 보여요. 맞으면 **키워드 1개를 잃고**, 끌려오는 동안에는 움직이거나 스킬을 쓸 수 없고 다른 원과도 부딪히지 않아요. 옆으로 움직이면 피할 수 있어요.
                     - 끌려온 뒤에는 쓴 사람과 반드시 부딪혀요. 점수가 낮은 쪽이 키워드를 하나 더 잃을 수 있으니, 점수가 높은 상대에게는 조심하세요.""",
@@ -521,7 +541,7 @@ final class GuideSeed {
 
                     [[skill hook]]
 
-                    - **Aiming**: Toward the mouse on PC; on mobile toward the direction you hold on the joystick (or the direction you were heading). The range is about 5 circle radii, shown first as a dotted line.
+                    - **Aiming**: Toward the mouse on PC; on mobile toward the direction you hold on the joystick (or the direction you were heading). The range is about 300 px on screen from your circle's edge (a setting), so it looks about the same whether your circle is small or large, and it is shown first as a dotted line.
                     - **Your screen**: The hook line shoots out, catches the circle and pulls it in. The pulled circle collides with you right away and is settled by the normal rules.
                     - **The other player's screen**: You see a red dotted line and the rope flying at you. If hit you **lose one keyword**, and while being pulled you can't move, use skills, or touch other circles. Move sideways to dodge.
                     - After being pulled you always collide with the user. The lower-scoring side can lose one more keyword, so be careful against higher-scoring players."""),
@@ -533,6 +553,7 @@ final class GuideSeed {
                     - **언제 쓸까요**: 여러 원에게 둘러싸였을 때 거리를 벌리거나, 가까이 붙은 상대를 떼어 낼 때 좋아요.
                     - **내 화면**: 내 원에서 고리가 퍼져 나가요. 고리의 바깥 점선이 닿는 범위예요. 닿은 원은 바깥으로 밀려나요.
                     - **상대 화면**: 퍼지는 빨간 고리에 닿으면 바깥으로 밀려나요. 키워드를 잃지는 않아요. 고리가 닿기 전에 범위 밖으로 움직이면 피할 수 있어요.
+                    - **모양과 범위**: 고리는 일정한 간격으로 지그재그인 물결 모양으로 퍼져요. 퍼지는 거리는 내 원 가장자리에서 화면 기준 약 300px(설정값)라서 가장 작은 원도 충분히 멀리 닿아요.
                     - 세이프존 안의 원이나 방패·무적 중인 원은 밀리지 않아요.""",
                     "💥 Shockwave", """
                     **Send a shockwave out around your circle that pushes touched circles outward.** They do not lose keywords. See the table above for the unlock level. **It can't be used inside safe zones.**
@@ -542,9 +563,10 @@ final class GuideSeed {
                     - **When to use it**: Open some distance when surrounded by several circles, or shake off someone stuck to you.
                     - **Your screen**: A ring spreads out from your circle. The dotted outer line shows the reach. Circles it touches are pushed outward.
                     - **The other player's screen**: If the red spreading ring touches you, you are pushed outward. You don't lose keywords. Move out of its range before it reaches you to dodge.
+                    - **Shape and range**: The ring spreads out as a zigzag wave at even intervals. It reaches about 300 px on screen from your circle's edge (a setting), so even the smallest circle reaches far enough.
                     - Circles in safe zones, or shielded or invulnerable circles, are not pushed."""),
             new Added("skills", "👻 은신", """
-                    **잠깐 다른 사람 눈에 배경처럼 안 보여요.** 해금 레벨은 위 표를 보세요. 공격 스킬(갈고리, 충격파)을 쓰면 풀려요.
+                    **잠깐 다른 사람 눈에 배경처럼 안 보여요.** 해금 레벨은 위 표를 보세요. 공격 스킬(갈고리, 충격파, 독, 암흑)을 쓰면 풀려요.
 
                     [[스킬 은신]]
 
@@ -553,7 +575,7 @@ final class GuideSeed {
                     - **상대 화면**: 은신한 원은 서서히 사라져 이름, 테두리, 효과까지 배경과 똑같아 보여요(미니맵에서도 빠져요). 대신 **가까이 오면 내 원 위에 빨간 !**가 떠서 조심하라고 알려 줘요.
                     - 눈에 안 보일 뿐 몸은 그대로라서, 부딪히면 평소처럼 밀리고 키워드를 잃을 수 있어요. 세이프존 안에서는 ! 경고가 뜨지 않아요.""",
                     "👻 Stealth", """
-                    **Briefly blend into the background for other players.** See the table above for the unlock level. Using an attack skill (Hook, Shockwave) ends it.
+                    **Briefly blend into the background for other players.** See the table above for the unlock level. Using an attack skill (Hook, Shockwave, Poison, Darkness) ends it.
 
                     [[skill stealth]]
 
@@ -561,6 +583,78 @@ final class GuideSeed {
                     - **Your screen**: Your circle looks faint, with a dashed ring and the seconds left. It fades gradually and the rings gather in as you vanish.
                     - **The other player's screen**: A stealthed circle gradually disappears, name, border and effects included, and looks just like the background (it also drops off the minimap). But **when it comes near, a red ! appears above your circle** to warn you.
                     - You are only unseen: your body is still there, so a collision pushes you as usual and you can lose keywords. The ! warning doesn't appear while you stand in a safe zone.""")
+            ,new Added("skills", "🕶️ 암흑", """
+                    겨눈 방향으로 **검은 투사체를 던져요.** 맞은 원은 **3초 동안 자기 원 둘레만 보이고** 나머지 맵이 어두워져요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 암흑]]
+
+                    - **겨누는 법**: 갈고리와 같아요. PC는 마우스가 있는 쪽, 모바일은 조이스틱을 누른 방향(없으면 가던 방향)으로 나가요. 투사체는 갈고리가 뻗는 것만큼 빠르게 날아가고, 사거리는 내 원 가장자리에서 화면 기준 약 600px(설정값)예요.
+                    - **언제 쓸까요**: 도망치는 상대나 구슬·키워드를 노리는 상대의 시야를 가리고 싶을 때 좋아요.
+                    - **내 화면**: 맞으면 상대 원에 어두운 안개와 🕶️, 줄어드는 남은 시간 링이 떠요.
+                    - **상대 화면(맞은 사람)**: 3초 동안 내 원 중심에서 반지름 1.5배 안과 내 닉네임만 보이고, 나머지는 어두워지고 미니맵도 사라져요. 투사체는 옆으로 움직이면 피할 수 있어요.
+                    - **모두에게 보여요**: 암흑에 걸린 원은 사람이든 **봇이든** 안개와 🕶️, 남은 시간 링이 보여서 누가 앞을 못 보는지 알 수 있어요. 봇도 맞으면 3초 동안 같은 범위만 볼 수 있어서 도망·추격·구슬 찾기가 그 안으로 제한돼요.
+                    - **✨ 정화**를 쓰면 바로 풀려요. 세이프존 안의 원이나 방패·무적 중인 원은 투사체가 통과해요.""",
+                    "🕶️ Darkness", """
+                    **Throw a dark bolt** toward your aim. The circle it hits **can only see around its own circle for 3 seconds** and the rest of the map goes dark. See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill darkness]]
+
+                    - **Aiming**: Same as Hook. Toward the mouse on PC; on mobile toward the direction you hold on the joystick (or the direction you were heading). The bolt flies as fast as the hook shoots out, and its range is about 600 px on screen from your circle's edge (a setting).
+                    - **When to use it**: Blind someone running away, or someone after the same orbs and keywords.
+                    - **Your screen**: When it hits, the target circle shows dark fog, 🕶️ and a shrinking countdown ring.
+                    - **The other player's screen (the one hit)**: For 3 seconds you only see within 1.5 radii of your circle's center, plus your own nickname; the rest goes dark and the minimap disappears. Move sideways to dodge the bolt.
+                    - **Everyone can see it**: A darkened circle, player or **bot**, shows the fog, 🕶️ and countdown ring, so you can tell who can't see. Bots that get hit also only see that same range for 3 seconds, which limits their fleeing, chasing and orb hunting to it.
+                    - **✨ Cleanse** removes it at once. The bolt passes through circles in safe zones and shielded or invulnerable circles.""")
+            ,new Added("skills", "☠️ 독", """
+                    겨눈 방향으로 **독 투사체를 던져요.** 맞은 원은 **9초 동안 3초마다 키워드를 잃어요**(총 3번). 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 독]]
+
+                    - **겨누는 법**: 암흑과 같은 투사체예요(속도와 사거리도 같아요).
+                    - **스택**: 독이 끝나기 전에 또 맞으면 **스택이 올라가고(최대 10)** 9초를 처음부터 다시 세요. 1스택은 틱마다 키워드 1개, 2스택은 틱마다 2개를 잃어요.
+                    - **내 화면**: 맞으면 상대 머리 위에 ☠ ×스택과 남은 초가 떠요. 독으로 잃은 키워드는 **빼앗지 못해요**(아무도 가져가지 않아요).
+                    - **상대 화면(맞은 사람)**: 3초마다 키워드를 잃어요. 잃는 키워드는 **무작위**예요. 한 번에 여러 개를 잃으면 결과 카드에 **"키워드 N개"로 개수만** 알려 주고, 어떤 키워드인지는 보여 주지 않아요. 독으로 잃으면 콤보와 불꽃이 끊겨요.
+                    - **✨ 정화**로 풀 수 있어요. 세이프존 안이거나 방패·무적 중이면 투사체가 통과하고, 키워드를 잃은 뒤 무적은 독을 막지 않아요.""",
+                    "☠️ Poison", """
+                    **Throw a poison bolt** toward your aim. The circle it hits **loses a keyword every 3 seconds for 9 seconds** (3 times in total). See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill poison]]
+
+                    - **Aiming**: The same bolt as Darkness (same speed and range).
+                    - **Stacks**: If you are hit again before the poison ends, the **stacks rise (up to 10)** and the 9 seconds start over. 1 stack loses 1 keyword per tick, 2 stacks lose 2 per tick.
+                    - **Your screen**: When it hits, ☠ ×stacks and the seconds left appear above the target. Keywords lost to poison **can't be stolen** (nobody takes them).
+                    - **The other player's screen (the one hit)**: You lose keywords every 3 seconds, and which ones is **random**. If you lose several at once, the result card only tells you **"N keywords"**, not which ones. Losing keywords to poison breaks your combo and flame.
+                    - **✨ Cleanse** removes it. The bolt passes through circles in safe zones and shielded or invulnerable circles, and the invulnerability after losing a keyword does not block poison.""")
+            ,new Added("skills", "✨ 정화", """
+                    **걸려 있는 방해를 한꺼번에 풀어요.** 갈고리에 끌려오는 중이든, ☠️ 독이든, 🕶️ 암흑이든 모두 사라져요. 해금 레벨은 위 표를 보세요. 다른 공격 스킬과 달리 **세이프존 안에서도 쓸 수 있어요.**
+
+                    [[스킬 정화]]
+
+                    - **언제 쓸까요**: 독이 쌓이고 있을 때, 암흑으로 앞이 안 보일 때, 갈고리에 잡혀 끌려올 때 쓰면 바로 벗어나요. 끌려오는 중에도 쓸 수 있어요.
+                    - **내 화면**: 원을 감싼 하늘색 테두리가 팽팽하게 떨리다가 불규칙한 조각으로 끊어져 사방으로 흩어지며 떨어져요.
+                    - **상대 화면**: 같은 연출이 보여서 걸어 둔 방해가 풀렸다는 걸 알 수 있어요. 정화 뒤에 면역은 없어서 바로 다시 걸 수 있어요(기본값).
+                    - 정화는 상대를 건드리지 않아요. 키워드를 빼앗거나 잃게 하지 않고, 나를 지키는 데만 써요.""",
+                    "✨ Cleanse", """
+                    **Remove every effect on you at once.** Being pulled by a hook, ☠️ poison or 🕶️ darkness, all of it disappears. See the table above for the unlock level. Unlike the other attack skills, **it can be used inside safe zones.**
+
+                    [[skill cleanse]]
+
+                    - **When to use it**: When poison is stacking up, when darkness hides everything, or when a hook has caught you and is pulling you in, use it to get free at once. You can use it even while being pulled.
+                    - **Your screen**: The sky-blue outline around your circle shakes taut, then breaks into irregular pieces that scatter and fall away.
+                    - **The other player's screen**: You see the same effect, so you can tell the effects you applied are gone. There is no immunity afterward, so you can apply them again right away (default).
+                    - Cleanse doesn't touch anyone else. It doesn't steal or make anyone lose keywords; it is only for protecting yourself.""")
+            ,new Added("score-and-size", "유행도가 같으면? (도토리 키재기)", """
+                    두 원의 **현재 유행도가 같으면** 부딪혀도 아무도 키워드를 잃지 않고 서로 밀려나요. 이런 박빙의 부딪힘을 **10번** 하면 **"도토리 키재기"** 칭호를 받아요.
+
+                    - 같은 상대와 연달아 부딪혀도 **1초에 한 번**만 세요.
+                    - 상대가 봇이어도 유행도가 같으면 세요.
+                    - 얼마나 모았는지는 **내 정보 → 🏅 칭호**의 진행 막대에서 볼 수 있어요.""",
+                    "When trend scores are equal (Acorn Contest)", """
+                    If two circles have the **same current trend score**, nobody loses a keyword when they collide; they just bounce apart. Do this kind of neck-and-neck bump **10 times** and you earn the **"Acorn Contest"** title.
+
+                    - Bumping into the same opponent again and again only counts **once per second**.
+                    - It also counts when the opponent is a bot with the same trend score.
+                    - You can see your progress in the bar under **My info → 🏅 Titles**.""")
             ,new Added("score-and-size", "죽음과 리스폰", """
                     **키워드가 하나도 없는 채로 충돌에서 지면** 죽어요. 키워드가 있으면 하나를 잃을 뿐이에요.
 

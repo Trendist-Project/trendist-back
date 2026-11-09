@@ -271,7 +271,28 @@ public class DataSeeder implements ApplicationRunner {
             guides.save(g);
             added++;
         }
-        return added;
+        return added + applyAddedGuideFixes();
+    }
+
+    /**
+     * 나중에 더한 글(GuideSeed.ADDED) 고치기(GuideSeedOld.FIXES): DB의 본문이 그 글의 예전 시드 그대로일 때만 새 본문(영어 포함)으로 바꾼다.
+     * 관리자가 이미 고친 글은 건드리지 않는다. 새 글은 위에서 같은 제목이 없을 때 이미 넣었다.
+     */
+    private int applyAddedGuideFixes() {
+        int n = 0;
+        for (GuideSeed.Fix fix : GuideSeedOld.FIXES) {
+            GuideSeed.Added fresh = GuideSeed.ADDED.stream()
+                    .filter(a -> a.categoryCode().equals(fix.categoryCode()) && a.title().equals(fix.title())).findFirst().orElse(null);
+            GuideCategory category = guideCategories.findByCodeAndEnabledTrue(fix.categoryCode()).orElse(null);
+            if (fresh == null || category == null) continue;
+            for (com.trendist.guide.entity.Guide g : guides.findByGuideCategoryId(category.getId())) {
+                if (!g.getTitle().equals(fix.title()) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
+                g.changeBody(fresh.body());
+                g.changeEnglish(g.getTitleEn(), fresh.bodyEn());
+                n++;
+            }
+        }
+        return n;
     }
 
     private int insertGuideArticles() {

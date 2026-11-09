@@ -40,15 +40,15 @@ public class GameInfoController {
         return levels.all().stream().map(l -> new LevelExp((int) l.getLevel(), l.getRequiredExp())).toList();
     }
 
-    /** 레벨별로 그 레벨이 되는 데 모아야 하는 EXP 전체(1~그 레벨의 합, 누적). levels=10,15,20 처럼 최대 30개, 1~100만 */
+    /** 레벨별로 그 레벨로 올라갈 때 필요한 EXP(levels 표의 값 그대로, 누적 아님). levels=10,15,20 처럼 최대 30개, 1~100만 */
     @GetMapping("/level-exp")
     public Map<Integer, Long> levelExp(@RequestParam("levels") java.util.List<Integer> wanted) {
         Map<Integer, Long> out = new LinkedHashMap<>();
         for (Integer lv : wanted.stream().distinct().limit(30).toList()) {
             if (lv == null || lv < 1 || lv > 100) continue;
             try {
-                levels.row(lv); // 표에 있는 레벨만
-                out.put(lv, levels.cumulative(lv));
+                Level row = levels.row(lv);
+                out.put(lv, row.getRequiredExp());
             } catch (RuntimeException e) { /* 표에 없는 레벨은 뺀다 */ }
         }
         return out;
