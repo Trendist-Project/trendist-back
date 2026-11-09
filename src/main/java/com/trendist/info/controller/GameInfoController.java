@@ -34,21 +34,21 @@ public class GameInfoController {
 
     public record LevelExp(int level, long requiredExp) {}
 
-    /** 모든 레벨(1~100)의 필요 누적 EXP. 가이드의 "레벨별 필요 경험치" 표가 쓴다(levels 표, 1분 캐시) */
+    /** 모든 레벨(1~100)의 필요 EXP(앞 레벨에서 올라올 때 모아야 하는 양). 가이드의 "레벨별 필요 경험치" 표가 쓴다(levels 표, 1분 캐시) */
     @GetMapping("/levels")
     public java.util.List<LevelExp> allLevels() {
         return levels.all().stream().map(l -> new LevelExp((int) l.getLevel(), l.getRequiredExp())).toList();
     }
 
-    /** 레벨별로 그 레벨이 되는 데 필요한 누적 EXP(levels 표). levels=10,15,20 처럼 최대 30개, 1~100만 */
+    /** 레벨별로 그 레벨이 되는 데 모아야 하는 EXP 전체(1~그 레벨의 합, 누적). levels=10,15,20 처럼 최대 30개, 1~100만 */
     @GetMapping("/level-exp")
     public Map<Integer, Long> levelExp(@RequestParam("levels") java.util.List<Integer> wanted) {
         Map<Integer, Long> out = new LinkedHashMap<>();
         for (Integer lv : wanted.stream().distinct().limit(30).toList()) {
             if (lv == null || lv < 1 || lv > 100) continue;
             try {
-                Level row = levels.row(lv);
-                out.put(lv, row.getRequiredExp());
+                levels.row(lv); // 표에 있는 레벨만
+                out.put(lv, levels.cumulative(lv));
             } catch (RuntimeException e) { /* 표에 없는 레벨은 뺀다 */ }
         }
         return out;

@@ -55,6 +55,9 @@ public interface PlayerService {
     /** 행을 이미 잠근 트랜잭션 안에서: 공격 성공 1회(빼앗은 횟수 +1, EXP `attack_exp`)를 반영하고 점수·레벨을 다시 정한다(4.3). */
     void awardAttack(Player p);
 
+    /** 현재 유행도가 같은 원과 부딪혔다(4.3): 횟수 +1 하고 칭호를 확인한다. 행을 잠그지 않는다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    void recordTie(long playerId);
+
     /** 패배했다(키워드가 없는 채로 져서 죽음, 4.31): 패배 횟수 +1 하고 칭호를 확인한다. 행을 잠그지 않는다. 방(틱) 밖의 작업 스레드에서 부른다. */
     void recordDefeat(long playerId);
 

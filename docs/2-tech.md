@@ -363,7 +363,7 @@ WHERE p.id IN (/* 500명 */)
 | | `player_skill_slots` | 스킬 장착(4.33, V29): 플레이어 × 칸(`actions` 중 종류가 `SKILL_SLOT`인 동작)에 끼운 스킬(`skill_id`, `skills.id` 외래 키). 칸 수는 그 동작의 수라서 칸을 늘리려면 `actions`에 행만 더하면 되고, 단축키 칸과 장착 칸이 한 목록을 따른다. `skill_id`가 NULL이면 일부러 비운 칸이고, 플레이어의 행이 하나도 없으면 아직 고른 적 없어서 해금된 스킬이 해금 순서대로 채워진다. 이전의 `players.skill_slots`(V27, 배포된 적 없음)는 V29에서 지웠다 |
 | | `titles`, `player_titles` | 칭호 목록(영어 이름·설명 `name_en`·`description_en`, 비어 있을 수 있음)과 플레이어별 보유 칭호 |
 | | `effect_types`, `effects` | 효과 종류(TRAIL 이동 효과 4.23 / BORDER 테두리 효과 4.9, 영어 이름 `name_en`)와 원을 꾸미는 효과 목록·얻는 조건. 쓰는 효과는 꾸미기 프로필의 `trail_effect_id`·`border_effect_id` |
-| | `levels` | 레벨별 필요 누적 EXP(1~100레벨, 관리자 편집기 없이 DB로 수정) |
+| | `levels` | 레벨별 필요 EXP(그 레벨이 되는 데 앞 레벨에서 모아야 하는 양, 누적 아님, 1~100레벨, 관리자 편집기 없이 DB로 수정) |
 | | `refresh_tokens` | 계정 로그인 세션(갱신 토큰 해시, 만료·폐기) |
 | 키워드 | `countries` | 나라 설정(시간대, 오픈 여부, 방 상한) |
 | | `keyword_states` | 키워드 상태(활성 / 비활성 / 금지) |
@@ -415,7 +415,7 @@ WHERE p.id IN (/* 500명 */)
 | `countries` | KR·GLOBAL(오픈), JP·IN·CN(닫힘), 시간대·기본 언어·방 상한. 이미 있는 DB는 기본값이 바뀌지 않으므로 GLOBAL을 열려면 `UPDATE countries SET enabled = true WHERE code = 'GLOBAL';`을 직접 실행한다 |
 | `settings` | 13.3의 기본값과 허용 범위 |
 | `data_sources` | google 1, admin 1, internal 1 (10.3) |
-| `levels` | 1~100레벨 필요 누적 EXP (4.9의 곡선으로 계산) |
+| `levels` | 1~100레벨 필요 EXP (4.9의 곡선 값 그대로, 레벨마다 0부터 모으는 양) |
 | `user_states`, `keyword_states` | 정상 / 탈퇴, 활성 / 비활성 / 금지 |
 | `titles` | 4.10의 51개를 번호 순서대로(테이블이 비어 있을 때만), 처치 횟수 칭호 5개와 패배 횟수 칭호 5개(4.31)는 `kill_count`·`defeat_count` 칭호가 하나도 없을 때 각각 한 번 더 넣는다. 표시 순서는 종류별(`sort_order`). 영어 칸은 위 `EnglishBackfill`이 채운다 |
 | `effect_types`, `effects` | 효과 종류 TRAIL(이동 효과)·BORDER(테두리 효과), 이동 효과 16개(4.23)와 테두리 효과 5개(4.9), 모두 FREE. 코드에 있는데 DB에 없는 것만 넣는다 |

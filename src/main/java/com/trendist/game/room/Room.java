@@ -59,6 +59,8 @@ public class Room {
         default void requestKill(Room room, Member killer) {}
         /** 사람(attacker)이 공격에 성공했다(봇의 키워드를 불꽃으로 모두 잃게 한 경우 등). 빼앗은 횟수를 +1 하고 칭호를 확인한다(4.3). */
         default void requestSteal(Room room, Member attacker) {}
+        /** 사람(member)이 현재 유행도가 같은 원과 부딪혔다(승패가 없는 충돌). 횟수를 올리고 칭호를 확인한다(4.3). 봇은 부르지 않는다. */
+        default void requestTie(Room room, Member member) {}
         /** 사람(loser)이 키워드가 없는 채로 져서 죽었다(패배). 패배 횟수를 올리고 칭호를 확인한다(4.31). 봇은 부르지 않는다. */
         default void requestDefeat(Room room, Member loser) {}
         /** 사람(winner)의 연속 빼앗기 콤보가 최고 기록(이 접속에서 보낸 값)을 넘었다. 저장된 최고 콤보보다 높으면 올리고 칭호를 확인한다(4.25). 봇은 부르지 않는다. */
@@ -108,14 +110,15 @@ public class Room {
     }
 
     /**
-     * 스킬 설정(4.33). 충격파(속도는 최대 속도의 배수, 범위는 쓴 순간 반지름의 배수, 맞은 원은 knockback 세기로 밀려남),
-     * 갈고리(사거리는 반지름의 배수, seconds 동안 날아가고 맞은 원은 pullSeconds 동안 끌려온다), 방패·은신(지속 시간),
+     * 스킬 설정(4.33). 충격파(속도는 최대 속도의 배수, 범위는 쓴 순간 원 가장자리에서 화면 기준 px, 맞은 원은 knockback 세기로 밀려남),
+     * 갈고리(사거리는 원 가장자리에서 화면 기준 px, seconds 동안 날아가고 맞은 원은 pullSeconds 동안 끌려온다), 방패·은신(지속 시간),
+     * 독·암흑 투사체 사거리(boltReachPx, 갈고리와 같은 화면 기준 px),
      * 쿨타임은 모두 쓴 때부터 센다. 테스트하며 조절하도록 모두 설정이다.
      */
-    public record SkillTuning(double shockSpeedMult, double shockRangeRatio, double shockKnockback, double shockCooldown,
-                              double hookRangeRatio, double hookSeconds, double hookPullSeconds, double hookCooldown,
-                              double shieldSeconds, double shieldCooldown, double stealthSeconds, double stealthCooldown) {
-        public static final SkillTuning DEFAULT = new SkillTuning(4, 5, 1.5, 30, 5, 0.15, 0.3, 30, 3, 30, 5, 30);
+    public record SkillTuning(double shockSpeedMult, double shockReachPx, double shockKnockback, double shockCooldown,
+                              double hookReachPx, double hookSeconds, double hookPullSeconds, double hookCooldown,
+                              double shieldSeconds, double shieldCooldown, double stealthSeconds, double stealthCooldown, double boltReachPx) {
+        public static final SkillTuning DEFAULT = new SkillTuning(4, 300, 1.5, 30, 300, 0.15, 0.3, 30, 3, 30, 5, 30, 600);
     }
 
     /** 스킬 코드(4.33). 클라이언트는 이 코드로 쓴다 */
@@ -123,8 +126,7 @@ public class Room {
     public static final int DEFAULT_SKILL_SLOTS = 4;
     public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse");
 
-    /** 투사체 스킬(독·암흑, 4.33): 속도는 기본 최대 속도의 배수, 사거리(px), 맞는 반지름(px) */
-    static final double BOLT_SPEED_MULT = 3, BOLT_RANGE = 1200;
+    /** 투사체 스킬(독·암흑, 4.33): 화면에서 보이는 속도는 갈고리가 뻗는 속도(hookReachPx ÷ hookSeconds)와 같고, 사거리는 SkillTuning.boltReachPx다(둘 다 reachWorld로 월드 길이로 바꾼다) */
     /** 투사체 반지름 = 쓴 원 반지름 × BOLT_RADIUS_RATIO(최소 BOLT_MIN_RADIUS px). 판정과 화면 그림이 같은 값을 쓴다 */
     static final double BOLT_RADIUS_RATIO = 0.3, BOLT_MIN_RADIUS = 10;
     /** 독: 맞으면 POISON_TICKS번, POISON_TICK_SECONDS마다 스택 수만큼 키워드를 잃는다(9초). 다시 맞으면 스택이 올라가고 처음부터 다시 센다. 스택 상한은 POISON_MAX_STACKS */
@@ -132,6 +134,8 @@ public class Room {
     static final double POISON_TICK_SECONDS = 3;
     /** 암흑: 맞은 사람의 화면이 이 시간 동안 어두워진다 */
     static final double DARK_SECONDS = 3;
+    /** 암흑에 걸린 사람의 화면은 자기 원 중심에서 반지름의 이 배수 안만 보인다(클라이언트 `drawDarkness`). 봇의 시야도 같다 */
+    static final double DARK_SIGHT_RATIO = 1.5;
     /** 정화를 쓴 뒤 새 CC(갈고리·독·암흑·충격파)에 걸리지 않는 시간(초). 0이면 면역 없음 */
     static final double CLEANSE_IMMUNE_SECONDS = 0;
 
@@ -1146,9 +1150,25 @@ public class Room {
                     } else if (loser.protectUntil <= clockSeconds) {
                         die(loser, winner); // 잃을 키워드가 없는 채로 지면 죽는다(사람·봇, 4.31)
                     }
+                } else {
+                    tieCollision(a, b, key); // 유행도가 같으면 누구도 잃지 않는다. 사람의 "같은 유행도와 부딪힌 횟수"만 센다(4.3)
                 }
             }
         }
+    }
+
+    /** 같은 두 원은 이 시간(초) 안에 다시 부딪혀도 한 번만 센다(겹친 채 붙어 있거나 곧바로 다시 닿아 몇 번씩 세지 않게) */
+    static final double TIE_COUNT_COOLDOWN = 1.0;
+    private final Map<Long, Double> tieAt = new HashMap<>();
+
+    /** 현재 유행도가 같은 두 원이 부딪혔다: 사람인 쪽마다 횟수를 센다(칭호 "도토리 키재기"). 같은 짝은 TIE_COUNT_COOLDOWN초에 한 번만 센다. */
+    private void tieCollision(Member a, Member b, long pairKey) {
+        Double last = tieAt.get(pairKey);
+        if (last != null && clockSeconds - last < TIE_COUNT_COOLDOWN) return;
+        tieAt.put(pairKey, clockSeconds);
+        if (tieAt.size() > 512) tieAt.values().removeIf(t -> clockSeconds - t >= TIE_COUNT_COOLDOWN); // 오래된 짝은 지운다
+        if (!a.bot) outbox.requestTie(this, a);
+        if (!b.bot) outbox.requestTie(this, b);
     }
 
     /**
@@ -1289,11 +1309,19 @@ public class Room {
     // ---- 독·암흑·정화(4.33)
 
     private static final class Bolt {
-        final int id; final Member owner; final String kind; double x, y, left; final double dx, dy, speed, radius;
-        Bolt(int id, Member owner, String kind, double x, double y, double dx, double dy, double speed, double radius) { this.speed = speed; this.radius = radius; this.id = id; this.owner = owner; this.kind = kind; this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.left = BOLT_RANGE; }
+        final int id; final Member owner; final String kind; double x, y, left; final double dx, dy, speed, radius, range;
+        Bolt(int id, Member owner, String kind, double x, double y, double dx, double dy, double speed, double radius, double range) { this.speed = speed; this.radius = radius; this.range = range; this.id = id; this.owner = owner; this.kind = kind; this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.left = range; }
     }
     private final List<Bolt> bolts = new ArrayList<>();
     private int nextBoltId = 1;
+
+    /**
+     * 화면에서 보이는 길이(px)를 이 원 크기의 월드 길이로 바꾼다. 클라이언트 줌(`1 / (1 + (r − 최소 반지름) / zoom_factor)`)의 역수를 곱하므로
+     * 갈고리·투사체가 원 크기와 상관없이 화면에서 같은 길이로 보인다(작은 화면의 줌 상한 등으로 실제 화면은 조금 다를 수 있다).
+     */
+    double reachWorld(double screenPx, double radius) {
+        return screenPx * (1 + Math.max(0, radius - tuning.minRadius()) / Math.max(1, tuning.zoomFactor()));
+    }
 
     /** 지금 날아가는 투사체 수(테스트용) */
     int boltCount() { return bolts.size(); }
@@ -1304,12 +1332,12 @@ public class Room {
         if (!Double.isFinite(len) || len < 1e-6) { dx = m.vx; dy = m.vy; len = Math.hypot(dx, dy); }
         if (len < 1e-6) { dx = 0; dy = -1; len = 1; }
         dx /= len; dy /= len;
-        Bolt b = new Bolt(nextBoltId++, m, kind, m.x + dx * m.displayRadius, m.y + dy * m.displayRadius, dx, dy, tuning.maxSpeed() * BOLT_SPEED_MULT, Math.max(BOLT_MIN_RADIUS, m.displayRadius * BOLT_RADIUS_RATIO));
+        Bolt b = new Bolt(nextBoltId++, m, kind, m.x + dx * m.displayRadius, m.y + dy * m.displayRadius, dx, dy, reachWorld(skillTuning.hookReachPx() / Math.max(0.05, skillTuning.hookSeconds()), m.displayRadius), Math.max(BOLT_MIN_RADIUS, m.displayRadius * BOLT_RADIUS_RATIO), reachWorld(skillTuning.boltReachPx(), m.displayRadius));
         bolts.add(b);
         breakStealth(m);
         Map<String, Object> fx = new HashMap<>();
         fx.put("type", "skillFx"); fx.put("id", "bolt"); fx.put("kind", kind); fx.put("bid", b.id); fx.put("e", m.entityNo);
-        fx.put("x", b.x); fx.put("y", b.y); fx.put("dx", dx); fx.put("dy", dy); fx.put("speed", b.speed); fx.put("radius", b.radius); fx.put("range", BOLT_RANGE);
+        fx.put("x", b.x); fx.put("y", b.y); fx.put("dx", dx); fx.put("dy", dy); fx.put("speed", b.speed); fx.put("radius", b.radius); fx.put("range", b.range);
         broadcast(fx);
     }
 
@@ -1378,10 +1406,15 @@ public class Room {
         broadcast(Map.of("type", "skillFx", "id", "poisonEnd", "t", m.entityNo));
     }
 
-    /** 암흑: 맞은 사람의 화면이 DARK_SECONDS 동안 자기 원 둘레만 보이게 어두워진다(그리는 것은 클라이언트). 봇은 영향이 없다. */
+    /**
+     * 암흑: 맞은 사람의 화면이 DARK_SECONDS 동안 자기 원 둘레만 보이게 어두워진다(그리는 것은 클라이언트). 봇도 맞으면 같은 시간 동안
+     * 자기 원 중심에서 반지름 DARK_SIGHT_RATIO배 안에 있는 원·구슬만 볼 수 있다(thinkBots). 걸린 원은 사람·봇 모두 다른 사람에게 표시된다.
+     */
     private void applyDarkness(Member t) {
         t.darkUntil = clockSeconds + DARK_SECONDS;
         if (!t.bot) outbox.sendText(t, Map.of("type", "dark", "ms", Math.round(DARK_SECONDS * 1000)));
+        // 다른 사람도 누가 암흑에 걸렸는지 알 수 있게 모두에게 알린다(독과 같다). 풀리면(정화) cleanse 신호로 지운다
+        broadcast(Map.of("type", "skillFx", "id", "darkness", "t", t.entityNo, "ms", Math.round(DARK_SECONDS * 1000)));
     }
 
     /** 정화: 걸려 있는 CC(갈고리에 끌려오는 중, 독, 암흑)를 한꺼번에 풀고, CLEANSE_IMMUNE_SECONDS 동안 새 CC를 막는다(기본 0 = 면역 없음). */
@@ -1409,7 +1442,7 @@ public class Room {
 
     /** 충격파: 쓴 자리에서 쓴 순간의 내 원 크기로 시작해 speed로 퍼진다. 화면에는 skillFx로 그리고, 맞는 것은 updateShocks가 본다. */
     private void castShockwave(Member m, SkillTuning s) {
-        double r0 = m.displayRadius, rMax = r0 * Math.max(1, s.shockRangeRatio()), speed = tuning.maxSpeed() * s.shockSpeedMult();
+        double r0 = m.displayRadius, rMax = r0 + reachWorld(Math.max(1, s.shockReachPx()), r0), speed = reachWorld(tuning.maxSpeed() * s.shockSpeedMult(), r0); // 범위·속도 모두 화면 기준(줌의 역수)
         shocks.add(new Shock(m, m.x, m.y, r0, rMax, speed, clockSeconds, new HashSet<>()));
         breakStealth(m);
         broadcast(Map.of("type", "skillFx", "id", "shockwave", "e", m.entityNo, "x", m.x, "y", m.y, "r0", r0, "rMax", rMax, "speed", speed));
@@ -1432,12 +1465,12 @@ public class Room {
         }
     }
 
-    /** 갈고리: 내 원 중심에서 겨눈 방향으로 반지름의 hookRangeRatio배까지, hookSeconds에 걸쳐 뻗는다(논타겟). */
+    /** 갈고리: 내 원 중심에서 겨눈 방향으로 가장자리에서 화면 기준 hookReachPx만큼(월드 길이로 환산)까지, hookSeconds에 걸쳐 뻗는다(논타겟). */
     private void castHook(Member m, SkillTuning s, double ax, double ay) {
         double dx = ax - m.x, dy = ay - m.y, len = Math.hypot(dx, dy);
         if (!Double.isFinite(len) || len < 1e-6) { dx = m.vx; dy = m.vy; len = Math.hypot(dx, dy); } // 겨누지 않았으면 가던 방향
         if (len < 1e-6) { dx = 0; dy = -1; len = 1; }
-        double seconds = Math.max(0.05, s.hookSeconds()), range = m.displayRadius * Math.max(1, s.hookRangeRatio());
+        double seconds = Math.max(0.05, s.hookSeconds()), range = m.displayRadius + reachWorld(Math.max(1, s.hookReachPx()), m.displayRadius);
         hooks.add(new Hook(m, dx / len, dy / len, range, clockSeconds, seconds));
         breakStealth(m);
         broadcast(Map.of("type", "skillFx", "id", "hook", "e", m.entityNo, "dx", dx / len, "dy", dy / len, "range", range, "ms", Math.round(seconds * 1000)));
@@ -1683,12 +1716,14 @@ public class Room {
 
     public void setLevelForExp(java.util.function.LongToIntFunction f) { this.levelForExp = f; }
 
+    /** 모은 EXP 전체(누적)로 본 레벨: 레벨마다 필요한 EXP(시드 곡선)를 앞에서부터 차례로 쓴다. */
     static int defaultLevelForExp(long exp) {
         long[] low = {0, 0, 1, 3, 8, 13, 22, 33, 50, 72, 100};
         int level = 1;
+        long left = exp;
         for (int lv = 2; lv <= 100; lv++) {
             long need = lv <= 10 ? low[lv] : Math.round(100 * Math.pow(lv / 10.0, 2));
-            if (exp >= need) level = lv; else break;
+            if (left >= need) { left -= need; level = lv; } else break;
         }
         return level;
     }
@@ -1901,6 +1936,8 @@ public class Room {
             if (clockSeconds >= b.botNextPlusAt) botLife(b, tu);
             if (clockSeconds < b.botThinkAt) continue;
             b.botThinkAt = clockSeconds + b.botReact * (0.7 + rnd.nextDouble() * 0.6);
+            boolean dark = b.darkUntil > clockSeconds; // 암흑이면 자기 원 둘레만 보인다(사람과 같다)
+            double sight = b.displayRadius * DARK_SIGHT_RATIO;
             double fleeRange = b.botStyle == 0 ? 900 : 450, chaseRange = b.botStyle == 1 ? 1000 : 450, orbRange = b.botStyle == 2 ? 1600 : 700;
             Member threat = null, prey = null;
             double threatD = Double.MAX_VALUE, preyD = Double.MAX_VALUE;
@@ -1909,6 +1946,7 @@ public class Room {
             double look = Math.max(fleeRange, chaseRange) + b.displayRadius + grid.maxRadius;
             for (Member o : grid.membersNear(b.x, b.y, look)) {
                 if (o == b) continue;
+                if (dark && Math.hypot(o.x - b.x, o.y - b.y) > sight) continue; // 암흑: 시야 밖의 원은 보이지 않는다
                 double d = Math.hypot(o.x - b.x, o.y - b.y) - o.displayRadius - b.displayRadius;
                 // 세이프존 안의 원은 잡을 수 없고, 내가 세이프존 안이면 도망칠 필요가 없다(4.22)
                 if (!b.safe && !o.safe && o.score > b.score && d < fleeRange && d < threatD) { threat = o; threatD = d; }
@@ -1947,7 +1985,7 @@ public class Room {
                 b.botChaseFrom = 0;
             }
 
-            double[] orb = nearestFreeOrb(b, orbRange, claimed, grid);
+            double[] orb = nearestFreeOrb(b, dark ? Math.min(orbRange, sight) : orbRange, claimed, grid);
             if (orb != null) {
                 b.botOrb = (int) orb[2];
                 claimed.add(b.botOrb);

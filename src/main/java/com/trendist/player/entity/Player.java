@@ -24,6 +24,7 @@ public class Player extends BaseTimeEntity {
     @Column(name = "title_id") private Long titleId;
     @Column(nullable = false, length = 40) private String nickname;
     @Column(name = "nickname_changed_at", columnDefinition = "DATETIME(6)") private Instant nicknameChangedAt;
+    /** 지금 레벨에서 모은 EXP. 레벨이 오를 때마다 그 레벨에 필요한 만큼 빼고 남은 만큼을 이어 가진다(누적하지 않는다, 4.9) */
     @Column(nullable = false) private long exp;
     /** 레벨(levels 참조). 누적 EXP로 레벨표에서 정한 행을 가리킨다(4.9). 숫자는 getLevel()로 읽는다 */
     @ManyToOne(optional = false)
@@ -52,6 +53,8 @@ public class Player extends BaseTimeEntity {
     @Column(name = "kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long killCount;
     /** 패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 4.31) */
     @Column(name = "defeat_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long defeatCount;
+    /** 현재 유행도가 같은 원과 부딪힌 횟수(사람만, 같은 상대와는 1초에 한 번만 센다, 4.3) */
+    @Column(name = "tie_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long tieCount;
     /** 가장 높았던 연속 빼앗기 콤보(최고 기록, 줄지 않는다, 4.25) */
     @Column(name = "max_combo", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long maxCombo;
     /** 상대의 콤보 불꽃을 꺼뜨린 횟수(사람·봇의 불꽃 모두, 4.25) */
@@ -71,6 +74,8 @@ public class Player extends BaseTimeEntity {
     public Level getLevelRow() { return level; }
 
     public void addExp(long amount) { this.exp += amount; }
+    /** 지금 레벨에서 모은 EXP로 바꾼다(레벨이 오르며 남은 EXP, LevelService.advance) */
+    public void setExp(long exp) { this.exp = exp; }
     public void setLevel(Level level) { this.level = level; }
     public void setCurrentScore(long score) { this.currentScore = score; }
     public void incAdd() { this.addCount++; }

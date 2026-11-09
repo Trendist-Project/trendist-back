@@ -67,6 +67,7 @@ final class EnglishSeed {
             t("백전노장", "Battle-Hardened", "Lost 50 times but keep challenging"),
             t("불사조", "Phoenix", "Fell 200 times and rose again"),
             t("끝없는 도전자", "Endless Challenger", "Kept going after 1,000 defeats"),
+            t("도토리 키재기", "Acorn Contest", "Bumped into equally matched opponents 10 times"),
             t("연속 타격", "Combo Starter", "Took keywords 3 times in a row"),
             t("불꽃 점화", "Ignition", "Took keywords 5 times in a row and lit the flame"),
             t("연쇄 반응", "Chain Reaction", "Took keywords 10 times in a row"),

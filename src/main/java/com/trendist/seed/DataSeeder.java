@@ -108,8 +108,8 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
-        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size")) {
+        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2, 갈고리·충격파 반지름 배수 4.33)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
+        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size", "hook_range_ratio", "shockwave_range_ratio")) {
             settings.findByName(old).ifPresent(settings::delete);
         }
         // 최소·최대 크기는 지름이 아니라 반지름으로 둔다(4.2): 옛 지름 설정은 값을 절반으로 옮기며 이름을 바꾼다(아래 설정 만들기에서 옮긴 값을 쓴다)
@@ -312,7 +312,10 @@ public class DataSeeder implements ApplicationRunner {
         return new String[]{color, String.valueOf(alpha), "SOLID"};
     }
 
-    /** 4.9의 기본 곡선: 2~10레벨은 표, 11~100레벨은 100 × (레벨/10)². */
+    /**
+     * 4.9의 기본 곡선: 그 레벨이 되는 데 필요한 EXP(앞 레벨에서 올라올 때, 누적 아님, 1레벨은 0). 2~10레벨은 표, 11~100레벨은 100 × (레벨/10)².
+     * 그래서 100레벨은 99레벨에서 EXP 0부터 10,000을 모아야 한다.
+     */
     static long defaultRequiredExp(int level) {
         long[] early = {0, 0, 1, 3, 8, 13, 22, 33, 50, 72, 100};
         if (level <= 10) return early[level];
@@ -349,6 +352,10 @@ public class DataSeeder implements ApplicationRunner {
         for (String[] t : COMBO_EXTRA_TITLES) {
             if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
+        // 유행도가 같은 상대와 부딪힌 횟수 칭호(4.3): 나중에 더했으므로 같은 조건의 칭호가 없을 때만 한 번 넣는다
+        for (String[] t : TIE_TITLES) {
+            if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
         return added;
     }
 
@@ -369,13 +376,13 @@ public class DataSeeder implements ApplicationRunner {
      */
     private static final String[][] SKILL_ROWS = {
             {"dash", "⚡", "MOVE", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서)
-            {"shield", "🛡", "DEFENSE", "Digit1", "30", "10"},   // 그다음은 해금 레벨 순서
-            {"hook", "🪝", "ATTACK", "Digit2", "30", "15"},
-            {"shockwave", "💥", "ATTACK", "Digit3", "30", "20"},
-            {"stealth", "👻", "STEALTH", "Digit4", "30", "25"},
-            {"darkness", "🕶️", "ATTACK", "Digit5", "30", "30"},
-            {"cleanse", "✨", "DEFENSE", "Digit6", "30", "35"},
-            {"poison", "☠️", "ATTACK", "Digit7", "30", "40"},
+            {"shield", "🛡", "DEFENSE", "Digit1", "30", "5"},   // 그다음은 해금 레벨 순서
+            {"hook", "🪝", "ATTACK", "Digit2", "30", "10"},
+            {"shockwave", "💥", "ATTACK", "Digit3", "30", "15"},
+            {"stealth", "👻", "STEALTH", "Digit4", "30", "20"},
+            {"darkness", "🕶️", "ATTACK", "Digit5", "30", "25"},
+            {"cleanse", "✨", "DEFENSE", "Digit6", "30", "30"},
+            {"poison", "☠️", "ATTACK", "Digit7", "30", "35"},
     };
 
     private int seedSkills() {
@@ -459,6 +466,11 @@ public class DataSeeder implements ApplicationRunner {
             {"멈추지 않는 불꽃", "연속으로 40번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":40}"},
     };
 
+    /** 유행도가 같은 상대와 부딪힌 횟수 칭호(4.3): 승패가 없는 박빙의 싸움을 놀리듯 부르는 이름 */
+    private static final String[][] TIE_TITLES = {
+            {"도토리 키재기", "유행도가 같은 상대와 10번 부딪혔어요", "METRIC", "{\"metric\":\"tie_count\",\"gte\":10}"},
+    };
+
     /** 나중에 더한 최고 콤보 칭호(4.25): 100 콤보 */
     private static final String[][] COMBO_EXTRA_TITLES = {
             {"100 콤보", "연속으로 100번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":100}"},
@@ -486,6 +498,7 @@ public class DataSeeder implements ApplicationRunner {
             "오뚝이", "불굴",
             "첫 처치", "해결사", "저승사자", "아레나의 지배자", "최후의 승자",
             "첫 패배", "칠전팔기", "백전노장", "불사조", "끝없는 도전자",
+            "도토리 키재기",
             "연속 타격", "불꽃 점화", "연쇄 반응", "폭주 기관차", "멈추지 않는 불꽃",
             "100 콤보",
             "불 끄미", "소방관", "화재 진압 대장",

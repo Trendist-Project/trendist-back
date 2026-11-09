@@ -36,6 +36,8 @@ class RoomTest {
         public void requestCombo(Room room, Room.Member winner, int combo) { comboRecords.add(new long[]{winner.playerId, combo}); }
         final List<Long> flameOuts = new ArrayList<>();
         public void requestFlameOut(Room room, Room.Member by) { flameOuts.add(by.playerId); }
+        final List<Long> ties = new ArrayList<>();
+        public void requestTie(Room room, Room.Member member) { ties.add(member.playerId); }
         final List<Long> kills = new ArrayList<>();
         public void requestKill(Room room, Room.Member killer) { kills.add(killer.playerId); }
         final List<Long> botWinners = new ArrayList<>();
@@ -1127,7 +1129,7 @@ class RoomTest {
 
     @Test
     void shockwaveSpreadsFromCastPointAtSetSpeedAndPushesOnlyWhatItReaches() {
-        // 4.33: 쓴 순간 내 원 크기로 시작해 반지름의 3배까지 최대 속도 × 2로 퍼진다. 닿은 원만 밀려나고, 쿨타임은 30초
+        // 4.33: 쓴 순간 내 원 크기로 시작해 가장자리에서 화면 기준 300px까지 최대 속도 × 4(화면 기준)로 퍼진다. 닿은 원만 밀려나고, 쿨타임은 30초
         Out out = new Out();
         Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
@@ -1136,14 +1138,14 @@ class RoomTest {
         a.x = 800; a.y = 800;
         double r0 = a.displayRadius;
         near.x = 800 + r0 + near.displayRadius + 10; near.y = 800; // 가장자리 사이 10px
-        far.x = 800 - (r0 * 5 + far.displayRadius + 40); far.y = 800; // 범위(반지름 5배) 밖(밀려난 near와 부딪히지 않게 반대쪽)
+        far.x = 800 - (r0 + r.reachWorld(300, r0) + far.displayRadius + 40); far.y = 800; // 범위(가장자리에서 300px) 밖(밀려난 near와 부딪히지 않게 반대쪽)
         r.tick();
         r.skill(a, "shockwave", Double.NaN, Double.NaN);
         var fx = out.texts.stream().filter(m -> "skillFx".equals(m.get("type")) && "shockwave".equals(m.get("id"))).findFirst().orElseThrow();
         assertThat(fx.get("x")).isEqualTo(800.0);
         assertThat((double) fx.get("r0")).isEqualTo(r0);
-        assertThat((double) fx.get("rMax")).isEqualTo(r0 * 5);
-        assertThat((double) fx.get("speed")).isEqualTo(960.0); // 최대 속도 240 × 4(대시 속도의 2배)
+        assertThat((double) fx.get("rMax")).isEqualTo(r0 + r.reachWorld(300, r0));
+        assertThat((double) fx.get("speed")).isEqualTo(r.reachWorld(960.0, r0)); // 최대 속도 240 × 4(대시 속도의 2배)
         for (int i = 0; i < 6; i++) r.tick();
         assertThat(near.kbTime).isGreaterThan(0);  // 닿아서 바깥쪽으로 밀렸다
         assertThat(near.x).isGreaterThan(800 + r0 + near.displayRadius + 10);
@@ -1159,13 +1161,13 @@ class RoomTest {
     @Test
     void shockwaveRangeSpeedAndCooldownComeFromTuning() {
         Out out = new Out();
-        Room r = skillRoom(out, new Room.SkillTuning(1, 5, 1.5, 7, 5, 0.3, 0.3, 20, 3, 30, 5, 40));
+        Room r = skillRoom(out, new Room.SkillTuning(1, 300, 1.5, 7, 300, 0.3, 0.3, 20, 3, 30, 5, 40, 600));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         a.x = 800; a.y = 800;
         r.tick();
         r.skill(a, "shockwave", 0, 0);
         var fx = out.texts.stream().filter(m -> "skillFx".equals(m.get("type"))).findFirst().orElseThrow();
-        assertThat((double) fx.get("rMax")).isEqualTo(a.displayRadius * 5);
+        assertThat((double) fx.get("rMax")).isEqualTo(a.displayRadius + r.reachWorld(300, a.displayRadius)); // 가장자리에서 화면 기준 300px
         assertThat((double) fx.get("speed")).isEqualTo(240.0);
         var skill = out.texts.stream().filter(m -> "skill".equals(m.get("type"))).findFirst().orElseThrow();
         assertThat(skill.get("cooldownMs")).isEqualTo(7000L);
@@ -1187,7 +1189,7 @@ class RoomTest {
 
     @Test
     void hookCatchesFirstCircleOnLineLosesOneKeywordAndPullsItIntoAForcedCollision() {
-        // 4.33: 갈고리가 사거리(반지름 3배) 안의 원을 맞히면 키워드 1개를 잃고 0.3초 동안 끌려와 무조건 부딪힌다(여기서는 점수가 낮아 한 번 더 잃는다)
+        // 4.33: 갈고리가 사거리(가장자리에서 화면 기준 300px) 안의 원을 맞히면 키워드 1개를 잃고 0.3초 동안 끌려와 무조건 부딪힌다(여기서는 점수가 낮아 한 번 더 잃는다)
         Out out = new Out();
         Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
         Room.Member a = r.join(1, "s1", "a", 1, 50, List.of(100L)); // 점수가 높다: 부딪히면 이긴다
@@ -1197,7 +1199,7 @@ class RoomTest {
         b.x = 800 + r0 * 2.5; b.y = 800;
         r.tick();
         r.skill(a, "hook", b.x, b.y);
-        assertThat(out.texts).anyMatch(m -> "skillFx".equals(m.get("type")) && "hook".equals(m.get("id")) && m.get("ms").equals(150L) && (double) m.get("range") == r0 * 5);
+        assertThat(out.texts).anyMatch(m -> "skillFx".equals(m.get("type")) && "hook".equals(m.get("id")) && m.get("ms").equals(150L) && (double) m.get("range") == r0 + r.reachWorld(300, r0));
         for (int i = 0; i < 4; i++) r.tick();
         assertThat(out.loses).hasSize(1); // 맞는 순간 키워드 1개
         assertThat(out.loses.get(0)).containsExactly(2L, 1L);
@@ -1218,7 +1220,7 @@ class RoomTest {
         Room.Member off = r.join(3, "s3", "c", 1, 10, List.of(300L));
         a.x = 800; a.y = 800;
         double r0 = a.displayRadius;
-        far.x = 800 + r0 * 5 + far.displayRadius + 30; far.y = 800; // 사거리 밖
+        far.x = 800 + r0 + r.reachWorld(300, r0) + far.displayRadius + 30; far.y = 800; // 사거리 밖
         off.x = 800 + r0 * 2; off.y = 800 + 200;                    // 선에서 벗어남
         r.tick();
         r.skill(a, "hook", 5000, 800);
@@ -1226,6 +1228,83 @@ class RoomTest {
         assertThat(out.loses).isEmpty();
         assertThat(countFx(out, "skillFx", "hookHit")).isZero();
         assertThat(countFx(out, "skillFx", "hookEnd")).isEqualTo(1);
+    }
+
+    @Test
+    void hookAndBoltReachLookTheSameLengthOnScreenAtAnyCircleSize() {
+        // 사거리는 가장자리에서 화면 기준 px(갈고리 300, 투사체 600)라 월드 길이에 줌의 역수가 곱해진다: 큰 원일수록 월드 길이가 길다
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        for (double radius : new double[]{16, 100, 300}) {
+            double zoom = 1 / r.reachWorld(1, radius); // 클라이언트 줌
+            assertThat(r.reachWorld(300, radius) * zoom).isCloseTo(300, org.assertj.core.data.Offset.offset(1e-9));
+            assertThat(r.reachWorld(600, radius) * zoom).isCloseTo(600, org.assertj.core.data.Offset.offset(1e-9));
+        }
+        assertThat(r.reachWorld(600, 16)).isEqualTo(600);                       // 최소 크기는 줌 1: 화면 px = 월드 px
+        assertThat(r.reachWorld(600, 300)).isGreaterThan(r.reachWorld(600, 100)); // 커질수록 월드 길이가 길다
+    }
+
+    @Test
+    void boltRangeComesFromTuningAndBoltEndsAtThatDistance() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "poison", 5000, 800);
+        assertThat(out.texts).anyMatch(m -> "bolt".equals(m.get("id")) && (double) m.get("range") == r.reachWorld(600, a.displayRadius));
+    }
+
+    @Test
+    void darknessBoltAlsoHitsABotAndEveryoneSeesIt() {
+        Out out = new Out();
+        Room.Member[] h = new Room.Member[1];
+        Room r = botRoom(out, 1, h);
+        Room.Member human = h[0], bot = botsOf(r).getFirst();
+        r.setLoadout(human, java.util.Arrays.asList("darkness", null, null, null));
+        bot.protectUntil = 0; human.protectUntil = 0;
+        human.x = 800; human.y = 800; bot.x = 1100; bot.y = 800;
+        r.tick();
+        bot.x = 1100; bot.y = 800;
+        r.skill(human, "darkness", bot.x, bot.y);
+        tickSeconds(r, 0.4);
+        assertThat(bot.darkUntil).isGreaterThan(0);
+        assertThat(countFx(out, "skillFx", "darkness")).isEqualTo(1); // 모두에게 표시하려고 방송한다
+    }
+
+    @Test
+    void collidingWithEqualScoreCountsATieForEachHumanOncePerSecondAndLosesNothing() {
+        // 4.3: 현재 유행도가 같은 두 원이 부딪히면 누구도 잃지 않고, 사람마다 "같은 유행도와 부딪힌 횟수"가 센다(같은 짝은 1초에 한 번)
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 10, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 10, List.of(200L));
+        a.x = 800; a.y = 800; b.x = 800 + a.displayRadius + b.displayRadius - 5; b.y = 800;
+        a.protectUntil = 0; b.protectUntil = 0;
+        r.tick();
+        assertThat(out.loses).isEmpty();
+        assertThat(out.ties).containsExactlyInAnyOrder(1L, 2L);
+        // 1초 안에 다시 부딪혀도 또 세지 않는다
+        a.x = 800; b.x = 800 + a.displayRadius + b.displayRadius - 5;
+        r.tick();
+        assertThat(out.ties).hasSize(2);
+        // 1초가 지난 뒤 다시 부딪히면 센다
+        for (int i = 0; i < 25; i++) r.tick();
+        a.x = 800; a.y = 800; b.x = 800 + a.displayRadius + b.displayRadius - 5; b.y = 800;
+        r.tick();
+        assertThat(out.ties).hasSize(4);
+    }
+
+    @Test
+    void differentScoresAreNotATie() {
+        Out out = new Out();
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        Room.Member a = r.join(1, "s1", "a", 1, 10, List.of(100L));
+        Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
+        a.x = 800; a.y = 800; b.x = 800 + a.displayRadius + b.displayRadius - 5; b.y = 800;
+        a.protectUntil = 0; b.protectUntil = 0;
+        r.tick();
+        assertThat(out.ties).isEmpty();
     }
 
     @Test

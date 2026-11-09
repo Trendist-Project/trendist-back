@@ -424,25 +424,25 @@ final class GuideSeed {
 
     static final List<Added> ADDED = List.of(
             new Added("icons-and-titles", "레벨별 필요 경험치", """
-                    레벨은 **경험치(EXP)**가 쌓이면 올라요. 아래 표는 **모든 레벨**에 필요한 **누적 경험치**예요.
+                    레벨은 **경험치(EXP)**가 쌓이면 올라요. 아래 표는 **모든 레벨**마다 **앞 레벨에서 올라올 때 필요한 경험치**예요.
 
                     [[레벨 필요 경험치]]
 
                     - 경험치는 키워드를 **추가**할 때마다, 공격에 **성공**할 때마다, 상대를 **쓰러뜨릴** 때마다 쌓여요(기본값: 추가 1, 공격 성공 1, 처치 5).
                     - 1~10레벨은 빠르게 올라가고, 11레벨부터는 레벨이 높을수록 점점 더 많이 필요해요.
                     - 표의 값은 **지금 적용 중인 값**이에요. 운영 중에 바뀔 수 있어요.
-                    - 경험치는 줄어들지 않고, 레벨은 나라마다 따로 쌓여요.
+                    - 레벨이 오르면 필요한 경험치만큼 쓰고 **남은 경험치는 다음 레벨로 이어져요.** 레벨은 나라마다 따로 쌓여요.
 
                     > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 거북이 아이콘이 자라고, 꾸미기와 스킬이 열리는 열쇠예요.""",
                     "EXP needed per level", """
-                    Your level goes up as you collect **experience (EXP)**. The table below shows the **total EXP** needed for **every level**.
+                    Your level goes up as you collect **experience (EXP)**. The table below shows the **EXP needed to reach each level from the one before it**.
 
                     [[level exp table]]
 
                     - You earn EXP each time you **add** a keyword, each time an attack **succeeds**, and each time you **take someone down** (defaults: add 1, successful attack 1, takedown 5).
                     - Levels 1–10 come quickly; from level 11 on, higher levels need more and more.
                     - The values in the table are the ones **in use right now**. They can change while the game runs.
-                    - EXP never goes down, and levels are tracked separately for each country.
+                    - When you level up, the EXP it needed is spent and **any leftover EXP carries over** to the next level. Levels are tracked separately for each country.
 
                     > Your level does not affect keyword score or circle size. It makes your turtle icon grow and unlocks customizing and skills."""),
             new Added("skills", "스킬 한눈에 보기", """

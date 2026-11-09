@@ -388,7 +388,7 @@ class ApiFlowTest {
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
         java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
-        assertThat(all).hasSize(70);
+        assertThat(all).hasSize(71);
         // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
         assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
     }
@@ -399,10 +399,10 @@ class ApiFlowTest {
         String t = player("처치시험");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.killCount").value(0));
-        long expBeforeKill = playerRepo.findById(pid).orElseThrow().getExp();
+        long expBeforeKill = totalExp(pid);
         playerService.recordKill(pid);
         assertThat(playerRepo.findById(pid).orElseThrow().getKillCount()).isEqualTo(1);
-        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(expBeforeKill + 5); // 죽이면 EXP +kill_exp(기본 5)
+        assertThat(totalExp(pid)).isEqualTo(expBeforeKill + 5); // 죽이면 EXP +kill_exp(기본 5)
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.killCount").value(1));
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
@@ -415,14 +415,28 @@ class ApiFlowTest {
         String t = player("패배시험");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(0));
-        long exp0 = playerRepo.findById(pid).orElseThrow().getExp();
+        long exp0 = totalExp(pid);
         playerService.recordDefeat(pid);
         assertThat(playerRepo.findById(pid).orElseThrow().getDefeatCount()).isEqualTo(1);
-        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0);
+        assertThat(totalExp(pid)).isEqualTo(exp0);
         mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(1));
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("첫 패배");
+    }
+
+    @Test
+    void tieCountGrantsAcornTitleAtTen() throws Exception {
+        // 4.3: 현재 유행도가 같은 원과 10번 부딪히면 "도토리 키재기" 칭호를 받는다
+        String t = player("키재기시험");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        for (int i = 0; i < 9; i++) playerService.recordTie(pid);
+        assertThat(playerRepo.findById(pid).orElseThrow().getTieCount()).isEqualTo(9);
+        String before = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        assertThat((java.util.List<String>) JsonPath.read(before, "$.titles[?(@.owned == true)].name")).doesNotContain("도토리 키재기");
+        playerService.recordTie(pid);
+        String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        assertThat((java.util.List<String>) JsonPath.read(json, "$.titles[?(@.owned == true)].name")).contains("도토리 키재기");
     }
 
     @Test
@@ -433,7 +447,7 @@ class ApiFlowTest {
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         long countryId = playerRepo.findById(pid).orElseThrow().getCountry().getId();
         var picked = keywordService.botCatalog(countryId).stream().filter(k -> k.text().equals("봇이잃은키워드")).findFirst().orElseThrow();
-        long exp0 = playerRepo.findById(pid).orElseThrow().getExp();
+        long exp0 = totalExp(pid);
         var r = keywordService.gainFromBot(pid, picked.id());
         assertThat(r.text()).isEqualTo("봇이잃은키워드");
         // 봇도 빼앗기 대상이다: 봇을 이겨도 빼앗은 횟수 +1(4.3)
@@ -441,10 +455,10 @@ class ApiFlowTest {
         assertThat(playerRepo.findById(pid).orElseThrow().getBotWinCount()).isEqualTo(1);
         // 불꽃으로 모두 잃게 한 경우 등 방이 알리는 공격 성공도 한 번에 +1이고, 칭호 확인이 따라온다
         // 공격 성공 EXP(attack_exp, 기본 1) + 새 키워드를 얻은 일반 추가 EXP(exp_per_plus, 기본 1)
-        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0 + 2);
+        assertThat(totalExp(pid)).isEqualTo(exp0 + 2);
         playerService.recordSteal(pid);
         assertThat(playerRepo.findById(pid).orElseThrow().getStealCount()).isEqualTo(2);
-        assertThat(playerRepo.findById(pid).orElseThrow().getExp()).isEqualTo(exp0 + 3); // 공격 성공 한 번 = EXP +1
+        assertThat(totalExp(pid)).isEqualTo(exp0 + 3); // 공격 성공 한 번 = EXP +1
     }
 
     @Test
@@ -567,9 +581,15 @@ class ApiFlowTest {
                 .isInstanceOf(com.trendist.common.exception.ApiException.class); // 채팅은 지울 수 없다
     }
 
+    /** 지금까지 모은 EXP 전체(레벨마다 쓰고 남기는 방식이라 레벨이 올라도 총량은 줄지 않는다) */
+    private long totalExp(long pid) {
+        var p = playerRepo.findById(pid).orElseThrow();
+        return levelService.totalExp(p.getLevel(), p.getExp());
+    }
+
     private void level(String token, int level) throws Exception {
         long pid = playerIdOf(token);
-        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.addExp(100L * level * level / 100); p.setLevel(levelService.row(level)); });
+        tx.executeWithoutResult(st -> { var p = playerRepo.findById(pid).orElseThrow(); p.setLevel(levelService.row(level)); p.setExp(0); });
     }
 
     private org.springframework.test.web.servlet.ResultActions saveProfile(String token, int slot, String json) throws Exception {
@@ -694,7 +714,7 @@ class ApiFlowTest {
         mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + t)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"양쯔깐루\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.player.exp").value(1))
+                .andExpect(jsonPath("$.player.exp").value(0)) // EXP 1을 얻어 2레벨(필요 1)이 되고 남은 EXP는 0
                 .andExpect(jsonPath("$.keyword.holderCount").value(1))
                 .andExpect(jsonPath("$.keyword.plusedByMe").value(true));
         // 같은 키워드 두 번은 안 된다
@@ -1128,16 +1148,16 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
                 .andExpect(jsonPath("$[1].category").value("DEFENSE"))
                 .andExpect(jsonPath("$[1].icon").value("🛡"))
-                .andExpect(jsonPath("$[1].requiredLevel").value(10))   // 방패 10레벨
+                .andExpect(jsonPath("$[1].requiredLevel").value(5))   // 방패 5레벨
                 .andExpect(jsonPath("$[2].code").value("hook"))
                 .andExpect(jsonPath("$[2].defaultKey").value("Digit2"))
-                .andExpect(jsonPath("$[2].requiredLevel").value(15))   // 갈고리 15레벨
+                .andExpect(jsonPath("$[2].requiredLevel").value(10))   // 갈고리 10레벨
                 .andExpect(jsonPath("$[3].code").value("shockwave"))
                 .andExpect(jsonPath("$[3].defaultKey").value("Digit3"))
-                .andExpect(jsonPath("$[3].requiredLevel").value(20))   // 충격파 20레벨
+                .andExpect(jsonPath("$[3].requiredLevel").value(15))   // 충격파 15레벨
                 .andExpect(jsonPath("$[4].code").value("stealth"))
                 .andExpect(jsonPath("$[4].defaultKey").value("Digit4"))
-                .andExpect(jsonPath("$[4].requiredLevel").value(25))   // 은신 25레벨
+                .andExpect(jsonPath("$[4].requiredLevel").value(20))   // 은신 20레벨
                 .andExpect(jsonPath("$[0].name").doesNotExist())
                 .andExpect(jsonPath("$[0].code").value("dash")) // 대시는 목록의 맨 앞
                 .andExpect(jsonPath("$[0].defaultKey").value("Space"))
@@ -1160,24 +1180,26 @@ class ApiFlowTest {
     }
     @Test
     void gameInfoPublishesOrbOddsAndLevelRequirementsWithoutLogin() throws Exception {
-        // 4.17, 4.20: 가이드가 보여 주는 구슬 확률(기본 60/40)과 레벨별 필요 EXP는 운영 값(설정·levels)에서 바로 읽는다
+        // 4.17, 4.20: 가이드가 보여 주는 구슬 확률(기본 60/40)과 레벨별 필요 EXP는 운영 값(설정·levels)에서 바로 읽는다. level-exp는 그 레벨까지 모은 누적 EXP다
         mvc.perform(get("/api/game-info/orb-odds"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gainPercent").value(60))
                 .andExpect(jsonPath("$.losePercent").value(40));
         mvc.perform(get("/api/game-info/level-exp").param("levels", "10,15,20,25,999,0"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$['10']").value(100))
-                .andExpect(jsonPath("$['15']").value(225))
-                .andExpect(jsonPath("$['20']").value(400))
-                .andExpect(jsonPath("$['25']").value(625))
+                .andExpect(jsonPath("$['10']").value(302))      // 2~10레벨에 필요한 EXP를 모두 더한 값
+                .andExpect(jsonPath("$['15']").value(1157))
+                .andExpect(jsonPath("$['20']").value(2787))
+                .andExpect(jsonPath("$['25']").value(5442))
                 .andExpect(jsonPath("$['999']").doesNotExist());
         mvc.perform(get("/api/game-info/levels"))                       // 모든 레벨의 필요 EXP
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(100))
                 .andExpect(jsonPath("$[0].level").value(1))
                 .andExpect(jsonPath("$[99].level").value(100))
-                .andExpect(jsonPath("$[99].requiredExp").value(10000));
+                .andExpect(jsonPath("$[1].requiredExp").value(1))              // 2레벨이 되는 데 필요한 EXP(앞 레벨에서 올라올 때)
+                .andExpect(jsonPath("$[9].requiredExp").value(100))
+                .andExpect(jsonPath("$[99].requiredExp").value(10000));        // 100레벨은 99레벨에서 EXP 0부터 10,000이 필요하다
     }
     @Test
     void popularityCanBeRaisedOrLoweredOncePerTargetPerDayAndPlayersAreSearchable() throws Exception {
@@ -1239,7 +1261,7 @@ class ApiFlowTest {
             assertThatThrownBy(() -> adminSkills.update("nope", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(1.0, null, null)))
                     .hasMessageContaining("없는 스킬");
         } finally {
-            adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 15, true));
+            adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 10, true));
         }
     }
 }

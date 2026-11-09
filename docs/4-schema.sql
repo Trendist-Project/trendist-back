@@ -153,7 +153,7 @@ CREATE TABLE effects (
 CREATE TABLE levels (
   id           BIGINT NOT NULL AUTO_INCREMENT COMMENT '레벨 ID',
   level        BIGINT NOT NULL COMMENT '레벨(1~100). 1레벨은 필요 EXP 0',
-  required_exp BIGINT NOT NULL COMMENT '그 레벨에 필요한 누적 EXP(레벨이 오를수록 커져야 함, 애플리케이션이 검사)',
+  required_exp BIGINT NOT NULL COMMENT '그 레벨이 되는 데 필요한 EXP(바로 앞 레벨에서 올라올 때, 누적 아님. 1레벨은 0)',
   badge_color  VARCHAR(7) NULL COMMENT '레벨 표시 옆 성장 아이콘의 바탕색(#RRGGBB). NULL이면 기본 거북이 색(4.9)',
   badge_alpha  BIGINT NULL COMMENT '바탕색 진하기(0~100%, 낮을수록 옅음). NULL이면 아직 값을 넣지 않은 행(시더가 기본 규칙으로 채움)',
   badge_rainbow BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'TRUE면 바탕을 색 대신 무지개 그라데이션으로(100레벨)',
@@ -202,7 +202,7 @@ CREATE TABLE players (
   title_id            BIGINT NULL COMMENT '활성 칭호(NULL이면 없음)',
   nickname            VARCHAR(40) NOT NULL COMMENT '닉네임(나라별, 중복 허용). 탈퇴 후에도 유지하고 화면에서만 탈퇴한 사용자로 표시',
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
-  exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '누적 경험치 EXP(그 나라, `+`·공격 성공·처치로 쌓이고 줄지 않음, 4.9)',
+  exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '지금 레벨에서 모은 EXP(그 나라, `+`·공격 성공·처치로 쌓인다. 레벨이 오르면 그 레벨에 필요한 만큼 빼고 남은 만큼을 이어 가진다, 4.9)',
   level_id            BIGINT NOT NULL COMMENT '레벨(levels 참조). 누적 EXP로 levels에서 정한 행. 아이콘은 10레벨에서 완성, 꾸미기는 해금 레벨(설정, 기본 10)부터 가능',
   current_score       BIGINT NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기, 정수). min(EXP, 100) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
   hold_count          BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진(만료되지 않은) 트렌드 키워드 개수(player_keywords 행 수 캐시, 0 아래로 내려가지 않음, 1시간마다 실제 행 수로 보정)',

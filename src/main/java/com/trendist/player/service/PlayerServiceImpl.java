@@ -153,6 +153,12 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     @Transactional
+    public void recordTie(long playerId) {
+        if (players.incrementTieCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.10)
+    }
+
+    @Override
+    @Transactional
     public void recordDefeat(long playerId) {
         if (players.incrementDefeatCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.31)
     }
@@ -184,9 +190,11 @@ public class PlayerServiceImpl implements PlayerService {
         Instant now = Instant.now(clock);
         // 키워드 점수가 모두 정수라 합도 정수다(4.8)
         long sum = playerKeywords.sumActiveTrendValue(p.getId(), now, codes.keywordStateId(CodeTables.KW_ACTIVE));
-        long score = formula.expScore(p.getExp()) + sum;
+        var progress = levels.advance(p.getLevel(), p.getExp()); // 레벨이 오르면 필요한 EXP를 빼고 남은 EXP를 이어 가진다
+        p.setLevel(progress.row());
+        p.setExp(progress.exp());
+        long score = formula.expScore(levels.totalExp(p.getLevel(), p.getExp())) + sum;
         p.setCurrentScore(score);
-        p.setLevel(levels.rowFor(p.getExp()));
         events.publishEvent(new GameEvents.PlayerScoreChanged(p.getCountry().getId(), p.getId(), score, p.getExp(),
                 p.getLevel(), p.getHoldCount()));
         events.publishEvent(new GameEvents.TitleCheck(p.getId())); // 추가·레벨·보유 수·점수가 바뀌었을 수 있다(4.10)

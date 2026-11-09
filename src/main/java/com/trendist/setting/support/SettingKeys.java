@@ -58,9 +58,10 @@ public final class SettingKeys {
     public static final String DASH_SPEED_MULTIPLIER = "dash_speed_multiplier";
     public static final String DASH_SECONDS = "dash_seconds";
     public static final String SHOCKWAVE_SPEED_MULTIPLIER = "shockwave_speed_multiplier";
-    public static final String SHOCKWAVE_RANGE_RATIO = "shockwave_range_ratio";
+    public static final String SHOCKWAVE_REACH_PX = "shockwave_reach_px";
     public static final String SHOCKWAVE_KNOCKBACK = "shockwave_knockback";
-    public static final String HOOK_RANGE_RATIO = "hook_range_ratio";
+    public static final String HOOK_REACH_PX = "hook_reach_px";
+    public static final String BOLT_REACH_PX = "bolt_reach_px";
     public static final String HOOK_SECONDS = "hook_seconds";
     public static final String HOOK_PULL_SECONDS = "hook_pull_seconds";
     public static final String SKILL_SHIELD_SECONDS = "skill_shield_seconds";
@@ -135,9 +136,10 @@ public final class SettingKeys {
             new Def(DASH_SECONDS, "3", 0.5, 30, "대시가 유지되는 시간"),
             // 스킬(충격파·갈고리·방패·은신·먹물): 테스트하며 조절할 값이라 모두 설정으로 둔다. 쓰는 키는 클라이언트(GameScreen)가 정한다
             new Def(SHOCKWAVE_SPEED_MULTIPLIER, "4", 0.1, 20, "충격파가 퍼지는 속도: 최대 속도의 몇 배인지(기본 4 = 대시 속도(기본 최대 속도의 2배)의 2배)"),
-            new Def(SHOCKWAVE_RANGE_RATIO, "5", 1, 20, "충격파 범위: 쓴 순간 내 원 반지름의 몇 배까지 퍼지는지(시작은 내 원 크기, 중심은 쓴 자리)"),
+            new Def(SHOCKWAVE_REACH_PX, "300", 50, 3000, "충격파 범위: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 퍼지는지(시작은 내 원 크기, 중심은 쓴 자리). 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다. 갈고리 사거리와 같은 방식이다"),
             new Def(SHOCKWAVE_KNOCKBACK, "1.5", 0, 10, "충격파에 맞은 원이 밀려나는 세기(튕김 세기와 같은 단위. 1이면 같은 크기끼리 부딪힐 때만큼)"),
-            new Def(HOOK_RANGE_RATIO, "5", 1, 20, "갈고리 사거리: 내 원 중심에서 내 원 반지름의 몇 배까지 닿는지"),
+            new Def(HOOK_REACH_PX, "300", 50, 3000, "갈고리 사거리: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 뻗는지. 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다(기준 화면 기준, 작은 화면에서는 조금 달라질 수 있다)"),
+            new Def(BOLT_REACH_PX, "600", 50, 5000, "독·암흑 투사체 사거리: 내 원 가장자리에서 화면에 보이는 길이(px). 갈고리 사거리와 같은 방식이라 크기와 상관없이 갈고리와의 길이 비율이 일정하다"),
             new Def(HOOK_SECONDS, "0.15", 0.05, 5, "갈고리가 끝까지 날아가는 데 걸리는 시간(빗나가면 같은 시간에 걸쳐 돌아온다. 상대가 피할 수 있을 만큼은 걸리게)"),
             new Def(HOOK_PULL_SECONDS, "0.3", 0.05, 5, "갈고리에 맞은 원이 내게 끌려오는 시간(끌려오는 동안 스킬 사용·이동 불가, 다른 원과의 충돌 무효)"),
             new Def(SKILL_SHIELD_SECONDS, "3", 0.5, 60, "방패 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
@@ -174,8 +176,8 @@ public final class SettingKeys {
         group("? 구슬", ORB_DENSITY, ORB_MAX, ORB_SPAWN_SECONDS, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT);
         group("NPC 봇", BOT_PLAYERS, BOT_MIN_PLAYERS, BOT_CAP_RATIO);
         group("대시", DASH_SPEED_MULTIPLIER, DASH_SECONDS);
-        group("스킬", SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_RANGE_RATIO, SHOCKWAVE_KNOCKBACK,
-                HOOK_RANGE_RATIO, HOOK_SECONDS, HOOK_PULL_SECONDS,
+        group("스킬", SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_REACH_PX, SHOCKWAVE_KNOCKBACK,
+                HOOK_REACH_PX, BOLT_REACH_PX, HOOK_SECONDS, HOOK_PULL_SECONDS,
                 SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS, COMBO_WIPE_ORB_PERCENT);
         group("꾸미기·계정", CUSTOMIZE_UNLOCK_LEVEL, ART_CHANGE_MINUTES, NICKNAME_CHANGE_MINUTES);
@@ -209,10 +211,10 @@ public final class SettingKeys {
                 HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
-        unit("px", WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
+        unit("px", HOOK_REACH_PX, BOLT_REACH_PX, SHOCKWAVE_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_RANGE_RATIO,
-                HOOK_RANGE_RATIO, SHOCKWAVE_KNOCKBACK);
+        unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER,
+                SHOCKWAVE_KNOCKBACK);
         unit("%", ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, COMBO_WIPE_ORB_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE);

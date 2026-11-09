@@ -174,12 +174,13 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     /** 스킬 설정(4.33). */
     private Room.SkillTuning skillTuning() {
         return new Room.SkillTuning(
-                settings.getDouble(SettingKeys.SHOCKWAVE_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.SHOCKWAVE_RANGE_RATIO),
+                settings.getDouble(SettingKeys.SHOCKWAVE_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.SHOCKWAVE_REACH_PX),
                 settings.getDouble(SettingKeys.SHOCKWAVE_KNOCKBACK), skillCatalog.cooldownSeconds("shockwave", 30),
-                settings.getDouble(SettingKeys.HOOK_RANGE_RATIO), settings.getDouble(SettingKeys.HOOK_SECONDS),
+                settings.getDouble(SettingKeys.HOOK_REACH_PX), settings.getDouble(SettingKeys.HOOK_SECONDS),
                 settings.getDouble(SettingKeys.HOOK_PULL_SECONDS), skillCatalog.cooldownSeconds("hook", 30),
                 settings.getDouble(SettingKeys.SKILL_SHIELD_SECONDS), skillCatalog.cooldownSeconds("shield", 30),
-                settings.getDouble(SettingKeys.STEALTH_SECONDS), skillCatalog.cooldownSeconds("stealth", 30));
+                settings.getDouble(SettingKeys.STEALTH_SECONDS), skillCatalog.cooldownSeconds("stealth", 30),
+                settings.getDouble(SettingKeys.BOLT_REACH_PX));
     }
 
     /** 연속 빼앗기 콤보 설정(4.25). */
@@ -242,7 +243,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         r.submit(room -> {
             room.applyScore(e.playerId(), e.score(), Math.toIntExact(e.level())); // 방 메모리의 레벨은 int(1~100)
             Room.Member m = room.byPlayer(e.playerId());
-            if (m != null) sendText(m, Map.of("type", "score", "score", e.score(), "exp", e.exp(), "level", e.level(),
+            if (m != null) sendText(m, Map.of("type", "score", "score", e.score(), "exp", e.exp(), "nextExp", levels.nextRequired(e.level()), "level", e.level(),
                     "holdCount", e.holdCount()));
         });
     }
@@ -353,18 +354,24 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         String by = owner != null ? owner.nickname : "☠";
         db(() -> {
             try {
+                // 스택으로 한 틱에 여러 개를 잃으면 알림을 하나로 모아 잃은 개수만 알린다(어떤 키워드인지는 알리지 않는다. 따로 보내면 마지막 하나만 보인다)
+                java.util.List<String> texts = new java.util.ArrayList<>();
+                long total = 0;
                 for (int i = 0; i < count; i++) {
                     var lost = keywordService.loseRandom(victimId);
                     if (lost.isEmpty()) break;
-                    var l = lost.get();
-                    room.submit(r -> {
-                        Room.Member m = r.byPlayer(victimId);
-                        if (m != null) {
-                            r.poisonLost(m, owner);
-                            sendText(m, Map.of("type", "lost", "by", by, "keyword", l.text(), "score", l.score(), "poison", true));
-                        }
-                    });
+                    texts.add(lost.get().text());
+                    total += lost.get().score();
                 }
+                if (texts.isEmpty()) return;
+                long score = total;
+                room.submit(r -> {
+                    Room.Member m = r.byPlayer(victimId);
+                    if (m != null) {
+                        r.poisonLost(m, owner);
+                        sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "poison", true, "count", texts.size()));
+                    }
+                });
             } catch (RuntimeException e) {
                 log.warn("poison lose failed for player {}", victimId, e);
             }
@@ -402,6 +409,18 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 playerService.recordSteal(playerId);
             } catch (RuntimeException e) {
                 log.warn("record steal failed for player {}", playerId, e);
+            }
+        });
+    }
+
+    @Override
+    public void requestTie(Room room, Room.Member member) {
+        long playerId = member.playerId;
+        db(() -> {
+            try {
+                playerService.recordTie(playerId);
+            } catch (RuntimeException e) {
+                log.warn("record tie failed for player {}", playerId, e);
             }
         });
     }
