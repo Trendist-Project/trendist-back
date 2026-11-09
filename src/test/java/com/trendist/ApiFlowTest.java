@@ -598,6 +598,27 @@ class ApiFlowTest {
     }
 
     @Test
+    void playerCardCarriesTheEquippedLookSoSearchAndChatCanShowTheDesignedCircle() throws Exception {
+        // 검색·채팅에서 열어 방에 그 원이 없어도 정보 창에 꾸민 모양을 보여 주려고 카드(/api/players/{id})에 장착한 모양이 함께 온다
+        String target = player("꾸민이");
+        long targetId = playerIdOf(target);
+        String viewer = player("보는이");
+        // 꾸미지 않았으면 기본 바탕색
+        mvc.perform(get("/api/players/" + targetId).header("Authorization", "Bearer " + viewer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.look.bg").value("#3fb68b")).andExpect(jsonPath("$.look.borderColor").doesNotExist());
+        level(target, 10);
+        saveProfile(target, 1, "{\"background\":\"#FF6B6B\",\"borderColor\":\"#ffffff\",\"borderWidth\":4}").andExpect(status().isOk());
+        mvc.perform(get("/api/players/" + targetId).header("Authorization", "Bearer " + viewer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.look.bg").value("#ff6b6b")).andExpect(jsonPath("$.look.borderColor").value("#ffffff"))
+                .andExpect(jsonPath("$.look.borderWidth").value(4));
+        // 내 정보 창과 같은 구성으로 보이도록 기록도 함께 온다
+        mvc.perform(get("/api/players/" + targetId).header("Authorization", "Bearer " + viewer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.stats.exp").isNumber()).andExpect(jsonPath("$.stats.nextLevelExp").isNumber())
+                .andExpect(jsonPath("$.stats.holdCount").value(0)).andExpect(jsonPath("$.stats.stealCount").value(0))
+                .andExpect(jsonPath("$.stats.activeDays").isNumber());
+    }
+
+    @Test
     void profilesUnlockAtLevelTenAndSlotOneIsEquippedByDefault() throws Exception {
         // 꾸미기 프로필(4.9): 1~3번 칸, 아무것도 저장하지 않았으면 1번 칸(기본 모습)을 장착. 꾸미기는 10레벨부터
         String t = player("프로필시험");

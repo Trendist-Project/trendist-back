@@ -34,6 +34,8 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
     private final RateLimiter rateLimiter;
     private final Clock clock;
     private final PopularityService popularity;
+    private final com.trendist.profile.support.ProfileLooks looks;
+    private final LevelService levels;
 
     @Override
     @Transactional(readOnly = true)
@@ -70,7 +72,19 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
         String title = p.getTitleId() == null ? null : titles.findById(p.getTitleId()).map(t -> t.name(com.trendist.common.support.Lang.ofLocale(p.getCountry().getDefaultLocale()))).orElse(null);
         return new PlayerDtos.PlayerCard(entityNo, nickname, title,
                 level, score, p.getCommentScore(), top, p.getId(), p.getPopularity(), popularity.myVoteToday(userId, p), p.getCreatedAt(),
-                p.getUser().getId().equals(userId));
+                p.getUser().getId().equals(userId), orbLook(p), stats(p));
+    }
+
+    /** 내 정보 창과 같은 기록(지금 레벨 기준 EXP와 다음 레벨 필요량 포함) */
+    private PlayerDtos.Stats stats(Player p) {
+        return new PlayerDtos.Stats(p.getExp(), levels.nextRequired(p.getLevel()), p.getHoldCount(), p.getAddCount(), p.getSearchCount(),
+                p.getStealCount(), p.getBotWinCount(), p.getKillCount(), p.getDefeatCount(), p.getActiveDays());
+    }
+
+    /** 장착한 꾸미기 프로필의 원 모양. 효과·그림은 로그인 사용자만 있다(ProfileLooks) */
+    private PlayerDtos.OrbLook orbLook(Player p) {
+        var l = looks.equippedLook(p);
+        return new PlayerDtos.OrbLook(l.background(), l.borderColor(), l.borderWidth(), l.art(), l.borderEffect());
     }
 
     @Override

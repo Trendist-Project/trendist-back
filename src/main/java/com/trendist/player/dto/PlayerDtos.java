@@ -25,7 +25,20 @@ public final class PlayerDtos {
      */
     public record PlayerCard(int entityNo, String nickname, String title, long level, long score,
                              long commentScore, java.util.List<KeywordTag> topKeywords,
-                             long playerId, long popularity, int myVote, java.time.Instant createdAt, boolean me) {}
+                             long playerId, long popularity, int myVote, java.time.Instant createdAt, boolean me, OrbLook look, Stats stats) {}
+
+    /**
+     * 다른 플레이어 정보 창이 내 정보 창과 같은 구성으로 보이도록 함께 내려 주는 기록: 지금 레벨에서 모은 EXP와 다음 레벨 필요량(최고 레벨이면 -1),
+     * 보유 키워드 수, 추가·검색·빼앗기·봇 사냥·처치·패배 횟수, 활동한 날. (키워드 이름은 상위 3개만 따로 공개한다)
+     */
+    public record Stats(long exp, long nextLevelExp, long holdCount, long addCount, long searchCount, long stealCount,
+                        long botWinCount, long killCount, long defeatCount, long activeDays) {}
+
+    /**
+     * 그 플레이어가 장착한 꾸미기 프로필의 원 모양(아레나에서 보이는 그대로): 바탕색, 테두리 색·두께(1~8단계), 픽셀 그림 주소, 테두리 효과 코드.
+     * 검색·채팅에서 열어 방에 그 원이 없어도 정보 창에 꾸민 모양을 보여 주려고 카드에 함께 내려 준다. 값이 null이면 기본이다.
+     */
+    public record OrbLook(String bg, String borderColor, Integer borderWidth, String art, String borderEffect) {}
 
     /** 플레이어 검색 결과 한 줄(4.34). myVote: 오늘 내가 준 표(+1, -1, 없으면 0) */
     public record PlayerHit(long playerId, String nickname, long level, long score, long popularity, boolean me, int myVote) {}
