@@ -139,8 +139,8 @@ public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("select k.normalized from Keyword k where k.country.code = :countryCode and k.keywordState.id = :stateId")
     List<String> findNormalizedByCountryCodeAndState(@Param("countryCode") String countryCode, @Param("stateId") Long stateId);
 
-    /** 사이트맵(4.28): 그 나라에서 금지가 아닌 키워드의 [정규화 키, 수정 시각]. 최근에 만든 키워드부터(상한을 넘으면 오래된 것이 빠진다). */
-    @Query("select k.normalized, k.updatedAt from Keyword k where k.country.id = :countryId and k.keywordState.id <> :bannedId order by k.id desc")
-    List<Object[]> findSitemapRows(@Param("countryId") Long countryId, @Param("bannedId") Long bannedId,
+    /** 사이트맵(4.28): 그 나라에서 활성 상태인 키워드의 [정규화 키, 수정 시각]. 최근에 만든 키워드부터(상한을 넘으면 오래된 것이 빠진다). */
+    @Query("select k.normalized, k.updatedAt from Keyword k where k.country.id = :countryId and k.keywordState.id = :activeId order by k.id desc")
+    List<Object[]> findSitemapRows(@Param("countryId") Long countryId, @Param("activeId") Long activeId,
                                    org.springframework.data.domain.Pageable pageable);
 }

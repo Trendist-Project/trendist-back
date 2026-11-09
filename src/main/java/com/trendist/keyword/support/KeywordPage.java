@@ -22,6 +22,8 @@ public final class KeywordPage {
                        boolean googleSource, Map<String, KeywordDtos.Activity> activities) {
         public boolean english() { return !"KR".equalsIgnoreCase(countryCode); }
         public boolean active() { return "활성".equals(state); }
+        /** 색인은 kr 서버의 활성 키워드만 한다(global과 비활성은 noindex, 사이트맵에도 넣지 않는다) */
+        public boolean indexable() { return active() && !english(); }
     }
 
     /** `/kr/keywords/키워드`: 나라 코드가 앞, 키워드는 정규화 키를 퍼센트 인코딩해서 쓴다. */
@@ -146,7 +148,7 @@ public final class KeywordPage {
                 @@GTM_HEAD@@
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
-                <meta name="robots" content="index,follow">
+                <meta name="robots" content="@@ROBOTS@@">
                 <title>@@TITLE@@</title>
                 <meta name="description" content="@@DESC@@">
                 <link rel="canonical" href="@@URL@@">
@@ -205,7 +207,7 @@ public final class KeywordPage {
                 """
                 .replace("@@GTM_HEAD@@", com.trendist.common.support.AnalyticsTag.HEAD).replace("@@GTM_BODY@@", com.trendist.common.support.AnalyticsTag.BODY)
                 .replace("@@CSS@@", CSS).replace("@@LANG@@", en ? "en" : "ko").replace("@@TITLE@@", title).replace("@@DESC@@", desc)
-                .replace("@@URL@@", url).replace("@@BASE@@", base).replace("@@KW@@", SharePage.escape(d.text()))
+                .replace("@@ROBOTS@@", d.indexable() ? "index,follow" : "noindex,follow").replace("@@URL@@", url).replace("@@BASE@@", base).replace("@@KW@@", SharePage.escape(d.text()))
                 .replace("@@CLOSE@@", en ? "Close" : "닫기").replace("@@AI@@", ai).replace("@@STATE@@", d.active() ? "활성" : "비활성")
                 .replace("@@BADGE@@", badge).replace("@@SCORE@@", String.valueOf(d.trendValue())).replace("@@UNIT@@", en ? "pts" : "점")
                 .replace("@@ADD@@", en ? "Add in game" : "게임에서 추가").replace("@@STATS@@", statsHtml)

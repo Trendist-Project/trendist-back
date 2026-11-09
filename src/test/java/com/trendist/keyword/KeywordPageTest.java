@@ -47,6 +47,7 @@ class KeywordPageTest {
     @Test
     void everyKeywordGetsAPageUnderItsServer() throws Exception {
         plus("페이지왕", "소소한 페이지키워드");
+        jdbc.update("update keywords set keyword_state_id = (select id from keyword_states where name = '활성') where normalized = '소소한페이지키워드'");
         // 서버(kr)가 앞, 키워드는 공백이 빠진 정규화 키로 연다
         String page = html("/kr/keywords/{k}", "소소한페이지키워드");
         assertThat(page).contains("<h1>소소한 페이지키워드</h1>").contains("index,follow").contains("조회수")
@@ -106,18 +107,44 @@ class KeywordPageTest {
     @Test
     void sitemapXmlListsMainAndEveryKeywordAndSkipsBanned() throws Exception {
         plus("맵왕", "사이트맵키워드");
+        jdbc.update("update keywords set keyword_state_id = (select id from keyword_states where name = '활성') where normalized = '사이트맵키워드'");
         plus("맵왕2", "사이트맵금지");
         jdbc.update("update keywords set keyword_state_id = (select id from keyword_states where name = '금지') where normalized = '사이트맵금지'");
 
         String xml = mvc.perform(get("/sitemap.xml")).andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", org.hamcrest.Matchers.containsString("xml")))
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        // 메인 주소와 모든 키워드가 한 파일에 있고, 금지 키워드는 없다
+        // 메인 주소와 활성 키워드가 한 파일에 있고, 금지 키워드는 없다
         assertThat(xml).contains("<loc>http://localhost:8080/</loc>")
                 .contains("<loc>http://localhost:8080/kr/keywords/" + java.net.URLEncoder.encode("사이트맵키워드", StandardCharsets.UTF_8) + "</loc>")
                 .contains("<lastmod>")
                 .doesNotContain(java.net.URLEncoder.encode("사이트맵금지", StandardCharsets.UTF_8));
         // 별도 파일 주소는 없다
         mvc.perform(get("/sitemap-keywords.xml")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void inactiveKeywordIsNoindexAndLeftOutOfSitemap() throws Exception {
+        plus("비활왕", "비활성색인키워드");
+        jdbc.update("update keywords set keyword_state_id = (select id from keyword_states where name = '비활성') where normalized = '비활성색인키워드'");
+
+        assertThat(html("/kr/keywords/{k}", "비활성색인키워드")).contains("<meta name=\"robots\" content=\"noindex,follow\">");
+        String xml = mvc.perform(get("/sitemap.xml")).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(xml).doesNotContain(java.net.URLEncoder.encode("비활성색인키워드", StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void globalKeywordPageIsNoindexAndLeftOutOfSitemap() throws Exception {
+        MvcResult r = mvc.perform(post("/api/auth/guest")).andExpect(status().isOk()).andReturn();
+        String token = JsonPath.read(r.getResponse().getContentAsString(), "$.accessToken");
+        mvc.perform(post("/api/players").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"GlobalKing\",\"countryCode\":\"GLOBAL\"}")).andExpect(status().isOk());
+        mvc.perform(post("/api/keywords/plus").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"globalseoprobe\"}")).andExpect(status().isOk());
+        jdbc.update("update keywords set keyword_state_id = (select id from keyword_states where name = '활성') where normalized = 'globalseoprobe'");
+
+        assertThat(html("/global/keywords/{k}", "globalseoprobe")).contains("<meta name=\"robots\" content=\"noindex,follow\">");
+        String xml = mvc.perform(get("/sitemap.xml")).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(xml).doesNotContain("/global/keywords/");
     }
 }
