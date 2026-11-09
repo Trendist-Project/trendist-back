@@ -18,6 +18,8 @@ public class Room {
     private static final int MINIMAP_TOP = 20;   // 큰 아이콘 상위 20명(4.2)
     /** 목표 속도로 다가가는 빠르기. 50ms마다 차이가 절반이 된다(클라이언트 Arena 예측과 같은 값). */
     static final double ACCEL_RATE = Math.log(2) / 0.05;
+    /** 지연 보상으로 앞당기는 시간의 상한(초). 지연이 아주 크거나 값을 속여도 이 이상은 보상하지 않는다 */
+    static final double LAG_COMP_MAX_SEC = 0.15;
     public static final double ORB_RADIUS = 14; // ? 구슬 반지름(px)
 
     /** 틱에서 쓰는 설정값. 1분 캐시된 settings에서 매초 다시 읽는다. */
@@ -25,7 +27,8 @@ public class Room {
                          double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
                          double loseProtectSeconds,
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
-                         int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap) {}
+                         int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap,
+                         double minEatReach) {}
 
     /**
      * 세이프존 설정(4.22). 가운데 고정 존과 무작위 존의 한 변은 활동 영역 한 변의 비율(최소값 이상)이고,
@@ -157,6 +160,8 @@ public class Room {
         public double x, y, vx, vy;
         /** 이번 틱 이동 단계가 시작되기 직전의 위치. 구슬 먹기는 이 위치에서 현재 위치까지의 선분으로 판정한다 */
         public double prevX, prevY;
+        /** 이 접속의 입력이 서버에 닿는 데 걸리는 시간(초, 왕복의 절반, 상한 LAG_COMP_MAX_SEC). 클라이언트가 ping에 실어 보낸 값이고, 구슬 판정에서 서버 위치를 화면 위치 쪽으로 이만큼 앞당긴다 */
+        public volatile double lagSec;
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
@@ -862,11 +867,14 @@ public class Room {
      * 먹는 거리는 화면에 보이는 접촉(원 반지름 + 구슬 반지름)이다. 구슬 중심을 거의 덮어야 먹으면, 작은 원은 겹쳐 보이는데도 안 먹히고
      * 지나치는 것처럼 느껴진다(4.20).
      */
-    static boolean sweepCovers(Member m, double ox, double oy) {
-        double sx = m.x - m.prevX, sy = m.y - m.prevY, len2 = sx * sx + sy * sy;
+    boolean sweepCovers(Member m, double ox, double oy) {
+        // 서버의 내 원은 입력이 닿는 시간만큼 화면의 내 원보다 뒤에 있다. 경로 끝을 현재 속도로 그만큼 앞당겨 화면에서 닿은 구슬을 놓치지 않게 한다(지연 보상)
+        double lag = Math.min(m.lagSec, LAG_COMP_MAX_SEC);
+        double ex = m.x + m.vx * lag, ey = m.y + m.vy * lag;
+        double sx = ex - m.prevX, sy = ey - m.prevY, len2 = sx * sx + sy * sy;
         double t = len2 > 0 ? Math.max(0, Math.min(1, ((ox - m.prevX) * sx + (oy - m.prevY) * sy) / len2)) : 0;
         double dist = Math.hypot(m.prevX + sx * t - ox, m.prevY + sy * t - oy);
-        return dist < m.displayRadius + ORB_RADIUS;
+        return dist < Math.max(m.displayRadius + ORB_RADIUS, tuning.minEatReach());
     }
 
     /** 원이 구슬 중심을 덮으면(이번 틱 이동 경로 포함) 먹는다. 구슬은 바로 사라지고, 모두에게 누가 먹었는지 알려 먹는 연출을 보여 준다. */
@@ -1326,6 +1334,11 @@ public class Room {
     }
 
     /** 클라이언트가 알린 보이는 범위(가로·세로 절반, px)를 받는다. 값은 한도 안으로 맞춘다(너무 작아 화면이 비거나 너무 커서 전부 보내게 되는 것을 막는다). */
+    /** 클라이언트가 보낸 왕복 시간(ms)으로 지연 보상 시간을 정한다. 이상한 값은 0~상한으로 자른다. */
+    public void setLag(Member m, double rttMs) {
+        m.lagSec = Double.isFinite(rttMs) ? Math.max(0, Math.min(LAG_COMP_MAX_SEC, rttMs / 2000)) : 0;
+    }
+
     public void setView(Member m, double halfW, double halfH) {
         if (members.get(m.entityNo) != m) return;
         m.viewHalfW = clamp(halfW, VIEW_MIN, VIEW_MAX);

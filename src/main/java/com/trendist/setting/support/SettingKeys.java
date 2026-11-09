@@ -22,6 +22,7 @@ public final class SettingKeys {
     public static final String KILL_EXP = "kill_exp";
     public static final String WORLD_SIZE = "world_size";
     public static final String MIN_DIAMETER = "min_diameter";
+    public static final String EAT_MIN_REACH = "eat_min_reach";
     public static final String MAX_DIAMETER = "max_diameter";
     public static final String AREA_GROW_SPEED = "area_grow_speed";
     public static final String AREA_SHRINK_SPEED = "area_shrink_speed";
@@ -89,6 +90,7 @@ public final class SettingKeys {
             new Def(KILL_EXP, "5", 0, 1000, "상대를 죽였을 때 얻는 EXP(키워드가 없는 사람·봇을 쓰러뜨렸을 때)"),
             new Def(WORLD_SIZE, "48000", 1000, 50000, "기준 맵 한 변"),
             new Def(MIN_DIAMETER, "60", 8, 200, "최소 지름(고정값. 점수 0일 때의 원 크기)"),
+            new Def(EAT_MIN_REACH, "64", 0, 300, "구슬 먹는 거리 최소값(원 중심에서 구슬 중심까지. 작은 원도 이만큼 떨어진 구슬은 먹는다)"),
             new Def(OFFLINE_KEEP_SECONDS, "60", 0, 3600, "연결이 끊겨도 원이 아레나에 남아 있는 시간: 끊긴 자리에 그대로 남아 공격받거나 방어하는 등 남아 있는 사람처럼 동작하다가, 이 시간이 지나면 아레나에서 뺀다(0이면 끊기는 순간 뺀다). 그 뒤 접속하면 가운데 세이프존에서 시작한다"),
             new Def(AREA_GROW_SPEED, "300", 0, 10000, "활동 영역이 커지는 속도: 한 변이 1초에 이만큼(px)씩만 커진다(0이면 바로 커짐). 사람·봇이 들어올 때 맵 벽이 갑자기 튀지 않고 부드럽게 움직이게 한다"),
             new Def(AREA_SHRINK_SPEED, "60", 0, 10000, "활동 영역이 줄어드는 속도: 한 변이 1초에 이만큼(px)씩만 줄어든다(0이면 바로 줄어듦). 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀리지 않게 한다"),
@@ -165,7 +167,7 @@ public final class SettingKeys {
                 EXTERNAL_CONFIRM_HEAT, EXTERNAL_HOLD_HOURS);                                                                // 외부 소스
         group("성장·경험치·칭호", EXP_PER_PLUS, ATTACK_EXP, KILL_EXP, EXP_SCORE_CAP, RANK_TITLE_MIN_PLAYERS);
         group("맵·크기", WORLD_SIZE, AREA_GROW_SPEED, AREA_SHRINK_SPEED,           // 활동 영역
-                MIN_DIAMETER, MAX_DIAMETER, SCORE_CAP, ZOOM_FACTOR);                // 원 크기
+                MIN_DIAMETER, MAX_DIAMETER, EAT_MIN_REACH, SCORE_CAP, ZOOM_FACTOR);                // 원 크기
         group("이동·충돌", MAX_SPEED, BIG_RATIO, KNOCKBACK_CAP, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE);
         group("보호·접속", LOSE_PROTECT_SECONDS, OFFLINE_KEEP_SECONDS);
         group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
@@ -207,7 +209,7 @@ public final class SettingKeys {
                 HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
-        unit("px", WORLD_SIZE, MIN_DIAMETER, MAX_DIAMETER, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
+        unit("px", WORLD_SIZE, MIN_DIAMETER, EAT_MIN_REACH, MAX_DIAMETER, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
         unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_RANGE_RATIO,
                 HOOK_RANGE_RATIO, SHOCKWAVE_KNOCKBACK);

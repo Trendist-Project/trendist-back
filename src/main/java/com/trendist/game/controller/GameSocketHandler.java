@@ -105,6 +105,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
         if ("ping".equals(type)) {
             // 왕복 시간 측정용. 클라이언트가 보낸 시각을 그대로 돌려준다. 이동 명령 빈도 제한에는 넣지 않는다
             double t = node.path("t").asDouble(0);
+            double rtt = node.path("rtt").asDouble(0); // 클라이언트가 잰 왕복 시간(ms). 구슬 판정의 지연 보상에 쓴다
+            Room room = (Room) session.getAttributes().get(ATTR_ROOM);
+            if (room != null) room.submit(r -> r.setLag(member, rtt));
             rooms.sendText(member, Map.of("type", "pong", "t", Double.isFinite(t) ? t : 0));
             return;
         }

@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
-    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+    static final Room.Tuning T = new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
 
     /** 충돌 테스트: 무작위 세이프존을 끄고, 가운데 고정 세이프존(한 변 600px) 밖에서 부딪히게 한다(4.22). */
     static final Room.ZoneTuning NO_RANDOM_ZONES = new Room.ZoneTuning(0.06, 600, 0.035, 400, 0, 0, 300);
@@ -295,7 +295,7 @@ class RoomTest {
 
     @Test
     void orbsSpawnUpToMax() {
-        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 5, 0.5, 2.2, 5, 33, 0, 0, 1.5, 100), new Out());
+        Room r = new Room(1, new Room.Tuning(12000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 5, 0.5, 2.2, 5, 33, 0, 0, 1.5, 100, 0), new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         for (int i = 0; i < 20 * 10; i++) r.tick(); // 10초
         assertThat(r.orbCount()).isEqualTo(5);
@@ -672,7 +672,7 @@ class RoomTest {
     @Test
     void activeAreaScalesWithWorldSize() {
         // 적은 인원에서도 기준 맵 한 변의 1/4, 1000명이면 한 변 전체(4.2)
-        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100), new Out());
+        Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0), new Out());
         assertThat(small.activeArea(1)).isEqualTo(6000);
         assertThat(small.activeArea(1000)).isEqualTo(24000);
         assertThat(new Room(1, T, new Out()).activeArea(1)).isEqualTo(3000);
@@ -681,19 +681,19 @@ class RoomTest {
     @Test
     void orbTargetFollowsArea() {
         // 3,000×3,000px에 20개였던 비율(밀도 2.2)을 넓이에 비례해 유지한다. 상한 orbMax를 넘지 않는다(4.20)
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
         Room r = new Room(1, tu, new Out());
         assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
         assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역
         assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
-        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+        Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
         assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
     }
 
     @Test
     void orbsFillInBatches() {
         // 목표 79개면 간격마다 5%(4개)씩 생긴다
-        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+        Room.Tuning tu = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 1500, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
         Room r = new Room(1, tu, new Out());
         r.join(1, "s1", "a", 1, 0, List.of());
         r.tick();
@@ -703,7 +703,7 @@ class RoomTest {
     static Room.Tuning withBots(int botPlayers) { return withBots(botPlayers, 0); }
 
     static Room.Tuning withBots(int botPlayers, int botMinPlayers) {
-        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 3, 0, 3, 2.2, 5, 100, botPlayers, botMinPlayers, 1.5, 100);
+        return new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 3, 0, 3, 2.2, 5, 100, botPlayers, botMinPlayers, 1.5, 100, 0);
     }
 
     @Test
@@ -901,7 +901,7 @@ class RoomTest {
     @Test
     void botCapIsAverageOfConnectedHumans() {
         // 봇 상한 = 접속 중인 사람 유행도 평균 × 배수(기본 1). 봇은 평균에 들어가지 않는다(4.21)
-        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 3, 0, 3, 2.2, 5, 100, 10, 0, 1.0, 100);
+        Room.Tuning avg = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 3, 0, 3, 2.2, 5, 100, 10, 0, 1.0, 100, 0);
         Room r = new Room(1, avg, new Out());
         r.join(1, "s1", "작은", 1, 100, List.of());
         r.join(2, "s2", "큰", 1, 500, List.of());
@@ -1231,7 +1231,7 @@ class RoomTest {
     // ---- 구슬 먹기는 틱 사이에 움직인 경로(선분)로 판정한다: 점수가 낮은 작은 원이 최대 속도로 달릴 때 구슬을 지나치던 문제
 
     /** 운영 기본값(최소 반지름 16, 최대 속도 480)의 Tuning. 나머지는 T와 같다. 최대 속도에서 한 틱(50ms)에 24px 간다. */
-    static final Room.Tuning FAST = new Room.Tuning(12000, 16, 600, 2000, 480, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+    static final Room.Tuning FAST = new Room.Tuning(12000, 16, 600, 2000, 480, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
 
     /** (1000,1000)에서 +x 방향으로 이미 최대 속도(480)에 도달해 달리는 원 하나. 한 틱에 정확히 24px 간다. */
     private static Room.Member runner(Room r, long playerId, double y) {
@@ -1247,6 +1247,58 @@ class RoomTest {
         Room r = new Room(1, FAST, out);
         r.setZoneTuning(NO_RANDOM_ZONES);
         return r;
+    }
+
+    @Test
+    void lagCompensationExtendsTheSweepAlongTheVelocity() {
+        // 입력 지연 0.1초(왕복 200ms)면 서버 위치(1024)를 속도 480 × 0.1 = 48px 앞(1072)으로 본다. 끝점 1024에서 60px 앞의 구슬(1084)은 30px 안
+        Out lagOut = new Out();
+        Room lagRoom = fastRoom(lagOut);
+        Room.Member m = runner(lagRoom, 1, 1000);
+        lagRoom.setLag(m, 200);
+        lagRoom.placeOrb(1084, 1000);
+        lagRoom.tick();
+        assertThat(lagOut.orbEaters).containsExactly(1L);
+
+        Out noLagOut = new Out();
+        Room noLagRoom = fastRoom(noLagOut);
+        runner(noLagRoom, 1, 1000);
+        noLagRoom.placeOrb(1084, 1000);
+        noLagRoom.tick();
+        assertThat(noLagOut.orbEaters).isEmpty();
+    }
+
+    @Test
+    void lagCompensationIsCappedAndIgnoresBadValues() {
+        Room r = fastRoom(new Out());
+        Room.Member m = runner(r, 1, 1000);
+        r.setLag(m, 10_000);
+        assertThat(m.lagSec).isEqualTo(Room.LAG_COMP_MAX_SEC);
+        r.setLag(m, -5);
+        assertThat(m.lagSec).isZero();
+        r.setLag(m, Double.NaN);
+        assertThat(m.lagSec).isZero();
+    }
+
+    @Test
+    void minimumEatReachLetsSmallCirclesEatOrbsFurtherAway() {
+        // 반지름 16 + 구슬 14 = 30px지만 최소 먹는 거리 64px면 진행선에서 60px 떨어진 구슬도 먹고, 70px는 먹지 않는다
+        Room.Tuning reach = new Room.Tuning(12000, 16, 600, 2000, 480, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 64);
+        Out nearOut = new Out();
+        Room nearRoom = new Room(1, reach, nearOut);
+        nearRoom.setZoneTuning(NO_RANDOM_ZONES);
+        runner(nearRoom, 1, 1000);
+        nearRoom.placeOrb(1012, 1060);
+        nearRoom.tick();
+        assertThat(nearOut.orbEaters).containsExactly(1L);
+
+        Out farOut = new Out();
+        Room farRoom = new Room(1, reach, farOut);
+        farRoom.setZoneTuning(NO_RANDOM_ZONES);
+        runner(farRoom, 1, 1000);
+        farRoom.placeOrb(1012, 1070);
+        farRoom.tick();
+        assertThat(farOut.orbEaters).isEmpty();
     }
 
     @Test

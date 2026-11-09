@@ -149,7 +149,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getInt(SettingKeys.BOT_PLAYERS),
                 settings.getInt(SettingKeys.BOT_MIN_PLAYERS),
                 settings.getDouble(SettingKeys.BOT_CAP_RATIO),
-                settings.getDouble(SettingKeys.EXP_SCORE_CAP));
+                settings.getDouble(SettingKeys.EXP_SCORE_CAP),
+                settings.getDouble(SettingKeys.EAT_MIN_REACH));
     }
 
     /** 대시 설정(4.27). */
