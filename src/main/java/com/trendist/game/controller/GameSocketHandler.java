@@ -47,6 +47,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final AccountGuard guard;
     private final PlayerService playerService;
     private final KeywordService keywordService;
+    private final com.trendist.skill.service.SkillLoadoutService skillLoadouts;
     private final ChatService chatService;
     private final RoomManager rooms;
     private final ObjectMapper json;
@@ -142,6 +143,14 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 double ax = node.path("x").asDouble(Double.NaN), ay = node.path("y").asDouble(Double.NaN);
                 if (Room.SKILLS.contains(id)) room.submit(r -> r.skill(member, id, ax, ay));
             }
+            case "loadout" -> { // 장착 스킬 4칸(4.33): slots 배열, 빈 칸은 null·빈 문자열
+                var arr = node.path("slots");
+                if (arr.isArray() && arr.size() == room.skillSlotCount() && allowInput(session, "loadout")) {
+                    java.util.List<String> slots = new java.util.ArrayList<>();
+                    arr.forEach(n -> slots.add(n.isNull() ? null : n.asString("")));
+                    room.submit(r -> r.setLoadout(member, slots));
+                }
+            }
             case "view" -> { // 내 화면에 보이는 세계 범위(관심 영역 전송, 9.2): 가로·세로 절반(px). 방이 범위를 다듬어 쓴다
                 double hw = node.path("hw").asDouble(0), hh = node.path("hh").asDouble(0);
                 if (Double.isFinite(hw) && Double.isFinite(hh) && hw > 0 && hh > 0) room.submit(r -> r.setView(member, hw, hh));
@@ -194,6 +203,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 if (info.isEmpty()) { close(session, CloseStatus.POLICY_VIOLATION.withReason("NO_PLAYER")); return; }
                 PlayerService.JoinInfo player = info.get();
                 List<Long> keywordIds = keywordService.activeKeywordIds(player.playerId());
+                List<String> saved = skillLoadouts.load(player.playerId()); // 장착한 스킬(4.33). 고른 적 없으면 null
                 Room room = rooms.room(player.countryId());
                 WebSocketSession safe = (WebSocketSession) session.getAttributes().get(ATTR_SAFE);
                 room.submit(r -> {
@@ -204,6 +214,8 @@ public class GameSocketHandler extends TextWebSocketHandler {
                     session.getAttributes().put(ATTR_MEMBER, m);
                     rooms.sendText(m, Map.of("type", "welcome", "entityNo", m.entityNo, "playerId", player.playerId(),
                             "x", m.x, "y", m.y, "score", m.score, "level", m.level));
+                    r.restoreLoadout(m, saved);
+                    rooms.sendText(m, r.loadoutMessage(m)); // 장착 스킬 4칸(4.33)
                     rooms.sendText(m, rooms.tuningMessage(r.tuning()));
                     Map<String, Object> cooldowns = r.cooldownsMessage(m); // 이어받은 원이면 스킬·대시 쿨타임을 다시 알린다(새로고침해도 서버의 쿨타임은 그대로)
                     if (cooldowns != null) rooms.sendText(m, cooldowns);

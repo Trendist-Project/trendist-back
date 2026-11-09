@@ -76,6 +76,7 @@ public class PlayerServiceImpl implements PlayerService {
         });
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public boolean isGuest(long userId) {

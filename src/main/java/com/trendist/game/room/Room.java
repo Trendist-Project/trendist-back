@@ -45,6 +45,10 @@ public class Room {
     /** 방 밖(서비스)으로 나가는 요청: 충돌로 키워드 잃기, 메시지 전송. */
     public interface Outbox {
         void requestLose(Room room, Member loser, Member winner);
+        /** 독(4.33)으로 키워드를 count개 잃는다(빼앗는 사람 없음). owner는 독을 건 사람(알림용). 틱 밖에서 무작위로 잃고 당한 사람에게 알린다. */
+        default void requestPoisonLose(Room room, Member victim, Member owner, int count) {}
+        /** 장착 스킬 4칸이 바뀌었다(4.33). slots는 쉼표로 이은 코드(빈 칸은 빈 문자열)이고 틱 밖에서 저장한다. */
+        default void saveSkillSlots(Room room, Member member, List<String> slots) {}
         /** ? 구슬을 먹었다. 보상(무작위 🔥 키워드)은 틱 밖에서 정하고 먹은 사람에게 알린다(4.20). */
         void requestOrb(Room room, Member eater, boolean prize);
         /** 불꽃인 사람(winner)에게 져서 키워드를 모두 잃는다. 잃은 수만큼 ! 구슬이 떨어진다(4.25). */
@@ -115,7 +119,21 @@ public class Room {
     }
 
     /** 스킬 코드(4.33). 클라이언트는 이 코드로 쓴다 */
-    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth");
+    /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
+    public static final int DEFAULT_SKILL_SLOTS = 4;
+    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse");
+
+    /** 투사체 스킬(독·암흑, 4.33): 속도는 기본 최대 속도의 배수, 사거리(px), 맞는 반지름(px) */
+    static final double BOLT_SPEED_MULT = 3, BOLT_RANGE = 1200;
+    /** 투사체 반지름 = 쓴 원 반지름 × BOLT_RADIUS_RATIO(최소 BOLT_MIN_RADIUS px). 판정과 화면 그림이 같은 값을 쓴다 */
+    static final double BOLT_RADIUS_RATIO = 0.3, BOLT_MIN_RADIUS = 10;
+    /** 독: 맞으면 POISON_TICKS번, POISON_TICK_SECONDS마다 스택 수만큼 키워드를 잃는다(9초). 다시 맞으면 스택이 올라가고 처음부터 다시 센다. 스택 상한은 POISON_MAX_STACKS */
+    static final int POISON_TICKS = 3, POISON_MAX_STACKS = 10;
+    static final double POISON_TICK_SECONDS = 3;
+    /** 암흑: 맞은 사람의 화면이 이 시간 동안 어두워진다 */
+    static final double DARK_SECONDS = 3;
+    /** 정화를 쓴 뒤 새 CC(갈고리·독·암흑·충격파)에 걸리지 않는 시간(초). 0이면 면역 없음 */
+    static final double CLEANSE_IMMUNE_SECONDS = 0;
 
     /** 퍼지고 있는 충격파: 쓴 자리(x, y)에서 반지름 r0로 시작해 speed(px/s)로 rMax까지 퍼진다. hit은 이미 맞은 원 */
     private record Shock(Member owner, double x, double y, double r0, double rMax, double speed, double startedAt, Set<Member> hit) {}
@@ -162,6 +180,14 @@ public class Room {
         public double prevX, prevY;
         /** 이 접속의 입력이 서버에 닿는 데 걸리는 시간(초, 왕복의 절반, 상한 LAG_COMP_MAX_SEC). 클라이언트가 ping에 실어 보낸 값이고, 구슬 판정에서 서버 위치를 화면 위치 쪽으로 이만큼 앞당긴다 */
         public volatile double lagSec;
+        /** 독(4.33): 쌓인 스택, 남은 틱 수, 다음 틱 시각(방 시계 초), 독을 건 사람. 스택 0이면 중독 아님 */
+        /** 장착 스킬 4칸(4.33). 빈 칸은 null. null 배열이면 아직 고른 적 없어서 해금된 스킬이 해금 순서대로 채워진다 */
+        public volatile String[] loadout;
+        public int poisonStacks, poisonTicksLeft;
+        public double poisonNextAt;
+        Member poisonOwner;
+        /** 암흑이 끝나는 시각(방 시계 초), 정화 뒤 CC 면역이 끝나는 시각 */
+        public double darkUntil, ccImmuneUntil;
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
@@ -268,7 +294,14 @@ public class Room {
     public void setComboTuning(ComboTuning c) { this.comboTuning = c; }
     public void setDashTuning(DashTuning d) { this.dashTuning = d; }
     public DashTuning dashTuning() { return dashTuning; }
+    private int skillSlots = DEFAULT_SKILL_SLOTS;
+    /** 장착 칸 수(actions의 SKILL_SLOT 행 수). 입장하기 전에 정한다 */
+    public void setSkillSlotCount(int n) { this.skillSlots = Math.max(1, n); }
+    public int skillSlotCount() { return skillSlots; }
     public void setSkillTuning(SkillTuning s) { this.skillTuning = s; }
+    /** 독·암흑·정화처럼 SkillTuning에 없는 스킬의 쿨타임(초, DB skills). 없으면 0 */
+    public void setSkillCooldowns(Map<String, Double> cooldowns) { this.skillCooldowns = Map.copyOf(cooldowns); }
+    private Map<String, Double> skillCooldowns = Map.of();
     public void setDisabledSkills(Set<String> codes) { this.disabledSkills = Set.copyOf(codes); }
     public void setRequiredLevels(Map<String, Integer> levels) { this.requiredLevels = Map.copyOf(levels); }
 
@@ -603,6 +636,7 @@ public class Room {
         m.score = score; m.level = level; m.radius = radiusFor(score);
         if (levelUp) {
             broadcastRoster();
+            if (m.loadout == null && !m.bot) outbox.sendText(m, loadoutMessage(m)); // 고른 적 없으면 새로 해금된 스킬이 빈 칸에 채워진다
             // 레벨업 이펙트(4.30): 모두에게 같은 빛기둥(고정). 모든 원에서 그 원이 보이는 화면에 나온다
             broadcast(Map.of("type", "levelFx", "e", m.entityNo, "level", m.level));
         }
@@ -693,6 +727,8 @@ public class Room {
         for (Member m : members.values()) m.safe = inSafeZone(m.x, m.y);
         updateShocks(tu);
         updateHooks(tu);
+        updateBolts(dt);
+        updatePoison();
         collide(tu);
         finishHooks(tu);
         eatOrbs();
@@ -1141,9 +1177,10 @@ public class Room {
      */
     public void skill(Member m, String id, double ax, double ay) {
         int idx = SKILLS.indexOf(id);
-        if (idx < 0 || m.bot || m.dead || m.offline || members.get(m.entityNo) != m || m.hookedBy != null || disabledSkills.contains(id)) return;
+        if (idx < 0 || m.bot || m.dead || m.offline || members.get(m.entityNo) != m || (m.hookedBy != null && !"cleanse".equals(id)) || disabledSkills.contains(id)) return; // 끌려오는 중에도 정화는 쓴다
         if (clockSeconds < m.skillReadyAt[idx]) return;
         if (!unlocked(m, id)) return; // 해금 레벨이 안 되면 쓰지 못한다(서버가 판정)
+        if (!equippedSkills(m).contains(id)) { outbox.sendText(m, Map.of("type", "skillFail", "id", id, "reason", "unequipped")); return; } // 장착해야만 쓴다(4.33)
         SkillTuning s = skillTuning;
         double cooldown;
         switch (id) {
@@ -1160,10 +1197,70 @@ public class Room {
                 broadcast(Map.of("type", "skillFx", "id", "stealth", "e", m.entityNo, "ms", Math.round(s.stealthSeconds() * 1000)));
                 cooldown = s.stealthCooldown();
             }
+            case "poison", "darkness" -> { if (!attackAllowed(m, id)) return; castBolt(m, id, ax, ay); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
+            case "cleanse" -> { cleanse(m); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
             default -> { return; }
         }
         m.skillReadyAt[idx] = clockSeconds + cooldown;
         outbox.sendText(m, Map.of("type", "skill", "id", id, "cooldownMs", Math.round(cooldown * 1000)));
+    }
+
+    // ---- 스킬 장착(4.33)
+
+    private boolean usableSkill(Member m, String id) {
+        return SKILLS.contains(id) && !disabledSkills.contains(id) && m.level >= requiredLevels.getOrDefault(id, 1);
+    }
+
+    /** 지금 장착해서 쓸 수 있는 스킬(해금되고 켜져 있는 것만). 고른 적 없으면 해금된 스킬이 해금 레벨 순서(같으면 SKILLS 순서)대로 SKILL_SLOTS개까지 채워진다. */
+    public List<String> equippedSkills(Member m) {
+        String[] lo = m.loadout;
+        List<String> out = new ArrayList<>();
+        if (lo == null) {
+            List<String> unlocked = SKILLS.stream().filter(id -> usableSkill(m, id))
+                    .sorted(Comparator.<String>comparingInt(id -> requiredLevels.getOrDefault(id, 1)).thenComparingInt(SKILLS::indexOf)).toList();
+            return new ArrayList<>(unlocked.subList(0, Math.min(skillSlots, unlocked.size())));
+        }
+        for (String id : lo) if (id != null && usableSkill(m, id) && !out.contains(id)) out.add(id);
+        return out;
+    }
+
+    /** 클라이언트에 보내는 장착 4칸(빈 칸은 null). 입장할 때와 바뀔 때마다 보낸다 */
+    public Map<String, Object> loadoutMessage(Member m) {
+        String[] lo = m.loadout;
+        List<String> slots = new ArrayList<>();
+        if (lo == null) slots.addAll(equippedSkills(m));
+        else for (String id : lo) slots.add(id != null && usableSkill(m, id) ? id : null);
+        while (slots.size() < skillSlots) slots.add(null);
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "loadout"); msg.put("slots", slots);
+        return msg;
+    }
+
+    /** 저장된 값(칸 순서대로 스킬 코드, 빈 칸 null)으로 장착을 복원한다. 모르는 코드는 빈 칸이 되고, null이면 고른 적 없는 상태로 둔다. */
+    public void restoreLoadout(Member m, List<String> saved) {
+        if (saved == null) { m.loadout = null; return; }
+        String[] lo = new String[skillSlots];
+        for (int i = 0; i < skillSlots && i < saved.size(); i++) lo[i] = saved.get(i) != null && SKILLS.contains(saved.get(i)) ? saved.get(i) : null;
+        m.loadout = lo;
+    }
+
+    /**
+     * 장착을 바꾼다. slots는 skillSlotCount()칸(빈 칸은 null·빈 문자열)이고, 모르는 스킬·아직 해금 안 된 스킬·같은 스킬 중복이 있으면 아무것도 바꾸지 않고
+     * 지금 장착을 다시 알려 준다. 쿨타임은 스킬마다 따로 세므로 바꿔도 풀리지 않는다.
+     */
+    public void setLoadout(Member m, List<String> slots) {
+        if (m.bot || slots == null || slots.size() != skillSlots) { outbox.sendText(m, loadoutMessage(m)); return; }
+        String[] lo = new String[skillSlots];
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < skillSlots; i++) {
+            String id = slots.get(i);
+            if (id == null || id.isBlank()) continue;
+            if (!usableSkill(m, id) || !seen.add(id)) { outbox.sendText(m, loadoutMessage(m)); return; }
+            lo[i] = id;
+        }
+        m.loadout = lo;
+        outbox.sendText(m, loadoutMessage(m));
+        outbox.saveSkillSlots(this, m, Arrays.asList(lo));
     }
 
     /**
@@ -1189,6 +1286,120 @@ public class Room {
         return true;
     }
 
+    // ---- 독·암흑·정화(4.33)
+
+    private static final class Bolt {
+        final int id; final Member owner; final String kind; double x, y, left; final double dx, dy, speed, radius;
+        Bolt(int id, Member owner, String kind, double x, double y, double dx, double dy, double speed, double radius) { this.speed = speed; this.radius = radius; this.id = id; this.owner = owner; this.kind = kind; this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.left = BOLT_RANGE; }
+    }
+    private final List<Bolt> bolts = new ArrayList<>();
+    private int nextBoltId = 1;
+
+    /** 지금 날아가는 투사체 수(테스트용) */
+    int boltCount() { return bolts.size(); }
+
+    /** 독·암흑 투사체: 내 원 가장자리에서 겨눈 방향으로 BOLT_SPEED로 날아간다(논타겟). 처음 닿은 원 하나가 맞고, 사거리 끝까지 빗나가면 사라진다. */
+    private void castBolt(Member m, String kind, double ax, double ay) {
+        double dx = ax - m.x, dy = ay - m.y, len = Math.hypot(dx, dy);
+        if (!Double.isFinite(len) || len < 1e-6) { dx = m.vx; dy = m.vy; len = Math.hypot(dx, dy); }
+        if (len < 1e-6) { dx = 0; dy = -1; len = 1; }
+        dx /= len; dy /= len;
+        Bolt b = new Bolt(nextBoltId++, m, kind, m.x + dx * m.displayRadius, m.y + dy * m.displayRadius, dx, dy, tuning.maxSpeed() * BOLT_SPEED_MULT, Math.max(BOLT_MIN_RADIUS, m.displayRadius * BOLT_RADIUS_RATIO));
+        bolts.add(b);
+        breakStealth(m);
+        Map<String, Object> fx = new HashMap<>();
+        fx.put("type", "skillFx"); fx.put("id", "bolt"); fx.put("kind", kind); fx.put("bid", b.id); fx.put("e", m.entityNo);
+        fx.put("x", b.x); fx.put("y", b.y); fx.put("dx", dx); fx.put("dy", dy); fx.put("speed", b.speed); fx.put("radius", b.radius); fx.put("range", BOLT_RANGE);
+        broadcast(fx);
+    }
+
+    /** 투사체를 한 틱 나아가게 하고, 지난 선분에 처음 닿은 원이 있으면 맞힌다. 세이프존·무적(방패 포함)·정화 직후 면역인 원은 지나간다. */
+    private void updateBolts(double dt) {
+        for (Iterator<Bolt> it = bolts.iterator(); it.hasNext(); ) {
+            Bolt b = it.next();
+            Member o = b.owner;
+            if (members.get(o.entityNo) != o) { it.remove(); broadcast(Map.of("type", "skillFx", "id", "boltEnd", "bid", b.id)); continue; }
+            double step = Math.min(b.speed * dt, b.left), nx = b.x + b.dx * step, ny = b.y + b.dy * step;
+            Member best = null; double bestT = Double.MAX_VALUE;
+            for (Member t : members.values()) {
+                if (t == o || t.dead || t.safe || t.protectUntil > clockSeconds || t.ccImmuneUntil > clockSeconds) continue;
+                double sx = nx - b.x, sy = ny - b.y, len2 = sx * sx + sy * sy;
+                double u = len2 > 0 ? Math.max(0, Math.min(1, ((t.x - b.x) * sx + (t.y - b.y) * sy) / len2)) : 0;
+                if (Math.hypot(b.x + sx * u - t.x, b.y + sy * u - t.y) <= t.displayRadius + b.radius && u < bestT) { best = t; bestT = u; }
+            }
+            if (best != null) {
+                double hx = b.x + (nx - b.x) * bestT, hy = b.y + (ny - b.y) * bestT;
+                it.remove();
+                Map<String, Object> end = new HashMap<>();
+                end.put("type", "skillFx"); end.put("id", "boltEnd"); end.put("bid", b.id); end.put("hit", best.entityNo); end.put("x", hx); end.put("y", hy);
+                broadcast(end);
+                if ("poison".equals(b.kind)) applyPoison(best, o); else applyDarkness(best);
+                continue;
+            }
+            b.x = nx; b.y = ny; b.left -= step;
+            if (b.left <= 1e-6) { it.remove(); broadcast(Map.of("type", "skillFx", "id", "boltEnd", "bid", b.id)); }
+        }
+    }
+
+    /** 독에 걸린다: 이미 중독이면 스택이 오르고(상한 POISON_MAX_STACKS) 9초를 처음부터 다시 센다. 틱마다 스택 수만큼 잃는다. */
+    private void applyPoison(Member t, Member owner) {
+        t.poisonStacks = t.poisonStacks > 0 ? Math.min(POISON_MAX_STACKS, t.poisonStacks + 1) : 1;
+        t.poisonTicksLeft = POISON_TICKS;
+        t.poisonNextAt = clockSeconds + POISON_TICK_SECONDS;
+        t.poisonOwner = owner;
+        broadcast(Map.of("type", "skillFx", "id", "poison", "t", t.entityNo, "stacks", t.poisonStacks, "ms", Math.round(POISON_TICKS * POISON_TICK_SECONDS * 1000)));
+    }
+
+    /** 틱마다 독이 다음 틱 시각에 닿았으면 스택 수만큼 키워드를 잃고, 마지막 틱이면 독이 끝난다. 잃은 뒤 무적은 독을 막지 않고 독도 무적을 주지 않는다. */
+    private void updatePoison() {
+        for (Member m : members.values()) {
+            if (m.poisonStacks <= 0) continue;
+            if (m.dead) { clearPoison(m); continue; }
+            if (clockSeconds + 1e-9 < m.poisonNextAt) continue;
+            int count = m.poisonStacks;
+            if (m.bot) {
+                for (int i = 0; i < count && !m.botKeywords.isEmpty(); i++) botLose(m, tuning);
+                comboLose(m, m.poisonOwner);
+            } else {
+                outbox.requestPoisonLose(this, m, m.poisonOwner, count);
+            }
+            m.poisonTicksLeft--;
+            m.poisonNextAt += POISON_TICK_SECONDS;
+            if (m.poisonTicksLeft <= 0) clearPoison(m);
+        }
+    }
+
+    /** 독으로 키워드를 잃었다: 콤보·불꽃이 끊긴다(4.25). 키워드를 가져가는 사람은 없다. */
+    public void poisonLost(Member victim, Member owner) { comboLose(victim, owner); }
+
+    private void clearPoison(Member m) {
+        if (m.poisonStacks <= 0) return;
+        m.poisonStacks = 0; m.poisonTicksLeft = 0; m.poisonOwner = null;
+        broadcast(Map.of("type", "skillFx", "id", "poisonEnd", "t", m.entityNo));
+    }
+
+    /** 암흑: 맞은 사람의 화면이 DARK_SECONDS 동안 자기 원 둘레만 보이게 어두워진다(그리는 것은 클라이언트). 봇은 영향이 없다. */
+    private void applyDarkness(Member t) {
+        t.darkUntil = clockSeconds + DARK_SECONDS;
+        if (!t.bot) outbox.sendText(t, Map.of("type", "dark", "ms", Math.round(DARK_SECONDS * 1000)));
+    }
+
+    /** 정화: 걸려 있는 CC(갈고리에 끌려오는 중, 독, 암흑)를 한꺼번에 풀고, CLEANSE_IMMUNE_SECONDS 동안 새 CC를 막는다(기본 0 = 면역 없음). */
+    private void cleanse(Member m) {
+        if (m.hookedBy != null) {
+            m.hookedBy = null; m.pullLeft = 0;
+            if (m.hookLost) { // 맞을 때 키워드를 잃었으면 끌려온 뒤에 받을 잃은 뒤 무적을 지금 준다(finishHooks와 같다)
+                m.hookLost = false;
+                if (m.protectUntil <= clockSeconds) { m.protectUntil = clockSeconds + tuning.loseProtectSeconds(); shield(m, tuning); }
+            }
+            if (!m.bot) outbox.sendText(m, Map.of("type", "pullEnd"));
+        }
+        clearPoison(m);
+        if (m.darkUntil > clockSeconds) { m.darkUntil = 0; if (!m.bot) outbox.sendText(m, Map.of("type", "darkEnd")); }
+        m.ccImmuneUntil = clockSeconds + CLEANSE_IMMUNE_SECONDS;
+        broadcast(Map.of("type", "skillFx", "id", "cleanse", "e", m.entityNo));
+    }
+
     /** 공격 스킬을 쓰면 은신이 풀린다 */
     private void breakStealth(Member m) {
         if (m.stealthUntil <= clockSeconds) return;
@@ -1210,7 +1421,7 @@ public class Room {
             Shock sh = it.next();
             double radius = Math.min(sh.rMax(), sh.r0() + sh.speed() * (clockSeconds - sh.startedAt()));
             for (Member t : members.values()) {
-                if (t == sh.owner() || t.dead || t.safe || t.protectUntil > clockSeconds || t.hookedBy != null || sh.hit().contains(t)) continue;
+                if (t == sh.owner() || t.dead || t.safe || t.protectUntil > clockSeconds || t.ccImmuneUntil > clockSeconds || t.hookedBy != null || sh.hit().contains(t)) continue;
                 double dx = t.x - sh.x(), dy = t.y - sh.y(), d = Math.hypot(dx, dy);
                 if (d - t.displayRadius > radius) continue;
                 sh.hit().add(t);
@@ -1246,7 +1457,7 @@ public class Room {
             Member best = null;
             double bestAt = Double.MAX_VALUE;
             for (Member t : members.values()) {
-                if (t == o || t.dead || t.safe || t.protectUntil > clockSeconds || t.hookedBy != null) continue;
+                if (t == o || t.dead || t.safe || t.protectUntil > clockSeconds || t.ccImmuneUntil > clockSeconds || t.hookedBy != null) continue;
                 double vx = t.x - o.x, vy = t.y - o.y, proj = vx * h.dirX() + vy * h.dirY(), perp = Math.abs(vx * h.dirY() - vy * h.dirX());
                 double tr = t.displayRadius, disc = tr * tr - perp * perp;
                 if (disc < 0) continue; // 빗나감
@@ -1333,12 +1544,12 @@ public class Room {
         if (!m.bot) outbox.sendText(m, Map.of("type", "knock", "dx", m.kbX, "dy", m.kbY, "ms", (long) (tu.knockbackSeconds() * 1000)));
     }
 
-    /** 클라이언트가 알린 보이는 범위(가로·세로 절반, px)를 받는다. 값은 한도 안으로 맞춘다(너무 작아 화면이 비거나 너무 커서 전부 보내게 되는 것을 막는다). */
     /** 클라이언트가 보낸 왕복 시간(ms)으로 지연 보상 시간을 정한다. 이상한 값은 0~상한으로 자른다. */
     public void setLag(Member m, double rttMs) {
         m.lagSec = Double.isFinite(rttMs) ? Math.max(0, Math.min(LAG_COMP_MAX_SEC, rttMs / 2000)) : 0;
     }
 
+    /** 클라이언트가 알린 보이는 범위(가로·세로 절반, px)를 받는다. 값은 한도 안으로 맞춘다(너무 작아 화면이 비거나 너무 커서 전부 보내게 되는 것을 막는다). */
     public void setView(Member m, double halfW, double halfH) {
         if (members.get(m.entityNo) != m) return;
         m.viewHalfW = clamp(halfW, VIEW_MIN, VIEW_MAX);

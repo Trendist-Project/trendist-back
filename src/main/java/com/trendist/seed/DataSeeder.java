@@ -70,6 +70,7 @@ public class DataSeeder implements ApplicationRunner {
     private final GuideRepository guides;
     private final UserRepository users;
     private final CodeTables codeTables;
+    private final com.trendist.keybinding.service.KeybindingSeeder keybindingSeeder;
 
     @Override
     @Transactional
@@ -107,9 +108,20 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2, 최소 반지름 → `min_diameter`로 바뀜 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
-        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size", "min_radius")) {
+        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
+        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size")) {
             settings.findByName(old).ifPresent(settings::delete);
+        }
+        // 최소·최대 크기는 지름이 아니라 반지름으로 둔다(4.2): 옛 지름 설정은 값을 절반으로 옮기며 이름을 바꾼다(아래 설정 만들기에서 옮긴 값을 쓴다)
+        java.util.Map<String, String> carried = new java.util.HashMap<>();
+        for (String[] pair : new String[][]{{"min_diameter", "min_radius"}, {"max_diameter", "max_radius"}}) {
+            settings.findByName(pair[0]).ifPresent(o -> {
+                if (settings.findByName(pair[1]).isEmpty()) {
+                    try { carried.put(pair[1], new BigDecimal(o.getValue().trim()).divide(BigDecimal.valueOf(2)).stripTrailingZeros().toPlainString()); }
+                    catch (NumberFormatException ignored) { /* 값이 이상하면 기본값을 쓴다 */ }
+                }
+                settings.delete(o);
+            });
         }
         // 설정 그룹(13.3): 이름과 순서는 코드(SettingKeys.GROUP_ORDER)가 정한다. 설정이 외래 키로 가리키므로 설정보다 먼저 만든다
         java.util.Map<String, SettingGroup> groupByName = new java.util.HashMap<>();
@@ -124,10 +136,11 @@ public class DataSeeder implements ApplicationRunner {
             SettingGroup group = groupByName.get(SettingKeys.groupOf(d.name()));
             String unit = SettingKeys.unitOf(d.name());
             long order = SettingKeys.sortOrderOf(d.name());
-            String type = d.value().contains(".") ? "DECIMAL" : "INT";
+            String value = carried.getOrDefault(d.name(), d.value());
+            String type = value.contains(".") ? "DECIMAL" : "INT";
             Setting s = settings.findByName(d.name()).orElse(null);
             if (s == null) {
-                settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description(), unit, group, order));
+                settings.save(new Setting(d.name(), value, type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description(), unit, group, order));
                 added++;
             } else {
                 boolean changed = false;
@@ -172,6 +185,7 @@ public class DataSeeder implements ApplicationRunner {
         }
         codeTables.clear();
         added += seedGuides();
+        added += keybindingSeeder.seed(); // 키 바인딩 목록: 키·동작(4.33)
         log.info("seed done, {} rows added", added);
     }
 
@@ -349,24 +363,32 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * 스킬(4.33): 코드가 있는데 DB에 없는 스킬만 채운다(운영에서 고친 쿨타임·기본 키는 건드리지 않는다). 스킬을 늘릴 때는 여기에 한 줄을 더하거나 DB에 행을 넣고,
+     * 스킬(4.33): 코드가 있는데 DB에 없는 스킬을 채우고, 이미 있는 스킬은 목록 순서만 코드(배열 순서, 대시가 맨 앞)와 맞춘다(운영에서 고친 쿨타임·기본 키는 건드리지 않는다). 스킬을 늘릴 때는 여기에 한 줄을 더하거나 DB에 행을 넣고,
      * 동작은 Room.SKILLS와 Room.skill에, 이름·설명은 프론트엔드 번역 파일(skills.<코드>_name·_desc)에 더한다. 기본 단축키는 KeyboardEvent.code(Space, Digit1, KeyQ …).
      * 필드: 코드, 아이콘, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬).
      */
     private static final String[][] SKILL_ROWS = {
-            {"shield", "🛡", "DEFENSE", "Digit1", "30", "10"},   // 해금 레벨 순서 = 키 순서 = 버튼 순서
+            {"dash", "⚡", "MOVE", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서)
+            {"shield", "🛡", "DEFENSE", "Digit1", "30", "10"},   // 그다음은 해금 레벨 순서
             {"hook", "🪝", "ATTACK", "Digit2", "30", "15"},
             {"shockwave", "💥", "ATTACK", "Digit3", "30", "20"},
             {"stealth", "👻", "STEALTH", "Digit4", "30", "25"},
-            {"dash", "⚡", "MOVE", "Space", "30", "1"}, // 기본 스킬. 버튼은 스킬 4개 뒤(오른쪽)
+            {"darkness", "🕶️", "ATTACK", "Digit5", "30", "30"},
+            {"cleanse", "✨", "DEFENSE", "Digit6", "30", "35"},
+            {"poison", "☠️", "ATTACK", "Digit7", "30", "40"},
     };
 
     private int seedSkills() {
         int added = 0;
         for (int i = 0; i < SKILL_ROWS.length; i++) {
             String[] r = SKILL_ROWS[i];
-            if (skills.findByCode(r[0]).isPresent()) continue;
-            skills.save(new com.trendist.skill.entity.Skill(r[0], r[1], r[2], r[3], Double.parseDouble(r[4]), Integer.parseInt(r[5]), (i + 1) * 10L));
+            long order = (i + 1) * 10L;
+            var existing = skills.findByCode(r[0]);
+            if (existing.isPresent()) { // 목록 순서만 코드와 맞춘다(쿨타임·해금 레벨·기본 키는 운영에서 고친 값을 건드리지 않는다)
+                if (existing.get().getSortOrder() != order) { existing.get().changeSortOrder(order); skills.save(existing.get()); }
+                continue;
+            }
+            skills.save(new com.trendist.skill.entity.Skill(r[0], r[1], r[2], r[3], Double.parseDouble(r[4]), Integer.parseInt(r[5]), order));
             added++;
         }
         return added;

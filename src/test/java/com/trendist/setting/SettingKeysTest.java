@@ -34,7 +34,7 @@ class SettingKeysTest {
 
     @Test
     void similarSettingsAreNextToEachOther() {
-        assertThat(SettingKeys.sortOrderOf(SettingKeys.MAX_DIAMETER)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.MIN_DIAMETER) + 1);
+        assertThat(SettingKeys.sortOrderOf(SettingKeys.MAX_RADIUS)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.MIN_RADIUS) + 1);
         assertThat(SettingKeys.sortOrderOf(SettingKeys.AREA_SHRINK_SPEED)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.AREA_GROW_SPEED) + 1);
         assertThat(SettingKeys.sortOrderOf(SettingKeys.HOOK_PULL_SECONDS)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.HOOK_SECONDS) + 1);
     }

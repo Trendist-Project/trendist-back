@@ -31,6 +31,8 @@ public class Skill extends BaseTimeEntity {
     public void changeCooldown(BigDecimal seconds) { this.cooldownSeconds = seconds; }
     public void changeRequiredLevel(int level) { this.requiredLevel = level; }
     public void changeEnabled(boolean enabled) { this.enabled = enabled; }
+    /** 목록 순서는 코드(시더)가 정한다 */
+    public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
 
     public Skill(String code, String icon, String category, String defaultKey, double cooldownSeconds, int requiredLevel, long sortOrder) {
         this.code = code; this.requiredLevel = requiredLevel;

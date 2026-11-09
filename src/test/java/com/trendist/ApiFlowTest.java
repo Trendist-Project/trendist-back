@@ -1122,26 +1122,26 @@ class ApiFlowTest {
         skillCatalog.invalidate();
         mvc.perform(get("/api/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(5))
-                .andExpect(jsonPath("$[0].code").value("shield"))      // 해금 레벨 순서 = 키 순서 = 버튼 순서
-                .andExpect(jsonPath("$[0].defaultKey").value("Digit1"))
-                .andExpect(jsonPath("$[0].cooldownSeconds").value(30.0))
-                .andExpect(jsonPath("$[0].category").value("DEFENSE"))
-                .andExpect(jsonPath("$[0].icon").value("🛡"))
-                .andExpect(jsonPath("$[0].requiredLevel").value(10))   // 방패 10레벨
-                .andExpect(jsonPath("$[1].code").value("hook"))
-                .andExpect(jsonPath("$[1].defaultKey").value("Digit2"))
-                .andExpect(jsonPath("$[1].requiredLevel").value(15))   // 갈고리 15레벨
-                .andExpect(jsonPath("$[2].code").value("shockwave"))
-                .andExpect(jsonPath("$[2].defaultKey").value("Digit3"))
-                .andExpect(jsonPath("$[2].requiredLevel").value(20))   // 충격파 20레벨
-                .andExpect(jsonPath("$[3].code").value("stealth"))
-                .andExpect(jsonPath("$[3].defaultKey").value("Digit4"))
-                .andExpect(jsonPath("$[3].requiredLevel").value(25))   // 은신 25레벨
+                .andExpect(jsonPath("$.length()").value(8))
+                .andExpect(jsonPath("$[1].code").value("shield"))      // 대시 다음은 해금 레벨 순서
+                .andExpect(jsonPath("$[1].defaultKey").value("Digit1"))
+                .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
+                .andExpect(jsonPath("$[1].category").value("DEFENSE"))
+                .andExpect(jsonPath("$[1].icon").value("🛡"))
+                .andExpect(jsonPath("$[1].requiredLevel").value(10))   // 방패 10레벨
+                .andExpect(jsonPath("$[2].code").value("hook"))
+                .andExpect(jsonPath("$[2].defaultKey").value("Digit2"))
+                .andExpect(jsonPath("$[2].requiredLevel").value(15))   // 갈고리 15레벨
+                .andExpect(jsonPath("$[3].code").value("shockwave"))
+                .andExpect(jsonPath("$[3].defaultKey").value("Digit3"))
+                .andExpect(jsonPath("$[3].requiredLevel").value(20))   // 충격파 20레벨
+                .andExpect(jsonPath("$[4].code").value("stealth"))
+                .andExpect(jsonPath("$[4].defaultKey").value("Digit4"))
+                .andExpect(jsonPath("$[4].requiredLevel").value(25))   // 은신 25레벨
                 .andExpect(jsonPath("$[0].name").doesNotExist())
-                .andExpect(jsonPath("$[4].code").value("dash")) // 대시는 스킬 4개 뒤
-                .andExpect(jsonPath("$[4].defaultKey").value("Space"))
-                .andExpect(jsonPath("$[4].requiredLevel").value(1));  // 대시는 기본 스킬 // 이름·설명은 프론트엔드 번역 파일이 코드로 찾는다
+                .andExpect(jsonPath("$[0].code").value("dash")) // 대시는 목록의 맨 앞
+                .andExpect(jsonPath("$[0].defaultKey").value("Space"))
+                .andExpect(jsonPath("$[0].requiredLevel").value(1));  // 대시는 기본 스킬 // 이름·설명은 프론트엔드 번역 파일이 코드로 찾는다
         // DB 값을 고치면(캐시를 버린 뒤) 쿨타임·사용 여부가 바로 읽힌다
         var hook = skillRepository.findByCode("hook").orElseThrow();
         try {
@@ -1151,7 +1151,7 @@ class ApiFlowTest {
             skillRepository.saveAndFlush(hook);
             skillCatalog.invalidate();
             assertThat(skillCatalog.disabledCodes()).contains("hook");
-            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(4));
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(7));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
             skillRepository.saveAndFlush(hook);
@@ -1224,7 +1224,7 @@ class ApiFlowTest {
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("shield", "hook", "shockwave", "stealth", "dash");
+                .containsExactly("dash", "shield", "hook", "shockwave", "stealth", "darkness", "cleanse", "poison");
         try {
             var r = adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);

@@ -48,6 +48,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
     private final SettingService settings;
     private final com.trendist.skill.service.SkillCatalog skillCatalog;
+    private final com.trendist.skill.service.SkillLoadoutService skillLoadouts;
     private final KeywordService keywordService;
     private final com.trendist.player.service.PlayerService playerService;
     private final LevelService levels;
@@ -55,9 +56,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json,
                            com.trendist.skill.service.SkillCatalog skillCatalog,
+                           com.trendist.skill.service.SkillLoadoutService skillLoadouts,
                            @org.springframework.context.annotation.Lazy com.trendist.player.service.PlayerService playerService) {
         this.playerService = playerService;
         this.skillCatalog = skillCatalog;
+        this.skillLoadouts = skillLoadouts;
         this.settings = settings;
         this.levels = levels;
         this.keywordService = keywordService;
@@ -69,10 +72,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.ComboTuning c = comboTuning();
                 Room.DashTuning dash = dashTuning();
                 Room.SkillTuning skill = skillTuning();
+                java.util.Map<String, Double> extra = extraSkillCooldowns();
                 java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
                 java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
                 rooms.values().forEach(r -> {
                     if (!skill.equals(r.skillTuning())) r.setSkillTuning(skill);
+                    r.setSkillCooldowns(extra);
                     r.setDisabledSkills(disabledSkills);
                     r.setRequiredLevels(requiredLevels);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
@@ -110,6 +115,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             r.setComboTuning(comboTuning());
             r.setDashTuning(dashTuning());
             r.setSkillTuning(skillTuning());
+            r.setSkillCooldowns(extraSkillCooldowns());
+            r.setSkillSlotCount(skillLoadouts.slotCount()); // 장착 칸 수는 actions의 SKILL_SLOT 동작 수(4.33)
             r.setDisabledSkills(skillCatalog.disabledCodes());
             r.setRequiredLevels(skillCatalog.requiredLevels());
             r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
@@ -131,8 +138,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     public Room.Tuning tuning() {
         double world = settings.getDouble(SettingKeys.WORLD_SIZE);
         return new Room.Tuning(world,
-                settings.getDouble(SettingKeys.MIN_DIAMETER) / 2,
-                settings.getDouble(SettingKeys.MAX_DIAMETER) / 2,
+                settings.getDouble(SettingKeys.MIN_RADIUS),
+                settings.getDouble(SettingKeys.MAX_RADIUS),
                 settings.getDouble(SettingKeys.SCORE_CAP),
                 settings.getDouble(SettingKeys.MAX_SPEED),
                 settings.getDouble(SettingKeys.ZOOM_FACTOR),
@@ -151,6 +158,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.BOT_CAP_RATIO),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP),
                 settings.getDouble(SettingKeys.EAT_MIN_REACH));
+    }
+
+    /** 독·암흑·정화의 쿨타임(DB skills). 테스트 중에는 0이다. */
+    private java.util.Map<String, Double> extraSkillCooldowns() {
+        return java.util.Map.of("poison", skillCatalog.cooldownSeconds("poison", 0), "darkness", skillCatalog.cooldownSeconds("darkness", 0), "cleanse", skillCatalog.cooldownSeconds("cleanse", 0));
     }
 
     /** 대시 설정(4.27). */
@@ -322,6 +334,39 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 }));
             } catch (RuntimeException e) {
                 log.warn("lose keyword failed for player {}", loserId, e);
+            }
+        });
+    }
+
+    @Override
+    public void saveSkillSlots(Room room, Room.Member member, java.util.List<String> slots) {
+        long playerId = member.playerId;
+        db(() -> {
+            try { skillLoadouts.save(playerId, slots); }
+            catch (RuntimeException e) { log.warn("save skill slots failed for player {}", playerId, e); }
+        });
+    }
+
+    @Override
+    public void requestPoisonLose(Room room, Room.Member victim, Room.Member owner, int count) {
+        long victimId = victim.playerId;
+        String by = owner != null ? owner.nickname : "☠";
+        db(() -> {
+            try {
+                for (int i = 0; i < count; i++) {
+                    var lost = keywordService.loseRandom(victimId);
+                    if (lost.isEmpty()) break;
+                    var l = lost.get();
+                    room.submit(r -> {
+                        Room.Member m = r.byPlayer(victimId);
+                        if (m != null) {
+                            r.poisonLost(m, owner);
+                            sendText(m, Map.of("type", "lost", "by", by, "keyword", l.text(), "score", l.score(), "poison", true));
+                        }
+                    });
+                }
+            } catch (RuntimeException e) {
+                log.warn("poison lose failed for player {}", victimId, e);
             }
         });
     }

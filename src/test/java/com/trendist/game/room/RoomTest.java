@@ -24,6 +24,10 @@ class RoomTest {
         final List<Long> prizeEaters = new ArrayList<>();
         final List<long[]> wipes = new ArrayList<>();
         public void requestWipe(Room room, Room.Member loser, Room.Member winner) { wipes.add(new long[]{loser.playerId, winner.playerId}); }
+        final List<String> savedSlots = new ArrayList<>(); // 저장 요청된 장착 4칸
+        public void saveSkillSlots(Room room, Room.Member member, List<String> slots) { savedSlots.add(member.playerId + ":" + String.join(",", slots.stream().map(x -> x == null ? "" : x).toList())); }
+        final List<long[]> poisonLoses = new ArrayList<>(); // {당한 사람, 잃은 개수}
+        public void requestPoisonLose(Room room, Room.Member victim, Room.Member owner, int count) { poisonLoses.add(new long[]{victim.playerId, count}); }
         final List<Long> defeats = new ArrayList<>();
         public void requestDefeat(Room room, Room.Member loser) { defeats.add(loser.playerId); }
         final List<Long> steals = new ArrayList<>();
@@ -926,6 +930,199 @@ class RoomTest {
     /** 방 전체에 보낸 메시지는 받는 사람마다 한 번씩 기록되므로 같은 메시지는 하나로 센다 */
     private static long countFx(Out out, String type, String id) {
         return out.texts.stream().filter(m -> type.equals(m.get("type")) && (id == null || id.equals(m.get("id")))).distinct().count();
+    }
+
+    /** 독·암흑 테스트: a(800,800)가 +x 쪽 b(1100,800)를 겨눈다. 가운데 세이프존 밖이고 서로 부딪히지 않는 거리다. */
+    private static Room boltRoom(Out out) {
+        Room r = skillRoom(out, Room.SkillTuning.DEFAULT);
+        return r;
+    }
+
+    /** 독·암흑·정화를 장착한 채로 입장시킨다(장착해야만 쓸 수 있다, 4.33) */
+    private static Room.Member joinEq(Room r, long id, String session, String name, int level, double score, List<Long> kws) {
+        Room.Member m = r.join(id, session, name, level, score, kws);
+        r.setLoadout(m, java.util.Arrays.asList("poison", "darkness", "cleanse", null));
+        return m;
+    }
+
+    private static void tickSeconds(Room r, double seconds) { for (int i = 0; i < Math.round(seconds * 20); i++) r.tick(); }
+
+    @Test
+    void poisonBoltHitsAndLosesOneKeywordEveryThreeSecondsThreeTimes() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        Room.Member b = joinEq(r, 2, "s2", "b", 1, 0, List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "poison", b.x, b.y);
+        assertThat(r.boltCount()).isEqualTo(1);
+        tickSeconds(r, 0.6); // 거리 300px, 속도 900px/초
+        assertThat(r.boltCount()).isZero();
+        assertThat(b.poisonStacks).isEqualTo(1);
+        tickSeconds(r, 2.2);
+        assertThat(out.poisonLoses).isEmpty();            // 아직 3초 전
+        tickSeconds(r, 0.9);
+        assertThat(out.poisonLoses).hasSize(1);
+        assertThat(out.poisonLoses.get(0)).containsExactly(2, 1);
+        tickSeconds(r, 6.5);
+        assertThat(out.poisonLoses).hasSize(3);           // 3초, 6초, 9초
+        assertThat(b.poisonStacks).isZero();
+        tickSeconds(r, 5);
+        assertThat(out.poisonLoses).hasSize(3);           // 끝난 뒤에는 더 잃지 않는다
+    }
+
+    @Test
+    void poisonStacksWhenHitAgainAndRestartsTheNineSecondCount() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        Room.Member b = joinEq(r, 2, "s2", "b", 1, 0, List.of());
+        Room.Member c = joinEq(r, 3, "s3", "c", 1, 0, List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800; c.x = 1400; c.y = 800;
+        r.tick();
+        r.skill(a, "poison", b.x, b.y);
+        tickSeconds(r, 2.5);                              // 첫 독이 끝나기 전(첫 틱 직전)
+        r.skill(c, "poison", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(b.poisonStacks).isEqualTo(2);
+        assertThat(out.poisonLoses).isEmpty();            // 다시 맞았으니 3초를 처음부터 센다
+        tickSeconds(r, 3.2);
+        assertThat(out.poisonLoses).hasSize(1);
+        assertThat(out.poisonLoses.get(0)).containsExactly(2, 2); // 2스택이라 한 번에 2개
+        tickSeconds(r, 6.5);
+        assertThat(out.poisonLoses).hasSize(3);
+        assertThat(out.poisonLoses).allSatisfy(l -> assertThat(l).containsExactly(2, 2));
+        assertThat(b.poisonStacks).isZero();
+    }
+
+    @Test
+    void shieldedOrSafeCirclesLetTheBoltPassThrough() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        Room.Member b = joinEq(r, 2, "s2", "b", 1, 0, List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        b.protectUntil = 1e9; // 방패·잃은 뒤 무적
+        r.skill(a, "poison", b.x, b.y);
+        tickSeconds(r, 2);
+        assertThat(b.poisonStacks).isZero();
+        assertThat(r.boltCount()).isZero(); // 사거리 끝에서 사라진다
+    }
+
+    @Test
+    void darknessBoltTellsTheVictimAndCleanseClearsEverythingEvenWhilePulled() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        Room.Member b = joinEq(r, 2, "s2", "b", 1, 0, List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "darkness", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(count(out, "dark", null)).isEqualTo(1);
+        assertThat(b.darkUntil).isGreaterThan(0);
+        r.skill(a, "poison", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(b.poisonStacks).isEqualTo(1);
+        b.hookedBy = a; b.pullLeft = 1; // 갈고리에 끌려오는 중에도 정화는 쓴다
+        r.skill(b, "cleanse", 0, 0);
+        assertThat(b.hookedBy).isNull();
+        assertThat(b.poisonStacks).isZero();
+        assertThat(b.darkUntil).isZero();
+        assertThat(count(out, "darkEnd", null)).isEqualTo(1);
+        assertThat(count(out, "pullEnd", null)).isEqualTo(1);
+        assertThat(countFx(out, "skillFx", "cleanse")).isEqualTo(1);
+        tickSeconds(r, 10);
+        assertThat(out.poisonLoses).isEmpty(); // 풀린 독은 더 잃지 않는다
+        r.skill(a, "poison", b.x, b.y);        // 면역 시간이 0이라 바로 다시 걸린다
+        tickSeconds(r, 0.6);
+        assertThat(b.poisonStacks).isEqualTo(1);
+    }
+
+    @Test
+    void newSkillsHaveNoCooldownByDefault() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinEq(r, 1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "poison", 1100, 800);
+        r.skill(a, "poison", 1100, 800);
+        assertThat(r.boltCount()).isEqualTo(2);
+        r.setSkillCooldowns(java.util.Map.of("poison", 5.0));
+        r.skill(a, "poison", 1100, 800);
+        r.skill(a, "poison", 1100, 800); // 쿨타임 5초 중
+        assertThat(r.boltCount()).isEqualTo(3);
+    }
+
+    @Test
+    void unequippedSkillCannotBeUsedAndEquippingChangesWhatWorks() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        assertThat(r.equippedSkills(a)).containsExactly("shockwave", "hook", "shield", "stealth"); // 고른 적 없으면 해금된 것이 순서대로
+        r.skill(a, "poison", 1100, 800);
+        assertThat(r.boltCount()).isZero();
+        assertThat(count(out, "skillFail", "poison")).isEqualTo(1);
+        r.setLoadout(a, java.util.Arrays.asList("poison", null, "shield", null));
+        assertThat(r.equippedSkills(a)).containsExactly("poison", "shield");
+        r.skill(a, "poison", 1100, 800);
+        assertThat(r.boltCount()).isEqualTo(1);
+        r.skill(a, "shockwave", 0, 0); // 해제했으니 못 쓴다
+        assertThat(count(out, "skill", "shockwave")).isZero();
+        assertThat(out.savedSlots).containsExactly("1:poison,,shield,");
+    }
+
+    @Test
+    void loadoutRejectsLockedUnknownDuplicateOrWrongSizeAndKeepsTheOldOne() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        r.setRequiredLevels(java.util.Map.of("poison", 40, "darkness", 30));
+        Room.Member a = r.join(1, "s1", "a", 20, 0, List.of());
+        r.setLoadout(a, java.util.Arrays.asList("shockwave", null, null, null));
+        r.setLoadout(a, java.util.Arrays.asList("poison", null, null, null));          // 40레벨 전이라 잠겨 있다
+        r.setLoadout(a, java.util.Arrays.asList("hook", "hook", null, null));          // 중복
+        r.setLoadout(a, java.util.Arrays.asList("nope", null, null, null));            // 모르는 스킬
+        r.setLoadout(a, java.util.Arrays.asList("hook", "shield", "stealth", "shockwave", "x")); // 칸 수가 다르다
+        assertThat(r.equippedSkills(a)).containsExactly("shockwave");
+        assertThat(out.savedSlots).containsExactly("1:shockwave,,,");
+        a.level = 40;
+        r.setLoadout(a, java.util.Arrays.asList("poison", "darkness", "shockwave", null));
+        assertThat(r.equippedSkills(a)).containsExactly("poison", "darkness", "shockwave");
+    }
+
+    @Test
+    void slotCountComesFromTheCatalogSoAFifthSlotNeedsNoCodeChange() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        r.setSkillSlotCount(5);
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        r.setLoadout(a, java.util.Arrays.asList("shockwave", "hook", "shield", "stealth", "poison"));
+        assertThat(r.equippedSkills(a)).containsExactly("shockwave", "hook", "shield", "stealth", "poison");
+        assertThat(r.loadoutMessage(a).get("slots")).isEqualTo(java.util.Arrays.asList("shockwave", "hook", "shield", "stealth", "poison"));
+        r.setLoadout(a, java.util.Arrays.asList("hook", null, null, null)); // 칸 수가 다르면 거절한다
+        assertThat(r.equippedSkills(a)).hasSize(5);
+        assertThat(out.savedSlots).containsExactly("1:shockwave,hook,shield,stealth,poison");
+    }
+
+    @Test
+    void defaultLoadoutFillsInUnlockOrderAndRestoreReadsTheSavedSlots() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "darkness", 30, "cleanse", 35, "poison", 40));
+        Room.Member a = r.join(1, "s1", "a", 12, 0, List.of());
+        assertThat(r.equippedSkills(a)).containsExactly("shield");
+        a.level = 40;
+        assertThat(r.equippedSkills(a)).containsExactly("shield", "hook", "shockwave", "stealth"); // 칸은 4개
+        r.restoreLoadout(a, java.util.Arrays.asList("poison", null, "cleanse", "bogus"));
+        assertThat(r.equippedSkills(a)).containsExactly("poison", "cleanse");
+        assertThat(r.loadoutMessage(a).get("slots")).isEqualTo(java.util.Arrays.asList("poison", null, "cleanse", null));
+        r.restoreLoadout(a, null);
+        assertThat(r.equippedSkills(a)).hasSize(4);
     }
 
     @Test

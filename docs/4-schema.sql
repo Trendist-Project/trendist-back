@@ -71,6 +71,57 @@ CREATE TABLE skills (
   UNIQUE KEY uk_skills_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='스킬(4.33)';
 
+CREATE TABLE key_categories (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '키 분류 ID',
+  code       VARCHAR(20) NOT NULL COMMENT '분류 코드(유일): DIGIT, LETTER, FUNCTION, NUMPAD, SPECIAL',
+  name       VARCHAR(30) NOT NULL COMMENT '분류 이름',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_key_categories_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키 분류 목록(4.33). 시더가 채운다';
+
+CREATE TABLE keyboard_keys (
+  id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '키 ID',
+  code        VARCHAR(32) NOT NULL COMMENT 'KeyboardEvent.code(유일): Digit1, KeyQ, Space, F1 … 한글 입력 상태에서도 같다',
+  label       VARCHAR(16) NOT NULL COMMENT '화면에 보이는 글자',
+  category_id BIGINT NOT NULL COMMENT '분류 ID',
+  alias_of_id BIGINT NULL COMMENT '같은 키로 보는 짝(숫자패드 1 → 위쪽 숫자 1). 둘 중 하나를 쓰면 다른 하나도 쓴 것으로 겹침을 판단한다',
+  reserved    BOOLEAN NOT NULL DEFAULT FALSE COMMENT '이미 다른 기능이 쓰는 키(이동 WASD·방향키, E, M, K, Enter, Esc, Tab, F5, F11, F12). 묶을 수 없다',
+  enabled     BOOLEAN NOT NULL DEFAULT TRUE COMMENT '사용 여부(운영에서 막을 때 끈다)',
+  created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_keyboard_keys_code (code),
+  CONSTRAINT fk_keyboard_keys_category FOREIGN KEY (category_id) REFERENCES key_categories (id),
+  CONSTRAINT fk_keyboard_keys_alias FOREIGN KEY (alias_of_id) REFERENCES keyboard_keys (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='단축키로 쓸 수 있는 키 목록(4.33). 시더가 채운다. 이름이 keys가 아닌 것은 KEYS가 MySQL 예약어라서';
+
+CREATE TABLE action_types (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '동작 종류 ID',
+  code       VARCHAR(20) NOT NULL COMMENT '종류 코드(유일): SKILL_SLOT, SYSTEM',
+  name       VARCHAR(30) NOT NULL COMMENT '종류 이름',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_action_types_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='동작 종류 목록(4.33). 시더가 채운다';
+
+CREATE TABLE actions (
+  id             BIGINT NOT NULL AUTO_INCREMENT COMMENT '동작 ID',
+  code           VARCHAR(40) NOT NULL COMMENT '동작 코드(유일): skill_slot_1~4, dash …',
+  type_id        BIGINT NOT NULL COMMENT '동작 종류 ID',
+  param          INT NULL COMMENT '종류가 SKILL_SLOT이면 칸 번호',
+  default_key_id BIGINT NULL COMMENT '바꾸지 않았을 때 쓰는 기본 키. key_bindings에는 바꾼 것만 저장한다',
+  sort_order     BIGINT NOT NULL COMMENT '화면 순서(작을수록 앞)',
+  created_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_actions_code (code),
+  CONSTRAINT fk_actions_type FOREIGN KEY (type_id) REFERENCES action_types (id),
+  CONSTRAINT fk_actions_default_key FOREIGN KEY (default_key_id) REFERENCES keyboard_keys (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='키를 묶을 수 있는 동작 목록(4.33). 새 기능은 이 표에 행을 더하면 키를 묶을 수 있다';
+
 CREATE TABLE effect_types (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '효과 종류 ID',
   code       VARCHAR(20) NOT NULL COMMENT '종류 코드: TRAIL(이동 효과, 4.23) / BORDER(테두리 효과, 4.9). 애플리케이션이 이 값으로 구분한다',
@@ -178,6 +229,36 @@ CREATE TABLE players (
   CONSTRAINT fk_players_title FOREIGN KEY (title_id) REFERENCES titles (id),
   CONSTRAINT fk_players_level FOREIGN KEY (level_id) REFERENCES levels (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어(사용자 × 나라): 닉네임, EXP·레벨, 활성 칭호, 트렌드 수치';
+
+CREATE TABLE key_bindings (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '키 연결 ID',
+  player_id  BIGINT NOT NULL COMMENT '플레이어 ID',
+  action_id  BIGINT NOT NULL COMMENT '동작 ID',
+  key_id     BIGINT NULL COMMENT '키 ID. NULL이면 일부러 비운 상태(행이 없으면 동작의 기본 키)',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_key_bindings_player_action (player_id, action_id),
+  UNIQUE KEY uk_key_bindings_player_key (player_id, key_id),
+  CONSTRAINT fk_key_bindings_player FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE,
+  CONSTRAINT fk_key_bindings_action FOREIGN KEY (action_id) REFERENCES actions (id),
+  CONSTRAINT fk_key_bindings_key FOREIGN KEY (key_id) REFERENCES keyboard_keys (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어가 바꾼 단축키(4.33). 바꾼 것만 저장하고, 기본 키와 같아지면 행을 지운다';
+
+CREATE TABLE player_skill_slots (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '장착 ID',
+  player_id  BIGINT NOT NULL COMMENT '플레이어 ID',
+  action_id  BIGINT NOT NULL COMMENT '칸 = actions 중 종류가 SKILL_SLOT인 동작 ID(칸 번호는 actions.param, 칸 수는 그 행의 수)',
+  skill_id   BIGINT NULL COMMENT '장착한 스킬 ID(skills.id). NULL이면 그 칸을 일부러 비움(플레이어의 행이 하나도 없으면 아직 고른 적 없어서 해금된 스킬이 순서대로 채워진다)',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '만든 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '바뀐 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_player_skill_slots_action (player_id, action_id),
+  UNIQUE KEY uk_player_skill_slots_skill (player_id, skill_id),
+  CONSTRAINT fk_player_skill_slots_player FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE,
+  CONSTRAINT fk_player_skill_slots_action FOREIGN KEY (action_id) REFERENCES actions (id),
+  CONSTRAINT fk_player_skill_slots_skill FOREIGN KEY (skill_id) REFERENCES skills (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='플레이어가 장착한 스킬(4.33). 칸 수는 actions의 SKILL_SLOT 동작 수라서 칸을 늘리려면 actions에 행만 더하면 된다';
 
 CREATE TABLE profiles (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '프로필 ID',
