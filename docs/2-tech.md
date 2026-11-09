@@ -379,7 +379,7 @@ WHERE p.id IN (/* 500명 */)
 | 운영 | `integration_links` | 관리자 연동 바로가기(13.15): code·이름·주소·순서. 기본 3개는 서버가 채움. 마이그레이션 V4 |
 | | `guide_categories`, `guides` | 게임 가이드(영어 `name_en` / `title_en`·`body_en`) |
 | | `player_score_24h`, `player_score_dailies` | 점수 추이 로그(플레이어 1 : 기록 N). 시간별은 플레이어당 24칸 덮어쓰기, 하루별은 영구 |
-| | `setting_groups`, `settings` | 설정 그룹(이름·표시 순서, V12)과 밸런스 설정(그룹·단위 포함) |
+| | `setting_groups`, `settings` | 설정 그룹(이름·표시 순서, V12)과 밸런스 설정(그룹·단위·화면 순서 `sort_order` 포함, V26) |
 | | `blocked_terms`, `blocked_nicknames`(아직 없음) | 차단어, 금지 닉네임 |
 | | `sanction_types`, `sanctions` | 제재 타입과 사용자 제재 기록(사유·기간·해제) |
 | | `site_hourly_stats`, `site_daily_stats` | 관리자 통계(13.9). 나라 × 한 시간 / 나라 × 현지 날짜: 최고·평균 동시 접속, 활동 인원, 새 플레이어, 추가·검색·구슬·충돌로 잃기·채팅·댓글·자랑하기 카드 수 |

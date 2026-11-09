@@ -107,8 +107,8 @@ public class DataSeeder implements ApplicationRunner {
                 added++;
             }
         }
-        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
-        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size")) {
+        // 더 이상 쓰지 않는 설정(콤보 궤도 위성 4.25, 지름 비율 4.2, 최소 반지름 → `min_diameter`로 바뀜 4.2)은 DB에서 지운다. 관리자 화면에 옛 설정으로 계속 남지 않게 한다
+        for (String old : List.of("combo_orbit_at", "orbit_interval_seconds", "orbit_max", "max_diameter_ratio", "leaderboard_size", "min_radius")) {
             settings.findByName(old).ifPresent(settings::delete);
         }
         // 설정 그룹(13.3): 이름과 순서는 코드(SettingKeys.GROUP_ORDER)가 정한다. 설정이 외래 키로 가리키므로 설정보다 먼저 만든다
@@ -123,18 +123,20 @@ public class DataSeeder implements ApplicationRunner {
         for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
             SettingGroup group = groupByName.get(SettingKeys.groupOf(d.name()));
             String unit = SettingKeys.unitOf(d.name());
+            long order = SettingKeys.sortOrderOf(d.name());
             String type = d.value().contains(".") ? "DECIMAL" : "INT";
             Setting s = settings.findByName(d.name()).orElse(null);
             if (s == null) {
-                settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description(), unit, group));
+                settings.save(new Setting(d.name(), d.value(), type, BigDecimal.valueOf(d.min()), BigDecimal.valueOf(d.max()), d.description(), unit, group, order));
                 added++;
             } else {
                 boolean changed = false;
-                // 설명·값 형식·단위·그룹은 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
+                // 설명·값 형식·단위·그룹·화면 순서는 코드가 정한다(관리자 화면에 보이는 뜻이 바뀐 규칙과 맞게, 정수였던 값이 소수가 되는 경우)
                 if (!d.description().equals(s.getDescription())) { s.changeDescription(d.description()); changed = true; }
                 if (!type.equals(s.getValueType())) { s.changeValueType(type); changed = true; }
                 if (!java.util.Objects.equals(unit, s.getUnit())) { s.changeUnit(unit); changed = true; }
                 if (!group.getId().equals(s.getGroup().getId())) { s.changeGroup(group); changed = true; }
+                if (s.getSortOrder() != order) { s.changeSortOrder(order); changed = true; }
                 if (changed) settings.save(s);
             }
         }

@@ -18,6 +18,28 @@ class SettingKeysTest {
     }
 
     @Test
+    void everySettingHasAUniqueSortOrderFollowingTheGroupOrder() {
+        // 화면 순서(settings.sort_order): 모든 설정이 서로 다른 번호를 갖고, 그룹 순서를 따른다
+        var orders = new HashSet<Long>();
+        for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
+            long o = SettingKeys.sortOrderOf(d.name());
+            assertThat(o).as("순서가 없는 설정: " + d.name()).isPositive();
+            assertThat(orders.add(o)).as("순서가 겹치는 설정: " + d.name()).isTrue();
+        }
+        for (SettingKeys.Def a : SettingKeys.DEFAULTS) for (SettingKeys.Def b : SettingKeys.DEFAULTS) {
+            int ga = SettingKeys.GROUP_ORDER.indexOf(SettingKeys.groupOf(a.name())), gb = SettingKeys.GROUP_ORDER.indexOf(SettingKeys.groupOf(b.name()));
+            if (ga < gb) assertThat(SettingKeys.sortOrderOf(a.name())).as(a.name() + " < " + b.name()).isLessThan(SettingKeys.sortOrderOf(b.name()));
+        }
+    }
+
+    @Test
+    void similarSettingsAreNextToEachOther() {
+        assertThat(SettingKeys.sortOrderOf(SettingKeys.MAX_DIAMETER)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.MIN_DIAMETER) + 1);
+        assertThat(SettingKeys.sortOrderOf(SettingKeys.AREA_SHRINK_SPEED)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.AREA_GROW_SPEED) + 1);
+        assertThat(SettingKeys.sortOrderOf(SettingKeys.HOOK_PULL_SECONDS)).isEqualTo(SettingKeys.sortOrderOf(SettingKeys.HOOK_SECONDS) + 1);
+    }
+
+    @Test
     void unknownSettingGoesToOther() {
         assertThat(SettingKeys.groupOf("no_such_setting")).isEqualTo("기타");
     }

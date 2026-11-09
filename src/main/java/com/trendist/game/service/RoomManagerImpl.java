@@ -131,7 +131,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     public Room.Tuning tuning() {
         double world = settings.getDouble(SettingKeys.WORLD_SIZE);
         return new Room.Tuning(world,
-                settings.getDouble(SettingKeys.MIN_RADIUS),
+                settings.getDouble(SettingKeys.MIN_DIAMETER) / 2,
                 settings.getDouble(SettingKeys.MAX_DIAMETER) / 2,
                 settings.getDouble(SettingKeys.SCORE_CAP),
                 settings.getDouble(SettingKeys.MAX_SPEED),

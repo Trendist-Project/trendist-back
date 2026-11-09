@@ -8,8 +8,6 @@ import com.trendist.setting.repository.SettingRepository;
 import com.trendist.setting.support.SettingKeys;
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,17 +54,8 @@ public class SettingServiceImpl implements SettingService {
     @Override
     @Transactional(readOnly = true)
     public List<Item> list() {
-        Map<String, Setting> rows = new HashMap<>();
-        for (Setting s : repository.findAllWithGroup()) rows.put(s.getName(), s);
-        List<Setting> ordered = new ArrayList<>();
-        for (SettingKeys.Def d : SettingKeys.DEFAULTS) {
-            Setting s = rows.remove(d.name());
-            if (s != null) ordered.add(s);
-        }
-        rows.values().stream().sorted(Comparator.comparing(Setting::getName)).forEach(ordered::add); // 코드에 없는 옛 설정
-        // 그룹 테이블의 순서대로 묶는다(같은 그룹 안에서는 코드의 순서 그대로, 안정 정렬)
-        ordered.sort(Comparator.comparingLong(s -> s.getGroup().getSortOrder()));
-        return ordered.stream().map(this::item).toList();
+        // 그룹 테이블의 순서대로 묶고, 같은 그룹 안에서는 설정의 sort_order대로 보인다(쿼리가 정렬한다)
+        return repository.findAllWithGroup().stream().map(this::item).toList();
     }
 
     @Override

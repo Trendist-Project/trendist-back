@@ -660,6 +660,7 @@ CREATE TABLE settings (
   min_value   DECIMAL(18,6) NULL COMMENT '허용 최솟값',
   max_value   DECIMAL(18,6) NULL COMMENT '허용 최댓값',
   unit        VARCHAR(20) NULL COMMENT '값 뒤에 붙일 단위(초, 분, 시간, px, 배, % 등). 단위 없는 값은 NULL',
+  sort_order  BIGINT NOT NULL DEFAULT 0 COMMENT '화면에 보이는 순서(작을수록 위, 전체에서 이어지는 번호). 같은 그룹 안에서 비슷한 설정끼리 붙음',
   description VARCHAR(500) NULL COMMENT '설정 설명(한글, 관리자 화면용)',
   created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',

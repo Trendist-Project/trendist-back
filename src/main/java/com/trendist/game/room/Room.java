@@ -155,6 +155,8 @@ public class Room {
         public int level;
         public double score;
         public double x, y, vx, vy;
+        /** 이번 틱 이동 단계가 시작되기 직전의 위치. 구슬 먹기는 이 위치에서 현재 위치까지의 선분으로 판정한다 */
+        public double prevX, prevY;
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
@@ -678,6 +680,8 @@ public class Room {
         double half = currentHalf();
         if (tick % 20 == 0) { dropSilent(); expireOffline(); maintainBots(tu); expireCombos(); }
         thinkBots(tu, half);
+        // 이동 단계가 시작되기 직전 위치를 기록한다: 입장·리스폰·직접 위치 변경은 이 앞에서 일어나므로 구슬 먹기 선분에 들어가지 않는다
+        for (Member m : members.values()) { m.prevX = m.x; m.prevY = m.y; }
         for (Member m : members.values()) move(m, dt, tu, half);
         pullHooked(dt, half); // 끌려오는 원은 다른 원이 모두 움직인 뒤에 끌어당긴다(끌어당긴 사람이 같은 틱에 더 움직여서 닿지 않는 일이 없게)
         updateZones(half);
@@ -852,7 +856,20 @@ public class Room {
 
     // ------------------------------------------------------------ ? 구슬(4.20)
 
-    /** 원이 구슬 중심을 덮으면 먹는다. 구슬은 바로 사라지고, 모두에게 누가 먹었는지 알려 먹는 연출을 보여 준다. */
+    /**
+     * 이번 틱에 원이 움직인 경로(이동 시작 위치에서 현재 위치까지의 선분)가 구슬 중심을 덮었는지.
+     * 빠르게 움직이면 틱 사이에 구슬을 지나치므로 현재 위치의 점 판정만으로는 놓친다. 선분 길이가 0이면 점 판정과 같다.
+     * 먹는 거리는 화면에 보이는 접촉(원 반지름 + 구슬 반지름)이다. 구슬 중심을 거의 덮어야 먹으면, 작은 원은 겹쳐 보이는데도 안 먹히고
+     * 지나치는 것처럼 느껴진다(4.20).
+     */
+    static boolean sweepCovers(Member m, double ox, double oy) {
+        double sx = m.x - m.prevX, sy = m.y - m.prevY, len2 = sx * sx + sy * sy;
+        double t = len2 > 0 ? Math.max(0, Math.min(1, ((ox - m.prevX) * sx + (oy - m.prevY) * sy) / len2)) : 0;
+        double dist = Math.hypot(m.prevX + sx * t - ox, m.prevY + sy * t - oy);
+        return dist < m.displayRadius + ORB_RADIUS;
+    }
+
+    /** 원이 구슬 중심을 덮으면(이번 틱 이동 경로 포함) 먹는다. 구슬은 바로 사라지고, 모두에게 누가 먹었는지 알려 먹는 연출을 보여 준다. */
     private void eatOrbs() {
         eatPrizeOrbs();
         if (orbs.isEmpty()) return;
@@ -862,7 +879,7 @@ public class Room {
             double[] p = o.getValue();
             Member eater = null;
             for (Member m : members.values()) {
-                if (Math.hypot(m.x - p[0], m.y - p[1]) < m.displayRadius + ORB_RADIUS * 0.5) { eater = m; break; }
+                if (sweepCovers(m, p[0], p[1])) { eater = m; break; }
             }
             if (eater == null) continue;
             it.remove();
@@ -886,7 +903,7 @@ public class Room {
             }
             Member eater = null;
             for (Member m : members.values()) {
-                if (Math.hypot(m.x - p[0], m.y - p[1]) < m.displayRadius + ORB_RADIUS * 0.5) { eater = m; break; }
+                if (sweepCovers(m, p[0], p[1])) { eater = m; break; }
             }
             if (eater == null) continue;
             it.remove();

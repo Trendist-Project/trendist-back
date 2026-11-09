@@ -1227,4 +1227,137 @@ class RoomTest {
         r.dash(a);                                             // 대시는 기본 스킬(레벨 제한 없음): 움직이는 중이 아니라 효과는 없지만 막히지는 않는다
         assertThat(out.texts.stream().noneMatch(m -> "skillFail".equals(m.get("type")) && "dash".equals(m.get("id")))).isTrue();
     }
+
+    // ---- 구슬 먹기는 틱 사이에 움직인 경로(선분)로 판정한다: 점수가 낮은 작은 원이 최대 속도로 달릴 때 구슬을 지나치던 문제
+
+    /** 운영 기본값(최소 반지름 16, 최대 속도 480)의 Tuning. 나머지는 T와 같다. 최대 속도에서 한 틱(50ms)에 24px 간다. */
+    static final Room.Tuning FAST = new Room.Tuning(12000, 16, 600, 2000, 480, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100);
+
+    /** (1000,1000)에서 +x 방향으로 이미 최대 속도(480)에 도달해 달리는 원 하나. 한 틱에 정확히 24px 간다. */
+    private static Room.Member runner(Room r, long playerId, double y) {
+        Room.Member m = r.join(playerId, "s" + playerId, "p" + playerId, 1, 0, List.of());
+        m.x = 1000; m.y = y;
+        m.protectUntil = 0;
+        r.setInput(m, 1, 0);
+        m.vx = 480;
+        return m;
+    }
+
+    private static Room fastRoom(Out out) {
+        Room r = new Room(1, FAST, out);
+        r.setZoneTuning(NO_RANDOM_ZONES);
+        return r;
+    }
+
+    @Test
+    void orbSweepEatsOrbOnTheTravelLine() {
+        Out out = new Out();
+        Room r = fastRoom(out);
+        Room.Member m = runner(r, 1, 1000);
+        r.placeOrb(1012, 1000); // 선분(1000→1024) 한가운데: 현재 위치(1024)에서도 12px
+        r.tick();
+        assertThat(m.x).isCloseTo(1024, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(out.orbEaters).containsExactly(1L);
+        assertThat(r.orbCount()).isZero();
+    }
+
+    @Test
+    void orbSweepEatsOrbPassedBetweenTicks29pxOffTheLine() {
+        // 회귀: 구슬이 선분 중간에서 진행선과 29px 떨어져(먹기 거리 16 + 14 = 30px 안) 있다. 시작(1000)과 끝(1024)에서는 각각 약 31px라 점 판정은 놓친다
+        Out out = new Out();
+        Room r = fastRoom(out);
+        runner(r, 1, 1000);
+        r.placeOrb(1012, 1029);
+        r.tick();
+        assertThat(out.orbEaters).containsExactly(1L);
+        assertThat(r.orbCount()).isZero();
+    }
+
+    @Test
+    void orbSweepDoesNotEatOrbOutsideTheRadius() {
+        // 진행선에서 31px 떨어진 구슬은 먹기 거리(16 + 14 = 30px) 밖이다
+        Out out = new Out();
+        Room r = fastRoom(out);
+        runner(r, 1, 1000);
+        r.placeOrb(1012, 1031);
+        r.tick();
+        assertThat(out.orbEaters).isEmpty();
+        assertThat(r.orbCount()).isEqualTo(1);
+    }
+
+    @Test
+    void orbSweepUsesEndpointDistanceBeyondTheSegmentEnd() {
+        // 수직 발이 선분 밖이면 끝점(1024)과의 거리로만 본다: 29px는 먹고 31px는 먹지 않는다
+        Out nearOut = new Out();
+        Room nearRoom = fastRoom(nearOut);
+        runner(nearRoom, 1, 1000);
+        nearRoom.placeOrb(1053, 1000); // 끝점에서 29px
+        nearRoom.tick();
+        assertThat(nearOut.orbEaters).containsExactly(1L);
+
+        Out farOut = new Out();
+        Room farRoom = fastRoom(farOut);
+        runner(farRoom, 1, 1000);
+        farRoom.placeOrb(1055, 1000); // 끝점에서 31px
+        farRoom.tick();
+        assertThat(farOut.orbEaters).isEmpty();
+        assertThat(farRoom.orbCount()).isEqualTo(1);
+    }
+
+    @Test
+    void orbSweepWorksDuringDash() {
+        // 대시 중에는 한 틱에 48px 간다. 진행선에서 29px 떨어져 중간(1024)에 있는 구슬도 먹는다(끝점 1048과는 약 38px)
+        Out out = new Out();
+        Room r = fastRoom(out);
+        r.setDashTuning(new Room.DashTuning(2.0, 1, 5));
+        Room.Member m = runner(r, 1, 1000);
+        m.vx = 960;
+        r.dash(m);
+        assertThat(m.dashUntil).isGreaterThan(0);
+        r.placeOrb(1024, 1029);
+        r.tick();
+        assertThat(m.x).isCloseTo(1048, org.assertj.core.data.Offset.offset(0.01));
+        assertThat(out.orbEaters).containsExactly(1L);
+    }
+
+    @Test
+    void orbSweepAlsoAppliesToPrizeOrbs() {
+        Out out = new Out();
+        Room r = fastRoom(out);
+        runner(r, 1, 1000);
+        r.placePrizeOrb(1012, 1029);
+        r.tick();
+        assertThat(out.prizeEaters).containsExactly(1L);
+        assertThat(r.prizeOrbCount()).isZero();
+    }
+
+    @Test
+    void orbSweepGivesTheOrbToTheFirstCircleAndConsumesItOnce() {
+        // 서로 닿지 않게 40px 떨어져(16+16=32 초과) 같은 방향으로 달리는 두 원이 모두 구슬(1012,1020)을 지난다: 원 목록에서 먼저 나오는 1번이 먹는다
+        Out out = new Out();
+        Room r = fastRoom(out);
+        runner(r, 1, 1000);
+        runner(r, 2, 1040);
+        r.placeOrb(1012, 1020);
+        r.tick();
+        assertThat(out.orbEaters).containsExactly(1L);
+        assertThat(r.orbCount()).isZero();
+        r.tick();
+        assertThat(out.orbEaters).containsExactly(1L); // 다음 틱에도 더 먹히지 않는다
+    }
+
+    @Test
+    void orbSweepIgnoresPositionJumpsBeforeTheMovePhase() {
+        // 이동 단계 앞에서 직접 옮긴 위치(입장·리스폰 같은 순간이동)는 선분에 들어가지 않는다: 옛 자리와 새 자리 사이의 구슬은 먹지 않는다
+        Out out = new Out();
+        Room r = fastRoom(out);
+        Room.Member m = r.join(1, "s1", "a", 1, 0, List.of());
+        m.x = 1000; m.y = 1000;
+        r.tick();
+        m.x = 1600; m.y = 1000; // 순간이동(입력 없음)
+        r.placeOrb(1300, 1000); // 옛 자리와 새 자리 한가운데
+        r.tick();
+        assertThat(out.orbEaters).isEmpty();
+        assertThat(r.orbCount()).isEqualTo(1);
+    }
 }
