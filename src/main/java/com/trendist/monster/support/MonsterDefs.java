@@ -61,14 +61,10 @@ public final class MonsterDefs {
         d.addAll(ringDefs());
         // ---- 보상
         d.add(new Def("reward_min_share", 0.5, 0, 100, "참여로 인정하는 최소 피해(보스 최대 체력의 %)", "%", "보상"));
-        d.add(new Def("reward_exp", 0, 0, 100000, "처치 성공 때 참여자가 모두 받는 기본 EXP(고정값)", null, "보상"));
-        d.add(new Def("reward_level_percent", 100, 0, 1000, "기여도에 비례한 레벨 진행: 내 몫이 100%일 때 '다음 레벨까지 필요한 EXP'의 몇 %를 EXP로 받는지(받는 사람 자신의 레벨 기준이라 사람마다 EXP가 다르다). 내 몫이 30%면 이 값의 30%", "%", "보상"));
+        d.add(new Def("reward_level_percent", 100, 0, 1000, "기여도에 비례한 레벨 진행: 내 몫이 100%일 때 '내 현재 레벨의 폭(그 레벨에 오를 때 필요했던 EXP)'의 몇 %를 EXP로 받는지(받는 사람 자신의 레벨 기준이라 사람마다 EXP가 다르다). 내 몫이 30%면 이 값의 30%", "%", "보상"));
         d.add(new Def("reward_keywords", 10, 0, 20, "처치 성공 때 참여자가 모두 받는 기본 🔥 활성 키워드 수(! 구슬과 같은 규칙: 무작위 🔥 키워드)", "개", "보상"));
         d.add(new Def("reward_keyword_pool", 0, 0, 20, "기여도에 비례해 더 받는 🔥 키워드 수: 내 몫이 100%면 이만큼(반올림), 25%면 이 값의 25%", "개", "보상"));
         d.add(new Def("reward_keywords_max", 10, 0, 20, "기본+기여도로 받는 🔥 키워드 수의 상한(1~3위 추가분은 별도)", "개", "보상"));
-        d.add(new Def("reward_top_exp", 30, 0, 100000, "피해 1~3위가 추가로 받는 EXP", null, "보상"));
-        d.add(new Def("reward_top_keywords", 2, 0, 20, "피해 1~3위가 추가로 받는 🔥 키워드 수", "개", "보상"));
-        d.add(new Def("fail_exp", 5, 0, 100000, "시간 안에 처치하지 못했을 때 참여자가 받는 EXP(키워드는 없음)", null, "보상"));
         return d;
     }
 

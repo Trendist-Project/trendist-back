@@ -19,7 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** 연동 바로가기(13.15): 기본 3개, 관리자만 주소를 고칠 수 있고 http(s) 주소만 받는다 */
+/** 연동 바로가기(13.15): 기본 4개, 관리자만 주소를 고칠 수 있고 http(s) 주소만 받는다 */
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -46,7 +46,7 @@ class IntegrationLinkTest {
         String admin = token(true);
         mvc.perform(get("/api/admin/integrations").header("Authorization", admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(jsonPath("$[0].code").value("NAVER_SEARCH_ADVISOR"))
                 .andExpect(jsonPath("$[2].code").value("GOOGLE_ANALYTICS"));
         mvc.perform(patch("/api/admin/integrations/GOOGLE_ANALYTICS").header("Authorization", admin)

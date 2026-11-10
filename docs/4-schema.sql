@@ -476,7 +476,7 @@ CREATE TABLE emergency_notices (
 
 CREATE TABLE integration_links (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '연동 항목 ID',
-  code       VARCHAR(30) NOT NULL COMMENT '항목 코드(NAVER_SEARCH_ADVISOR, GOOGLE_SEARCH_CONSOLE, GOOGLE_ANALYTICS). 화면이 아이콘을 고르는 기준',
+  code       VARCHAR(30) NOT NULL COMMENT '항목 코드(NAVER_SEARCH_ADVISOR, GOOGLE_SEARCH_CONSOLE, GOOGLE_ANALYTICS, GOOGLE_AI_STUDIO). 화면이 아이콘을 고르는 기준',
   label      VARCHAR(50) NOT NULL COMMENT '표시 이름',
   url        VARCHAR(500) NOT NULL COMMENT '바로가기 주소(관리자가 고침, http/https만)',
   sort_order INT NOT NULL COMMENT '화면 순서',
@@ -484,7 +484,7 @@ CREATE TABLE integration_links (
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
   UNIQUE KEY uk_integration_links_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 [연동] 바로가기(13.15). 기본 3개는 서버가 켜질 때 없으면 채운다. 마이그레이션 V4';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='관리자 [연동] 바로가기(13.15). 기본 4개는 서버가 켜질 때 없으면 채운다. 마이그레이션 V4';
 
 -- (아직 없음) 공지 팝업 열람 기록(4.16). 아직 없음: 엔티티·마이그레이션이 없고 팝업 열람은 브라우저 저장으로 판단한다
 CREATE TABLE user_notices (

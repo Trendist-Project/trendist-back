@@ -429,16 +429,23 @@ class ApiFlowTest {
     }
 
     @Test
-    void bossRewardGivesTheContributionAsAPercentOfThePlayersOwnNextLevelExp() throws Exception {
-        // 4.35: 보스 보상의 기여도 몫은 "레벨 진행 %"다. 받는 사람 자신의 다음 레벨까지 필요한 EXP의 그 %를 EXP로 준다(사람마다 EXP는 다르다)
+    void bossRewardGivesTheContributionAsAPercentOfThePlayersOwnCurrentLevelWidth() throws Exception {
+        // 4.35: 보스 보상의 기여도 몫은 "레벨 진행 %"다. 받는 사람 자신의 현재 레벨 폭(그 레벨에 오를 때 필요했던 EXP)의 그 %를 EXP로 준다(사람마다 EXP는 다르다)
         String t = player("보스보상");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
         long exp0 = totalExp(pid);
         long need = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.nextLevelExp"));
-        long got = playerService.awardMonster(pid, 7, 50.0, true);       // 고정 7 + 다음 레벨 필요 EXP의 50%
+        long got = playerService.awardMonster(pid, 7, 50.0, true);       // 1레벨은 폭이 0이라 다음 레벨로 가는 폭을 쓴다: 고정 7 + 그 폭의 50%
         assertThat(got).isEqualTo(7 + Math.round(need * 0.5));
         assertThat(totalExp(pid)).isEqualTo(exp0 + got);
         assertThat(playerRepo.findById(pid).orElseThrow().getBossKillCount()).isEqualTo(1);
+        level(t, 12);                                                    // 12레벨이면 12레벨에 오를 때 필요했던 EXP의 50%
+        long width = levelService.row(12).getRequiredExp();
+        assertThat(width).isPositive();
+        long exp1 = totalExp(pid);
+        long got12 = playerService.awardMonster(pid, 0, 50.0, true);
+        assertThat(got12).isEqualTo(Math.round(width * 0.5));
+        assertThat(totalExp(pid)).isEqualTo(exp1 + got12);
         playerService.recordSteal(pid); // 보스 처치 참여 칭호는 처치 보상 뒤 칭호 검사에서 받는다(검사를 한 번 더 돌려 확인)
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");

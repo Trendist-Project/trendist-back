@@ -381,8 +381,8 @@ class MonsterTest {
         assertThat(res.status()).isEqualTo(Monster.KILLED);
         assertThat(res.rewards()).hasSize(1);
         assertThat(res.rewards().get(0).playerId()).isEqualTo(1L);
-        assertThat(res.rewards().get(0).exp()).isEqualTo(30);       // 기본 EXP 0 + 1~3위 추가 30(기여도는 레벨 진행 %로 따로)
-        assertThat(res.rewards().get(0).keywords()).isEqualTo(12);  // 기본 키워드 10(기여도 키워드 0) + 1~3위 추가 2
+        assertThat(res.rewards().get(0).exp()).isZero();            // 고정 EXP는 없다(기여도는 레벨 진행 %로 따로)
+        assertThat(res.rewards().get(0).keywords()).isEqualTo(10);  // 기본 키워드 10(기여도 키워드 0, 순위 보너스 없음)
         assertThat(res.rewards().get(0).levelPercent()).isEqualTo(100.0); // 혼자 다 쳤으니 기여도 100% → 레벨 진행 100%
         assertThat(res.rewards().get(0).cleared()).isTrue();
         assertThat(r.monsters()).isEmpty();

@@ -175,7 +175,10 @@ public class PlayerServiceImpl implements PlayerService {
     public long awardMonster(long playerId, long exp, double levelPercent, boolean cleared) {
         return players.findByIdForUpdate(playerId).map(p -> {
             if (cleared) p.incBossKill(); // 칭호(4.35)
-            long total = exp + (levelPercent > 0 ? Math.round(levels.nextRequired(p.getLevel()) * levelPercent / 100.0) : 0); // 사람마다 다음 레벨까지 필요한 EXP가 달라 같은 %도 EXP는 다르다
+            // 기준은 받는 사람 자신의 **현재 레벨의 폭**(그 레벨에 오를 때 필요했던 EXP). 사람마다 달라 같은 %도 EXP는 다르다. 1레벨은 폭이 0이라 다음 레벨로 가는 폭을 쓴다
+            long base = levels.row(p.getLevel()).getRequiredExp();
+            if (base <= 0) base = Math.max(0, levels.nextRequired(p.getLevel()));
+            long total = exp + (levelPercent > 0 ? Math.round(base * levelPercent / 100.0) : 0);
             if (total > 0) p.addExp(total);
             recompute(p);
             return Math.max(0, total);

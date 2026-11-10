@@ -930,17 +930,13 @@ final class GuideSeed {
 
                     ## 기여도 보상
 
-                    - 전체 피해 중 **내가 입힌 몫**만큼 **내 레벨업 바**를 채워 줘요. 몫이 30%면 **다음 레벨까지 필요한 경험치의 30%**를 받아요.
-                    - 사람마다 필요한 경험치가 달라서, 같은 30%여도 **각자 자기 레벨 기준**으로 받아요.
+                    - 전체 피해 중 **내가 입힌 몫**만큼 **내 레벨업 바**를 채워 줘요. 몫이 30%면 **지금 내 레벨의 경험치 바 폭(이 레벨에 오를 때 필요했던 경험치)의 30%**를 받아요.
+                    - 사람마다 레벨이 달라서, 같은 30%여도 **각자 자기 현재 레벨 기준**으로 받아요. (1레벨은 다음 레벨로 가는 폭이 기준이에요.)
                     - 혼자 거의 다 쳤다면 한 레벨을 통째로 얻을 수도 있어요.
-
-                    ## 피해 1~3위
-
-                    - 추가로 **경험치 30**과 **키워드 2개**를 더 받아요.
 
                     ## 못 잡았다면
 
-                    - 10분 안에 못 쓰러뜨리면 참여한 사람은 **경험치 5**만 받아요. 보스를 쓰러뜨린 횟수는 올라가지 않아요.
+                    - 10분 안에 못 쓰러뜨리면 보상은 없어요. 보스를 쓰러뜨린 횟수도 올라가지 않아요.
 
                     > 보스 처치에 참여한 횟수에 따라 **칭호**(보스 사냥 입문 → 보스 사냥꾼 → 보스 슬레이어 → 보스 정복자)도 받아요.""",
                     "Boss rewards", """
@@ -952,17 +948,13 @@ final class GuideSeed {
 
                     ## Contribution reward
 
-                    - Your **share of the total damage** fills your **level bar**. A 30% share gives you **30% of the EXP needed for your next level**.
-                    - Since each player needs a different amount of EXP, the same 30% is calculated **from your own level**.
+                    - Your **share of the total damage** fills your **level bar**. A 30% share gives you **30% of your current level's bar (the EXP it took to reach this level)**.
+                    - Since each player is at a different level, the same 30% is calculated **from your own current level**. (At level 1 the bar to the next level is used.)
                     - If you dealt nearly all the damage by yourself, you could even gain a whole level.
-
-                    ## Damage ranks 1 to 3
-
-                    - You get an extra **30 EXP** and **2 keywords**.
 
                     ## If it got away
 
-                    - If the boss isn't defeated within 10 minutes, participants get only **5 EXP**, and your boss defeat count does not go up.
+                    - If the boss isn't defeated within 10 minutes, there is no reward, and your boss defeat count does not go up.
 
                     > Your number of boss defeats also earns **titles** (Boss Hunt Rookie → Boss Hunter → Boss Slayer → Boss Conqueror)."""));
 }

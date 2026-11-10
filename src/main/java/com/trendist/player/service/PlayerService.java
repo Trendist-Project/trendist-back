@@ -70,6 +70,6 @@ public interface PlayerService {
     /** 행을 이미 잠근 트랜잭션 안에서: 죽였다(죽인 횟수 +1, EXP `kill_exp`)를 반영하고 점수·레벨을 다시 정한다(4.31). */
     void awardKill(Player p);
 
-    /** 몬스터(보스) 보상(4.35): 행을 잠그고 EXP(고정 exp + 그 사람의 "다음 레벨까지 필요 EXP"의 levelPercent%)를 더하고(실제로 더한 EXP를 돌려준다) 처치 참여 횟수를 올린 뒤(cleared일 때만) 점수·레벨을 다시 정한다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    /** 몬스터(보스) 보상(4.35): 행을 잠그고 EXP(고정 exp + 그 사람의 "현재 레벨의 폭(그 레벨에 오를 때 필요했던 EXP, 1레벨은 다음 레벨로 가는 폭)"의 levelPercent%)를 더하고(실제로 더한 EXP를 돌려준다) 처치 참여 횟수를 올린 뒤(cleared일 때만) 점수·레벨을 다시 정한다. 방(틱) 밖의 작업 스레드에서 부른다. */
     long awardMonster(long playerId, long exp, double levelPercent, boolean cleared);
 }
