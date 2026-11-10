@@ -17,8 +17,8 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     /** 패배 횟수를 한 문장으로 올린다(행을 잠그고 읽지 않는다: 점수·레벨을 다시 정할 일이 없다, 4.31). */
     @org.springframework.data.jpa.repository.Modifying
-    @Query("update Player p set p.defeatCount = p.defeatCount + 1 where p.id = :id")
-    int incrementDefeatCount(@org.springframework.data.repository.query.Param("id") Long id);
+    @Query("update Player p set p.deathCount = p.deathCount + 1 where p.id = :id")
+    int incrementDeathCount(@org.springframework.data.repository.query.Param("id") Long id);
 
     /** 유행도가 같은 상대와 부딪힌 횟수를 한 문장으로 올린다(4.3). */
     @org.springframework.data.jpa.repository.Modifying

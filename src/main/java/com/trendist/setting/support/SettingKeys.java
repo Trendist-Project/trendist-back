@@ -65,6 +65,7 @@ public final class SettingKeys {
     public static final String HOOK_SECONDS = "hook_seconds";
     public static final String HOOK_PULL_SECONDS = "hook_pull_seconds";
     public static final String SKILL_SHIELD_SECONDS = "skill_shield_seconds";
+    public static final String SKILL_HEAL_PERCENT = "skill_heal_percent";
     public static final String STEALTH_SECONDS = "stealth_seconds";
     public static final String COMBO_FLAME_AT = "combo_flame_at";
     public static final String AI_COMMENT_ENABLED = "ai_comment_enabled";
@@ -152,6 +153,7 @@ public final class SettingKeys {
             new Def(HOOK_SECONDS, "0.15", 0.05, 5, "갈고리가 끝까지 날아가는 데 걸리는 시간(빗나가면 같은 시간에 걸쳐 돌아온다. 상대가 피할 수 있을 만큼은 걸리게)"),
             new Def(HOOK_PULL_SECONDS, "0.3", 0.05, 5, "갈고리에 맞은 원이 내게 끌려오는 시간(끌려오는 동안 스킬 사용·이동 불가, 다른 원과의 충돌 무효)"),
             new Def(SKILL_SHIELD_SECONDS, "3", 0.5, 60, "방패 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
+            new Def(SKILL_HEAL_PERCENT, "50", 1, 100, "회복 스킬이 한 번에 채우는 체력(최대 체력의 %). 체력(HP)이 켜져 있을 때만 쓸 수 있고 가득이면 쿨타임을 쓰지 않는다"),
             new Def(STEALTH_SECONDS, "5", 0.5, 60, "은신(유령)이 유지되는 시간(남에게는 원·이름·테두리·효과가 모두 배경색처럼 안 보이고 미니맵에서도 사라진다. 나에게는 반투명으로 보인다. 충격파·갈고리를 쓰면 풀린다)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(HP_ENABLED, "1", 0, 1, "체력(HP) 켜기(1) / 끄기(0): 켜면 부딪힐 때마다(사람·봇 모두) 서로의 유행도 비율로 체력이 깎이고, 0이 되면 죽는다(몬스터와의 싸움에는 쓰이지 않는다)"),
@@ -196,7 +198,7 @@ public final class SettingKeys {
         group("스킬", DASH_SPEED_MULTIPLIER, DASH_SECONDS,                                  // 대시
                 SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_REACH_PX, SHOCKWAVE_KNOCKBACK,
                 HOOK_REACH_PX, BOLT_REACH_PX, HOOK_SECONDS, HOOK_PULL_SECONDS,
-                SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
+                SKILL_SHIELD_SECONDS, SKILL_HEAL_PERCENT, STEALTH_SECONDS);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
         group("체력(HP)", HP_ENABLED, HP_MAX, HP_HIT_SECONDS, HP_FLAME_MULTIPLIER, HP_FLAME_COUNTER,
                 DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, HP_PUBLIC);
@@ -235,7 +237,7 @@ public final class SettingKeys {
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
         unit("배", HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER,
                 SHOCKWAVE_KNOCKBACK);
-        unit("%", ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
+        unit("%", SKILL_HEAL_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE);
         unit("개/1000×1000px", ORB_DENSITY);

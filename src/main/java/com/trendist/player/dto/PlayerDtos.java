@@ -7,7 +7,7 @@ public final class PlayerDtos {
 
     public record PlayerSummary(long id, String nickname, String countryCode, long level, long exp, long nextLevelExp,
                                 long currentScore, long holdCount, long addCount, long commentScore, long searchCount,
-                                Instant nicknameChangeableAt, long stealCount, long botWinCount, long activeDays, long killCount, long defeatCount,
+                                Instant nicknameChangeableAt, long stealCount, long botWinCount, long activeDays, long killCount, long deathCount,
                                 long popularity, Instant createdAt) {}
 
     /** 점수 추이의 점 하나(4.15). t는 그 칸의 시작(24시간은 정시, 나머지는 나라 현지 자정), live면 지금 값. */
@@ -32,7 +32,7 @@ public final class PlayerDtos {
      * 보유 키워드 수, 추가·검색·빼앗기·봇 사냥·처치·패배 횟수, 활동한 날. (키워드 이름은 상위 3개만 따로 공개한다)
      */
     public record Stats(long exp, long nextLevelExp, long holdCount, long addCount, long searchCount, long stealCount,
-                        long botWinCount, long killCount, long defeatCount, long activeDays) {}
+                        long botWinCount, long killCount, long deathCount, long activeDays) {}
 
     /**
      * 그 플레이어가 장착한 꾸미기 프로필의 원 모양(아레나에서 보이는 그대로): 바탕색, 테두리 색·두께(1~8단계), 픽셀 그림 주소, 테두리 효과 코드.

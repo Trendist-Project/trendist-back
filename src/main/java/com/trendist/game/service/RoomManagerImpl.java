@@ -184,7 +184,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     /** 독·암흑·정화의 쿨타임(DB skills). 테스트 중에는 0이다. */
     private java.util.Map<String, Double> extraSkillCooldowns() {
-        return java.util.Map.of("poison", skillCatalog.cooldownSeconds("poison", 0), "darkness", skillCatalog.cooldownSeconds("darkness", 0), "cleanse", skillCatalog.cooldownSeconds("cleanse", 0));
+        return java.util.Map.of("poison", skillCatalog.cooldownSeconds("poison", 0), "darkness", skillCatalog.cooldownSeconds("darkness", 0), "cleanse", skillCatalog.cooldownSeconds("cleanse", 0),
+                "heal", skillCatalog.cooldownSeconds("heal", 0), "heal_percent", settings.getDouble(SettingKeys.SKILL_HEAL_PERCENT)); // heal_percent는 쿨타임이 아니라 회복 스킬의 회복량(%)이다
     }
 
     /** 대시 설정(4.27). */

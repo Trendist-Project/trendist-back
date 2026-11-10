@@ -147,7 +147,7 @@ public class Room {
     /** 스킬 코드(4.33). 클라이언트는 이 코드로 쓴다 */
     /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
     public static final int DEFAULT_SKILL_SLOTS = 4;
-    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse");
+    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse", "heal");
 
     /** 투사체 스킬(독·암흑, 4.33): 화면에서 보이는 속도는 갈고리가 뻗는 속도(hookReachPx ÷ hookSeconds)와 같고, 사거리는 SkillTuning.boltReachPx다(둘 다 reachWorld로 월드 길이로 바꾼다) */
     /** 투사체 반지름 = 쓴 원 반지름 × BOLT_RADIUS_RATIO(최소 BOLT_MIN_RADIUS px). 판정과 화면 그림이 같은 값을 쓴다 */
@@ -689,6 +689,7 @@ public class Room {
         m.score = score; m.level = level; m.radius = radiusFor(score);
         if (levelUp) {
             broadcastRoster();
+            if (hpTuning.enabled() && !m.dead) healPercent(m, 100); // 레벨업하면 체력이 가득 찬다(회복 알림도 같이 나가 + 표시가 뜬다)
             if (m.loadout == null && !m.bot) outbox.sendText(m, loadoutMessage(m)); // 고른 적 없으면 새로 해금된 스킬이 빈 칸에 채워진다
             // 레벨업 이펙트(4.30): 모두에게 같은 빛기둥(고정). 모든 원에서 그 원이 보이는 화면에 나온다
             broadcast(Map.of("type", "levelFx", "e", m.entityNo, "level", m.level));
@@ -858,7 +859,7 @@ public class Room {
         for (Monster mo : new ArrayList<>(monsters.values())) {
             if (mo.ended) continue;
             mo.tick(this, dt);
-            if (!mo.ended && tick % 4 == 0) broadcast(mo.stateMessage(this)); // 5Hz
+            if (!mo.ended && (mo.fastState() || tick % 2 == 0)) broadcast(mo.stateMessage(this)); // 10Hz, 돌진처럼 빠르게 움직일 때는 매 틱(화면이 끊기지 않게)
         }
     }
 
@@ -872,13 +873,17 @@ public class Room {
 
     void monsterLose(Member m, String by, int count) { outbox.requestMonsterLose(this, m, by, count); }
 
-    /** 몬스터의 불꽃에 불꽃이 꺼진다: 콤보를 0으로 하고 모두에게 알린다 */
-    void monsterFlameOut(Member m, String by) {
-        if (m.combo <= 0) return;
-        m.combo = 0;
-        Map<String, Object> msg = comboMessage(m, "broken");
-        msg.put("by", by);
-        broadcast(msg);
+    /**
+     * 보스 패턴(돌진·충격고리)에 맞았다(4.35): 최대 체력의 percent%를 잃고, 남은 체력이 그 이하면 죽는다(키워드는 그대로, 죽음은 monsterKill과 같다).
+     * 체력(HP) 방식이 꺼져 있으면 아무 일도 없다. 모두에게 맞은 %를 알린다({hpHit}, 때린 원은 -1).
+     */
+    void monsterHurt(Member m, String by, double percent) {
+        if (!hpTuning.enabled() || m.bot || m.dead || percent <= 0) return;
+        double dmg = hpTuning.max() * percent / 100.0;
+        if (round2(m.hp - dmg) <= 0) { monsterKill(m, by); return; }
+        m.hp = round2(m.hp - dmg);
+        markHp(m); hpPublicDirty = true;
+        broadcast(Map.of("type", "hpHit", "e", m.entityNo, "by", -1, "dmg", round2(Math.min(100.0, percent)), "pct", hpPercent(m)));
     }
 
     /** 몬스터에게 즉사한다(4.35): 키워드는 그대로 두고 죽음(4.31)과 같이 방에서 빠져 구경 목록으로 간다 */
@@ -963,6 +968,9 @@ public class Room {
 
     /** 원의 중심이 가운데 고정 존이나 무작위 존 안에 있는지. */
     boolean inSafeZone(double x, double y) { return inSafeZone(x, y, 0); }
+
+    /** 보스처럼 큰 몸이 세이프존을 피해 다닐 때: 존을 margin만큼 넓혀 그 안인지 본다 */
+    boolean nearSafeZone(double x, double y, double margin) { return inSafeZone(x, y, margin); }
 
     /** 존을 margin만큼 넓혀서 본다(구슬이 존 가장자리에 걸치지 않게). */
     private boolean inSafeZone(double x, double y, double margin) {
@@ -1348,8 +1356,7 @@ public class Room {
             // 세이프존 회복은 1초에 한 번 통째로(매 틱 조금씩이 아니라): 계산 부담도 줄고 "1초마다 2%"로 알아보기 쉽다
             boolean inCenter = Math.abs(m.x) <= c && Math.abs(m.y) <= c; // 시간제로 생기는 무작위 세이프존은 회복하지 않는다
             if (tick % 20 == 0 && inCenter && hp.safeRegenPercent() > 0 && m.hp < hp.max()) {
-                m.hp = Math.min(hp.max(), round2(m.hp + hp.max() * hp.safeRegenPercent() / 100.0));
-                markHp(m);
+                healPercent(m, hp.safeRegenPercent()); // 회복 알림({hp, heal})도 같이 나가 다른 회복처럼 + 표시가 뜬다
             }
         }
         if (tick % 5 != 0) return;
@@ -1504,6 +1511,12 @@ public class Room {
             }
             case "poison", "darkness" -> { if (!attackAllowed(m, id)) return; castBolt(m, id, ax, ay); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
             case "cleanse" -> { cleanse(m); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
+            case "heal" -> { // 회복: 최대 체력의 일정 %를 바로 채운다(세이프존 밖에서도 쓴다). 체력이 이미 가득이거나 체력 방식이 꺼져 있으면 쿨타임을 쓰지 않는다
+                if (!hpTuning.enabled() || m.hp >= hpTuning.max()) { outbox.sendText(m, Map.of("type", "skillFail", "id", id, "reason", "hpFull")); return; }
+                healPercent(m, skillCooldowns.getOrDefault("heal_percent", 50.0));
+                broadcast(Map.of("type", "skillFx", "id", "heal", "e", m.entityNo)); // 다른 사람 화면에도 + 표시
+                cooldown = skillCooldowns.getOrDefault(id, 0.0);
+            }
             default -> { return; }
         }
         m.skillReadyAt[idx] = clockSeconds + cooldown;
@@ -2242,8 +2255,8 @@ public class Room {
 
     /**
      * 봇이 사람처럼 움직이게 한다. 봇마다 반응 속도(0.25~0.7초)가 달라 그 간격으로 다시 판단한다.
-     * 1) 나를 이길 원이 가까우면 반대쪽으로 도망치되, 벽에 몰리지 않게 안쪽으로 꺾고 지그재그로 흔든다.
-     * 2) 내가 이길 원이 보이면 그 원이 갈 곳을 앞질러 쫓는다. 4~7초 안에 못 잡으면 포기하고 한동안 쫓지 않는다.
+     * 1) 나를 이길 원(불꽃·체력까지 본 승산, botMatchup)이 가까우면 반대쪽으로 도망치되, 벽에 몰리지 않게 안쪽으로 꺾고 지그재그로 흔든다.
+     * 2) 내가 이길 원(botMatchup)이 보이면 그 원이 갈 곳을 앞질러 쫓는다. 4~7초 안에 못 잡으면 포기하고 한동안 쫓지 않는다.
      * 3) 아니면 다른 봇이 노리지 않는 가까운 구슬로 간다.
      * 4) 할 일이 없으면 진행 방향을 조금씩 틀며 곡선으로 돌아다니고, 가끔 잠깐 멈춘다.
      * 15~45초마다 스스로 키워드를 추가하거나 오래된 키워드가 사라진다(botLife).
@@ -2271,8 +2284,10 @@ public class Room {
                 if (dark && Math.hypot(o.x - b.x, o.y - b.y) > sight) continue; // 암흑: 시야 밖의 원은 보이지 않는다
                 double d = Math.hypot(o.x - b.x, o.y - b.y) - o.displayRadius - b.displayRadius;
                 // 세이프존 안의 원은 잡을 수 없고, 내가 세이프존 안이면 도망칠 필요가 없다(4.22)
-                if (!b.safe && !o.safe && o.score > b.score && d < fleeRange && d < threatD) { threat = o; threatD = d; }
-                if (!o.safe && o.score < b.score && d < chaseRange && d < preyD) { prey = o; preyD = d; }
+                if (d >= Math.max(fleeRange, chaseRange)) continue;
+                int mu = botMatchup(b, o); // 불꽃·체력까지 본 승산(4.36)
+                if (!b.safe && !o.safe && mu < 0 && d < fleeRange && d < threatD) { threat = o; threatD = d; }
+                if (!o.safe && mu > 0 && d < chaseRange && d < preyD) { prey = o; preyD = d; }
             }
             double limit = half - 60 - b.displayRadius;
 
@@ -2331,6 +2346,26 @@ public class Room {
             }
             setTarget(b, clamp(nx, -limit, limit), clamp(ny, -limit, limit));
         }
+    }
+
+    /**
+     * 봇이 보는 승산: 1이면 o가 사냥감(쫓는다), -1이면 위협(피한다), 0이면 비슷하다(신경 쓰지 않는다).
+     * 체력(HP)이 켜져 있으면 서로 상대를 쓰러뜨리는 데 몇 번 쳐야 하는지로 비교한다: 한 번의 피해는 hpDamage(불꽃 배수 포함)이고
+     * 체력이 적을수록 더 적게 맞아도 죽으니 점수가 조금 높은 상대도 피하게 된다. 같으면(또는 체력이 꺼져 있으면) 불꽃이 불꽃 없는 쪽을 이기는
+     * 키워드 규칙(4.25), 그다음 유행도로 정한다.
+     */
+    int botMatchup(Member b, Member o) {
+        boolean bf = isFlame(b), of = isFlame(o);
+        if (hpTuning.enabled() && !b.dead && !o.dead) {
+            double toMe = hpDamage(o, b), toThem = hpDamage(b, o);
+            if (!hpTuning.flameCounter() && bf != of) { if (bf) toMe = 0; else toThem = 0; }
+            double hitsToDie = toMe <= 0 ? Double.MAX_VALUE : Math.ceil(b.hp / toMe);
+            double hitsToKill = toThem <= 0 ? Double.MAX_VALUE : Math.ceil(o.hp / toThem);
+            if (hitsToKill < hitsToDie) return 1;
+            if (hitsToDie < hitsToKill) return -1;
+        }
+        if (bf != of) return bf ? 1 : -1;
+        return Double.compare(b.score, o.score);
     }
 
     /** 다른 봇이 노리지 않는 가장 가까운 구슬 {x, y, 번호}. */

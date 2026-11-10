@@ -99,9 +99,9 @@ public class TitleServiceImpl implements TitleService {
             case "orb_count" -> p.getOrbCount();
             case "lose_count" -> p.getLoseCount();
             case "kill_count" -> p.getKillCount();
-            case "defeat_count" -> p.getDefeatCount();
+            case "death_count" -> p.getDeathCount();
             case "tie_count" -> p.getTieCount();
-            case "monster_kill_count" -> p.getMonsterKillCount();
+            case "boss_kill_count" -> p.getBossKillCount();
             case "max_combo" -> p.getMaxCombo();
             case "flame_out_count" -> p.getFlameOutCount();
             case "active_days" -> p.getActiveDays();

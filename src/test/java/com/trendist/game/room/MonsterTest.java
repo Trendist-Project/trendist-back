@@ -37,6 +37,7 @@ class MonsterTest {
         Room r = new Room(1, T, out);
         r.setZoneTuning(RoomTest.NO_RANDOM_ZONES);
         r.setComboTuning(new Room.ComboTuning(5, true, 300));
+        r.setHpTuning(Room.HpTuning.on());
         r.setMonsterParams(Map.of("elder_turtle", p));
         return r;
     }
@@ -71,7 +72,7 @@ class MonsterTest {
     }
 
     @Test
-    void normalHitDealsScoreLosesKeywordAndKnocksBackWithProtection() {
+    void normalHitDealsScoreAndOnlyKnocksBackWithoutKeywordLossOrProtection() {
         Map<String, Double> p = defaults();
         MOut out = new MOut();
         Room r = room(out, p);
@@ -80,23 +81,29 @@ class MonsterTest {
         r.spawnMonster(spec(p));
         ElderTurtle b = boss(r); b.x = 0; b.y = 0;
         long hp0 = b.hp;
+        double hpMe = a.hp;
         touch(b, a);
         r.tick();
-        assertThat(hp0 - b.hp).isEqualTo(120);               // 내 유행도만큼 피해
-        assertThat(out.monsterLoses).containsExactly(new long[]{1, 1}); // 키워드 1개 잃음
-        assertThat(a.protectUntil).isGreaterThan(r.clock());   // 3초 무적
-        assertThat(a.kbTime).isGreaterThan(0);                 // 튕김
+        assertThat(hp0 - b.hp).isEqualTo(120);                 // 내 유행도만큼 보스가 피해를 입는다
+        assertThat(out.monsterLoses).isEmpty();                // 키워드를 잃지 않는다
+        assertThat(a.protectUntil).isLessThanOrEqualTo(r.clock()); // 무적이 되지 않는다
+        assertThat(a.hp).isCloseTo(hpMe - 5, org.assertj.core.api.Assertions.within(0.01)); // 부딪히면 내 체력이 5% 닳는다
+        assertThat(a.kbTime).isGreaterThan(0);                 // 나만 튕겨 난다
         assertThat(a.combo).isEqualTo(1);                      // 보스를 치는 것도 콤보
         assertThat(r.monsters().iterator().next().ledger.get(1L).damage).isEqualTo(120);
-        // 무적인 동안 다시 부딪혀도 피해가 없다
+        // 연타 방지 간격(hit_interval_seconds) 안에 다시 부딪혀도 피해가 없고, 지나면 다시 피해를 준다
         long hp1 = b.hp;
         touch(b, a);
         r.tick();
         assertThat(b.hp).isEqualTo(hp1);
+        for (int i = 0; i < 25; i++) r.tick();
+        touch(b, a);
+        r.tick();
+        assertThat(hp1 - b.hp).isEqualTo(120);
     }
 
     @Test
-    void flameHitDealsFiveTimesAndKeepsKeywords() {
+    void flameHitDealsFiveTimesAndKeepsKeywordsAndFlame() {
         Map<String, Double> p = defaults();
         MOut out = new MOut();
         Room r = room(out, p);
@@ -111,11 +118,11 @@ class MonsterTest {
         assertThat(hp0 - b.hp).isEqualTo(500);
         assertThat(out.monsterLoses).isEmpty();      // 불꽃이면 키워드를 잃지 않는다
         assertThat(a.combo).isEqualTo(6);            // 콤보는 이어진다
-        assertThat(a.protectUntil).isGreaterThan(r.clock());
+        assertThat(a.protectUntil).isLessThanOrEqualTo(r.clock()); // 무적이 되지 않는다
     }
 
     @Test
-    void flamingBossKillsNonFlamePlayersAndDousesFlamePlayers() {
+    void flamingBossTakesPlainDamageFromEveryoneAndOnlyKillsNonFlamePlayers() {
         Map<String, Double> p = defaults();
         p.put("rage_remaining_seconds", 99999.0); // 바로 분노(불꽃 보스)
         MOut out = new MOut();
@@ -125,23 +132,39 @@ class MonsterTest {
         hot.combo = 5;
         r.spawnMonster(spec(p));
         ElderTurtle b = boss(r); b.x = 0; b.y = 0;
+        long hp0 = b.hp;
         touch(b, cold);
         r.tick();
-        assertThat(cold.dead).isTrue();                                // 불꽃이 아니면 즉사
+        assertThat(cold.dead).isTrue();                                // 불꽃 없이 덤비면 즉사하지만
+        assertThat(hp0 - b.hp).isEqualTo(100);                         // 피해는 똑같이 준다
         assertThat(out.monsterLoses).isEmpty();                        // 키워드는 잃지 않는다
         assertThat(out.defeats).containsExactly(1L);
         assertThat(out.texts).anyMatch(m -> "died".equals(m.get("type")) && "장로 거북이".equals(m.get("by")));
-        long hp0 = b.hp;
+        long hp1 = b.hp;
         touch(b, hot);
         r.tick();
-        assertThat(hot.dead).isFalse();
-        assertThat(hot.combo).isZero();                                // 불꽃이 꺼진다
-        assertThat(out.monsterLoses).containsExactly(new long[]{2, 1}); // 키워드 1개를 잃는다
-        assertThat(hp0 - b.hp).isEqualTo(500);                         // 피해는 준다(불꽃 배수)
+        assertThat(hot.dead).isFalse();                                // 불꽃이면 즉사하지 않고
+        assertThat(hot.combo).isEqualTo(6);                            // 불꽃도 그대로
+        assertThat(out.monsterLoses).isEmpty();
+        assertThat(hp1 - b.hp).isEqualTo(100);                         // 불꽃 없는 피해량(×5가 아니다)
     }
 
     @Test
-    void ringLosesMoreKeywordsCloserAndSkipsShieldSafeZoneAndFlame() {
+    void rageFlameBurnsOnlyForTheConfiguredSeconds() {
+        Map<String, Double> p = defaults();
+        p.put("rage_remaining_seconds", 99999.0); p.put("rage_flame_seconds", 1.0); p.put("opening_delay_seconds", 999.0);
+        MOut out = new MOut();
+        Room r = room(out, p);
+        r.join(1, "s1", "a", 1, 100, List.of(10L));
+        r.spawnMonster(spec(p));
+        r.tick();
+        assertThat(boss(r).stateMessage(r)).containsEntry("flame", true).containsEntry("rage", true); // 분노하면 바로 불꽃
+        for (int i = 0; i < 30; i++) r.tick();
+        assertThat(boss(r).stateMessage(r)).containsEntry("flame", false).containsEntry("rage", true); // 1초 뒤 불꽃만 꺼진다
+    }
+
+    @Test
+    void dashHitCostsTenPercentOnceAndRingCostsMoreTheCloser() {
         Map<String, Double> p = defaults();
         p.put("opening_delay_seconds", 0.0); p.put("dash_weight", 0.0); p.put("ring_windup", 0.2); p.put("ring_speed", 6000.0);
         p.put("ring_range_px", 5000.0); p.put("recover_seconds", 0.2);
@@ -151,34 +174,160 @@ class MonsterTest {
         Room.Member far = r.join(2, "s2", "far", 1, 100, List.of(3L, 4L));
         Room.Member shielded = r.join(3, "s3", "shield", 1, 100, List.of(5L));
         Room.Member hot = r.join(4, "s4", "hot", 1, 100, List.of(6L));
+        Room.Member weak = r.join(5, "s5", "weak", 1, 100, List.of(7L));
         hot.combo = 5;
         r.spawnMonster(spec(p));
         ElderTurtle b = boss(r); b.x = 0; b.y = 0;
         double edge = b.radius;
-        near.x = edge + 500; near.y = 0;       // 몸 가장자리에서 500px(원 반지름보다 멀어 몸에는 닿지 않는다)
-        far.x = edge + 3500; far.y = 0;        // 멀다(범위 5000의 70%)
+        near.x = edge + 500; near.y = 0;       // 몸 가장자리에서 500px(범위 5000의 10%)
+        far.x = edge + 3500; far.y = 0;        // 멀다(범위의 70%)
         shielded.x = edge + 300; shielded.y = 300; shielded.protectUntil = 1e9;
         hot.x = edge + 400; hot.y = -300;
-        for (Room.Member m : List.of(near, far, shielded, hot)) { m.prevX = m.x; m.prevY = m.y; }
-        for (int i = 0; i < 20 * 6 && out.monsterLoses.size() < 2; i++) {
-            // 보스가 따라오지 않게 제자리에 둔다(위치를 고정한 채 패턴만 본다)
-            b.x = 0; b.y = 0;
-            for (Room.Member m : List.of(near, far, shielded, hot)) { m.vx = 0; m.vy = 0; }
+        weak.x = edge + 200; weak.y = 600; weak.hp = 25; // 체력이 최대 피해(33%)보다 적으면 가까이서 맞고 죽는다
+        List<Room.Member> all = List.of(near, far, shielded, hot, weak);
+        for (Room.Member m : all) { m.prevX = m.x; m.prevY = m.y; }
+        for (int i = 0; i < 20 * 6; i++) {
+            b.x = 0; b.y = 0; // 보스가 따라오지 않게 제자리에 둔다(위치를 고정한 채 패턴만 본다)
+            for (Room.Member m : all) if (!m.dead) { m.vx = 0; m.vy = 0; }
+            r.tick();
+            if (near.hp < 100 && far.hp < 100) break;
+        }
+        assertThat(near.hp).isCloseTo(100 - (33 - 28 * 0.1), org.assertj.core.api.Assertions.within(1.0)); // 가까우면 최대 33%에 가깝게
+        assertThat(far.hp).isCloseTo(100 - (33 - 28 * 0.7), org.assertj.core.api.Assertions.within(1.0));  // 멀수록 덜 깎인다
+        assertThat(near.hp).isLessThan(far.hp);
+        assertThat(shielded.hp).isEqualTo(100.0);                      // 무적 중이면 맞지 않는다
+        assertThat(hot.hp).isLessThan(100.0);                          // 불꽃이어도 맞는다
+        assertThat(weak.dead).isTrue();                                // 체력이 모자라면 죽는다
+        assertThat(out.monsterLoses).isEmpty();                        // 키워드는 잃지 않는다
+        assertThat(near.protectUntil).isLessThanOrEqualTo(r.clock());  // 무적도 되지 않는다
+    }
+
+    @Test
+    void touchingTheBossCostsFivePercentHpAndRageDoublesIt() {
+        for (boolean rage : new boolean[] {false, true}) {
+            Map<String, Double> p = defaults();
+            p.put("opening_delay_seconds", 0.0); p.put("dash_weight", 0.0); p.put("ring_weight", 0.0);
+            if (rage) p.put("rage_remaining_seconds", 99999.0);
+            MOut out = new MOut();
+            Room r = room(out, p);
+            Room.Member a = r.join(1, "s1", "a", 1, 100, List.of(1L, 2L));
+            r.spawnMonster(spec(p));
+            ElderTurtle b = boss(r); b.x = 3500; b.y = 3500;
+            if (rage) a.combo = 5; // 분노하면 보스에 불꽃이 붙어 불꽃 없는 사람은 즉사하니 불꽃으로 맞선다
+            a.x = -3500; a.y = -3500; a.prevX = a.x; a.prevY = a.y;
+            r.tick(); // 먼저 한 틱: 분노 판정이 끝난 뒤에 닿게 한다
+            b.x = 3500; b.y = 3500;
+            touch(b, a);
+            r.tick();
+            assertThat(a.hp).isCloseTo(100 - (rage ? 10 : 5), org.assertj.core.api.Assertions.within(0.5));
+        }
+    }
+
+    @Test
+    void bossWithNoTargetWandersAroundAndAvoidsTheSafeZone() {
+        Map<String, Double> p = defaults();
+        p.put("opening_delay_seconds", 999.0); p.put("wander_pause_seconds", 0.0); p.put("wander_speed_ratio", 1.0);
+        MOut out = new MOut();
+        Room r = room(out, p);
+        Room.Member a = r.join(1, "s1", "a", 1, 100, List.of(1L)); // 세이프존(가운데)에 있어 쫓기지 않는다
+        r.spawnMonster(spec(p));
+        ElderTurtle b = boss(r);
+        double x0 = b.x, y0 = b.y, far = 0;
+        for (int i = 0; i < 20 * 60; i++) {
+            r.tick();
+            far = Math.max(far, Math.hypot(b.x - x0, b.y - y0));
+            assertThat(r.nearSafeZone(b.x, b.y, 0)).isFalse(); // 몸 중심이 세이프존에 들어가지 않는다
+        }
+        assertThat(far).isGreaterThan(500);                    // 제자리에 서 있지 않고 돌아다닌다
+    }
+
+    @Test
+    void disabledPatternsAreNeverChosen() {
+        Map<String, Double> p = defaults();
+        p.put("opening_delay_seconds", 0.0); p.put("gcd_seconds", 0.0); p.put("recover_seconds", 0.0);
+        p.put("dash_enabled", 0.0); p.put("ring_enabled", 0.0);
+        MOut out = new MOut();
+        Room r = room(out, p);
+        Room.Member a = r.join(1, "s1", "a", 1, 100, List.of(1L));
+        a.x = 3500; a.y = 3500; a.prevX = a.x; a.prevY = a.y;
+        r.spawnMonster(spec(p));
+        for (int i = 0; i < 20 * 60; i++) {
+            r.tick();
+            assertThat(boss(r).stateMessage(r).get("ph")).isIn("chase");   // 패턴을 모두 끄면 쫓기만 한다
+        }
+    }
+
+    @Test
+    void rageDoublesTheHpPatternsTakeAndKeepsTheFlameLit() {
+        Map<String, Double> p = defaults();
+        p.put("opening_delay_seconds", 0.0); p.put("dash_weight", 0.0); p.put("ring_windup", 0.2); p.put("ring_speed", 6000.0);
+        p.put("ring_range_px", 5000.0); p.put("recover_seconds", 0.2);
+        p.put("rage_remaining_seconds", 99999.0); // 시작하자마자 분노
+        MOut out = new MOut();
+        Room r = room(out, p);
+        Room.Member near = r.join(1, "s1", "near", 1, 100, List.of(1L, 2L));
+        r.spawnMonster(spec(p));
+        ElderTurtle b = boss(r); b.x = 0; b.y = 0;
+        near.x = b.radius + 500; near.y = 0; near.prevX = near.x; near.prevY = near.y;
+        for (int i = 0; i < 20 * 6 && near.hp >= 100; i++) { b.x = 0; b.y = 0; near.vx = 0; near.vy = 0; r.tick(); }
+        assertThat(near.hp).isCloseTo(100 - 2 * (33 - 28 * 0.1), org.assertj.core.api.Assertions.within(1.5)); // 분노 중이라 2배
+        assertThat(b.stateMessage(r)).containsEntry("flame", true).containsEntry("rage", true);
+    }
+
+    @Test
+    void dashingIntoSomeoneCostsTenPercentHpOnlyOncePerDash() {
+        Map<String, Double> p = defaults();
+        p.put("opening_delay_seconds", 0.0); p.put("ring_weight", 0.0); p.put("dash_windup", 0.2);
+        p.put("dash_seconds", 6.0); p.put("dash_speed_mult", 10.0); p.put("hit_interval_seconds", 0.1); p.put("dash_cooldown", 999.0);
+        p.put("contact_hp_percent", 0.0); // 이 테스트는 돌진 피해만 본다
+        MOut out = new MOut();
+        Room r = room(out, p);
+        Room.Member a = r.join(1, "s1", "a", 1, 100, List.of(10L));
+        a.x = 3500; a.y = 3500; a.prevX = a.x; a.prevY = a.y;
+        r.spawnMonster(spec(p));
+        ElderTurtle b = boss(r); b.x = -3500; b.y = 3500;
+        long hp0 = b.hp;
+        for (int i = 0; i < 20 * 8; i++) {
+            a.x = 3500; a.y = 3500; a.vx = 0; a.vy = 0; a.targetX = null; a.protectUntil = 0;
             r.tick();
         }
-        Map<Long, Long> lost = new HashMap<>();
-        for (long[] l : out.monsterLoses) lost.put(l[0], l[1]);
-        assertThat(lost.get(1L)).isGreaterThanOrEqualTo(9);          // 가까우면 거의 최대(10)
-        assertThat(lost.get(2L)).isLessThanOrEqualTo(4);             // 멀면 적게 잃는다(최소 1에 가깝다)
-        assertThat(lost.get(1L)).isGreaterThan(lost.get(2L));
-        assertThat(lost).doesNotContainKeys(3L, 4L);                 // 방패·불꽃은 잃지 않는다
+        assertThat(b.hp).isLessThan(hp0);                  // 돌진 중 몸에 부딪혀 보스도 피해를 입었고
+        assertThat(a.hp).isCloseTo(90.0, org.assertj.core.api.Assertions.within(0.01)); // 한 번의 돌진에 10%만 잃는다
+        assertThat(a.dead).isFalse();
+    }
+
+    @Test
+    void dashStartsAndStopsSmoothlyAndCoversTheTelegraphedDistance() {
+        // 돌진은 서서히 빨라졌다 서서히 느려진다(끊기듯 출발·정지하지 않는다). 가는 거리는 예고한 길이와 같고 상태는 돌진 중 매 틱 간다
+        Map<String, Double> p = defaults();
+        p.put("opening_delay_seconds", 0.0); p.put("ring_weight", 0.0); p.put("gcd_seconds", 0.0);
+        MOut out = new MOut();
+        Room r = room(out, p);
+        Room.Member a = r.join(1, "s1", "a", 1, 100, List.of(10L));
+        a.x = 3500; a.y = 3500;
+        r.spawnMonster(spec(p));
+        ElderTurtle b = boss(r); b.x = -3500; b.y = -3500;
+        List<Double> xs = new java.util.ArrayList<>();
+        boolean dashed = false;
+        for (int i = 0; i < 20 * 12; i++) {
+            r.tick();
+            if (b.fastState()) { dashed = true; xs.add(b.x); }
+            else if (dashed) break;
+            a.x = 3500; a.y = 3500;
+        }
+        assertThat(dashed).isTrue();
+        assertThat(xs.size()).isGreaterThan(10);
+        double first = xs.get(1) - xs.get(0), mid = xs.get(xs.size() / 2) - xs.get(xs.size() / 2 - 1), last = xs.get(xs.size() - 1) - xs.get(xs.size() - 2);
+        assertThat(Math.abs(first)).isLessThan(Math.abs(mid) * 0.5);   // 처음은 느리다
+        assertThat(Math.abs(last)).isLessThan(Math.abs(mid) * 0.5);    // 끝도 느리다
+        for (int i = 1; i < xs.size(); i++) assertThat(Math.abs(xs.get(i) - xs.get(i - 1))).isLessThan(Math.abs(mid) * 1.2 + 1); // 갑자기 튀는 틱이 없다
     }
 
     @Test
     void skillsHaveGlobalCooldownAndDoNotRepeatBackToBack() {
         Map<String, Double> p = defaults();
         p.put("opening_delay_seconds", 0.0); p.put("gcd_seconds", 4.0); p.put("recover_seconds", 0.5);
-        p.put("dash_windup", 0.5); p.put("dash_seconds", 0.5); p.put("dash_cooldown", 0.0); p.put("dash_min_distance", 0.0);
+        p.put("dash_windup", 0.5); p.put("dash_seconds", 0.5); p.put("dash_cooldown", 0.0);
         p.put("ring_windup", 0.5); p.put("ring_cooldown", 0.0); p.put("ring_range_px", 300.0); p.put("ring_speed", 6000.0);
         MOut out = new MOut();
         Room r = room(out, p);
@@ -232,8 +381,8 @@ class MonsterTest {
         assertThat(res.status()).isEqualTo(Monster.KILLED);
         assertThat(res.rewards()).hasSize(1);
         assertThat(res.rewards().get(0).playerId()).isEqualTo(1L);
-        assertThat(res.rewards().get(0).exp()).isEqualTo(50);       // 30 + 1~3위 추가 20
-        assertThat(res.rewards().get(0).keywords()).isEqualTo(3);   // 2 + 추가 1
+        assertThat(res.rewards().get(0).exp()).isEqualTo(360);      // 기본 30 + 기여도 300(혼자 다 쳤다) + 1~3위 추가 30
+        assertThat(res.rewards().get(0).keywords()).isEqualTo(7);   // min(상한 5, 기본 2 + 기여도 4) + 1~3위 추가 2
         assertThat(res.rewards().get(0).cleared()).isTrue();
         assertThat(r.monsters()).isEmpty();
         // 시간 초과

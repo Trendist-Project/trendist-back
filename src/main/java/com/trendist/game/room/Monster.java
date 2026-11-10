@@ -62,8 +62,10 @@ public abstract class Monster {
 
     /** 틱마다 한 번(50ms). 시간 초과·체력 소진은 여기서 room.endMonster로 끝낸다 */
     abstract void tick(Room room, double dt);
-    /** 모두에게 5Hz로 보내는 상태(위치·체력·예고 등) */
+    /** 모두에게 보내는 상태(위치·체력·예고 등). 보통 10Hz, fastState()가 true인 동안(빠르게 움직일 때)은 매 틱 */
     abstract Map<String, Object> stateMessage(Room room);
+    /** 위치가 빨리 바뀌는 중이라 상태를 매 틱 보내야 매끄러운가 */
+    boolean fastState() { return false; }
     /** 관리자 모니터링(1초마다 갱신)에 보이는 요약 */
     abstract Map<String, Object> viewMessage(Room room);
 
@@ -85,6 +87,8 @@ public abstract class Monster {
         List<Reward> rewards = new ArrayList<>();
         double minShare = maxHp * p(room, "reward_min_share") / 100.0;
         int rank = 0;
+        double totalDamage = 0;
+        for (Ledger l : ledger.values()) totalDamage += Math.max(0, l.damage);
         for (Map.Entry<Long, Ledger> e : ranking()) {
             rank++;
             Ledger l = e.getValue();
@@ -92,8 +96,10 @@ public abstract class Monster {
             if (l.damage <= 0 || l.damage < minShare) continue;
             boolean top = rank <= 3;
             if (KILLED.equals(status)) {
-                long exp = Math.round(p(room, "reward_exp") + (top ? p(room, "reward_top_exp") : 0));
-                int kw = (int) Math.round(p(room, "reward_keywords") + (top ? p(room, "reward_top_keywords") : 0));
+                // 기여도 비례: 전체 피해에서 내가 차지한 몫(0~1)만큼 EXP 풀과 키워드 풀을 나눠 받는다. 참여만 해도 기본 보상은 있다
+                double share = totalDamage > 0 ? l.damage / totalDamage : 0;
+                long exp = Math.round(p(room, "reward_exp") + p(room, "reward_exp_pool") * share + (top ? p(room, "reward_top_exp") : 0));
+                int kw = (int) Math.round(Math.min(p(room, "reward_keywords_max"), p(room, "reward_keywords") + p(room, "reward_keyword_pool") * share) + (top ? p(room, "reward_top_keywords") : 0));
                 rewards.add(new Reward(e.getKey(), rank, l.damage, exp, kw, true));
             } else if (TIMEOUT.equals(status)) {
                 long exp = Math.round(p(room, "fail_exp"));

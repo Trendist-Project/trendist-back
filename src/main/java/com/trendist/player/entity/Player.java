@@ -52,11 +52,11 @@ public class Player extends BaseTimeEntity {
     /** 죽인 횟수: 키워드가 없는 사람·봇을 쓰러뜨린 횟수(4.31) */
     @Column(name = "kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long killCount;
     /** 패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 4.31) */
-    @Column(name = "defeat_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long defeatCount;
+    @Column(name = "death_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long deathCount;
     /** 현재 유행도가 같은 원과 부딪힌 횟수(사람만, 같은 상대와는 1초에 한 번만 센다, 4.3) */
     @Column(name = "tie_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long tieCount;
     /** 몬스터(보스)를 쓰러뜨리는 데 참여한 횟수(4.35) */
-    @Column(name = "monster_kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long monsterKillCount;
+    @Column(name = "boss_kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long bossKillCount;
     /** 가장 높았던 연속 빼앗기 콤보(최고 기록, 줄지 않는다, 4.25) */
     @Column(name = "max_combo", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long maxCombo;
     /** 상대의 콤보 불꽃을 꺼뜨린 횟수(사람·봇의 불꽃 모두, 4.25) */
@@ -94,7 +94,7 @@ public class Player extends BaseTimeEntity {
     public void incOrb() { this.orbCount++; }
     public void incLose() { this.loseCount++; }
     public void incKill() { this.killCount++; }
-    public void incMonsterKill() { this.monsterKillCount++; }
+    public void incBossKill() { this.bossKillCount++; }
     /** 활성 칭호(4.10). null이면 숨김. 가진 칭호인지는 서비스가 확인한다. */
     public void changeTitle(Long titleId) { this.titleId = titleId; }
 

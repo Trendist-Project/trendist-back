@@ -110,7 +110,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         String title = p.getTitleId() == null ? null : titles.findById(p.getTitleId()).map(Title::getName).orElse(null);
         AdminUserDtos.Stats stats = new AdminUserDtos.Stats(p.getExp(), p.getLevel(), live != null ? Math.round(live) : p.getCurrentScore(),
                 p.getHoldCount(), p.getAddCount(), p.getSearchCount(), p.getCommentScore(), p.getStealCount(), p.getBotWinCount(),
-                p.getOrbCount(), p.getLoseCount(), p.getActiveDays(), p.getKillCount(), p.getDefeatCount(), playerTitles.findByPlayerId(p.getId()).size(), title,
+                p.getOrbCount(), p.getLoseCount(), p.getActiveDays(), p.getKillCount(), p.getDeathCount(), playerTitles.findByPlayerId(p.getId()).size(), title,
                 comments.countByPlayerId(p.getId()), chats.countByPlayerId(p.getId()));
         Instant now = Instant.now(clock);
         List<AdminUserDtos.CommentLine> commentLines = comments.findRecentByPlayer(p.getId(), PageRequest.of(0, 10)).stream()

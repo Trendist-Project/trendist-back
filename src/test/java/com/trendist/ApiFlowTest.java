@@ -429,16 +429,16 @@ class ApiFlowTest {
     }
 
     @Test
-    void defeatCountIsRecordedAndGrantsDefeatTitle() throws Exception {
-        // 4.31: 패배(키워드 없이 져서 죽음)하면 패배 횟수가 오르고 "첫 패배" 칭호를 받는다. 프로필에도 defeatCount가 보인다. EXP는 주지 않는다
+    void deathCountIsRecordedAndGrantsDefeatTitle() throws Exception {
+        // 4.31: 패배(키워드 없이 져서 죽음)하면 패배 횟수가 오르고 "첫 패배" 칭호를 받는다. 프로필에도 deathCount가 보인다. EXP는 주지 않는다
         String t = player("패배시험");
         long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
-        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(0));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.deathCount").value(0));
         long exp0 = totalExp(pid);
         playerService.recordDefeat(pid);
-        assertThat(playerRepo.findById(pid).orElseThrow().getDefeatCount()).isEqualTo(1);
+        assertThat(playerRepo.findById(pid).orElseThrow().getDeathCount()).isEqualTo(1);
         assertThat(totalExp(pid)).isEqualTo(exp0);
-        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.defeatCount").value(1));
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.deathCount").value(1));
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("첫 패배");
@@ -1182,7 +1182,7 @@ class ApiFlowTest {
         skillCatalog.invalidate();
         mvc.perform(get("/api/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(8))
+                .andExpect(jsonPath("$.length()").value(9))
                 .andExpect(jsonPath("$[1].code").value("shield"))      // 대시 다음은 해금 레벨 순서
                 .andExpect(jsonPath("$[1].defaultKey").value("Digit1"))
                 .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
@@ -1211,7 +1211,7 @@ class ApiFlowTest {
             skillRepository.saveAndFlush(hook);
             skillCatalog.invalidate();
             assertThat(skillCatalog.disabledCodes()).contains("hook");
-            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(7));
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(8));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
             skillRepository.saveAndFlush(hook);
@@ -1286,7 +1286,7 @@ class ApiFlowTest {
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("dash", "shield", "hook", "shockwave", "stealth", "darkness", "cleanse", "poison");
+                .containsExactly("dash", "shield", "hook", "shockwave", "stealth", "darkness", "cleanse", "poison", "heal");
         try {
             var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);

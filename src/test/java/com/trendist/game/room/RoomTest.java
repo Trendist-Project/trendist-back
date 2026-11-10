@@ -955,6 +955,24 @@ class RoomTest {
     private static void tickSeconds(Room r, double seconds) { for (int i = 0; i < Math.round(seconds * 20); i++) r.tick(); }
 
     @Test
+    void healSkillRestoresFiftyPercentOnceAndSkipsTheCooldownWhenHpIsFull() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        r.setHpTuning(Room.HpTuning.on());
+        r.setSkillCooldowns(java.util.Map.of("heal", 60.0, "heal_percent", 50.0));
+        Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
+        r.setLoadout(a, java.util.Arrays.asList("heal", null, null, null));
+        r.tick();
+        r.skill(a, "heal", 0, 0);                       // 체력이 가득이면 쓰지 않는다(쿨타임도 안 쓴다)
+        assertThat(a.hp).isEqualTo(100.0);
+        a.hp = 40;
+        r.skill(a, "heal", 0, 0);
+        assertThat(a.hp).isEqualTo(90.0);               // 최대 체력의 50%
+        r.skill(a, "heal", 0, 0);                       // 쿨타임 중이라 다시 채우지 않는다
+        assertThat(a.hp).isEqualTo(90.0);
+    }
+
+    @Test
     void poisonBoltHitsAndLosesOneKeywordEveryThreeSecondsThreeTimes() {
         Out out = new Out();
         Room r = boltRoom(out);
@@ -1088,7 +1106,7 @@ class RoomTest {
     void loadoutRejectsLockedUnknownDuplicateOrWrongSizeAndKeepsTheOldOne() {
         Out out = new Out();
         Room r = boltRoom(out);
-        r.setRequiredLevels(java.util.Map.of("poison", 40, "darkness", 30));
+        r.setRequiredLevels(java.util.Map.of("poison", 40, "darkness", 30, "heal", 40));
         Room.Member a = r.join(1, "s1", "a", 20, 0, List.of());
         r.setLoadout(a, java.util.Arrays.asList("shockwave", null, null, null));
         r.setLoadout(a, java.util.Arrays.asList("poison", null, null, null));          // 40레벨 전이라 잠겨 있다
@@ -1120,7 +1138,7 @@ class RoomTest {
     void defaultLoadoutFillsInUnlockOrderAndRestoreReadsTheSavedSlots() {
         Out out = new Out();
         Room r = boltRoom(out);
-        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "darkness", 30, "cleanse", 35, "poison", 40));
+        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "darkness", 30, "cleanse", 35, "poison", 40, "heal", 40));
         Room.Member a = r.join(1, "s1", "a", 12, 0, List.of());
         assertThat(r.equippedSkills(a)).containsExactly("shield");
         a.level = 40;
@@ -1490,7 +1508,7 @@ class RoomTest {
         Out out = new Out();
         Room r = new Room(1, T, out);
         r.setZoneTuning(NO_RANDOM_ZONES);
-        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25));
+        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "heal", 40));
         Room.Member a = r.join(1, "s1", "a", 9, 0, List.of());
         a.x = 800; a.y = 800;
         r.tick();

@@ -66,7 +66,7 @@ public class MonsterDirector {
         long announce = Math.round(p.getOrDefault("announce_seconds", 60.0)), next = slot + interval;
         String alertKey = code + ":" + room.countryId() + ":" + next;
         if (announce > 0 && next - now <= announce && !alerted.contains(alertKey) && !active(room, code)
-                && room.size() >= p.getOrDefault("min_players", 3.0)) {
+                && room.size() >= p.getOrDefault("min_players", 1.0)) {
             alerted.add(alertKey);
             room.submit(r -> r.announce(Map.of("type", "monsterAlert", "name", e.type().getName(), "en", String.valueOf(e.type().getNameEn()), "seconds", next - System.currentTimeMillis() / 1000)));
         }
@@ -75,7 +75,7 @@ public class MonsterDirector {
         if (now - slot >= p.getOrDefault("grace_seconds", 120.0) || handled.contains(key) || active(room, code)) return;
         handled.add(key);
         if (spawns.existsByMonsterTypeIdAndCountryIdAndStartedAtGreaterThanEqual(e.type().getId(), room.countryId(), Instant.ofEpochSecond(slot))) return;
-        if (room.size() < p.getOrDefault("min_players", 3.0)) {
+        if (room.size() < p.getOrDefault("min_players", 1.0)) {
             recorder.open(e.type().getId(), room.countryId(), "SCHEDULE", "SKIPPED"); // 사람이 적어 건너뛴 것도 기록한다
             return;
         }

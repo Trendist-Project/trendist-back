@@ -160,7 +160,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     @Transactional
     public void recordDefeat(long playerId) {
-        if (players.incrementDefeatCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.31)
+        if (players.incrementDeathCount(playerId) > 0) events.publishEvent(new GameEvents.TitleCheck(playerId)); // 칭호(4.31)
     }
 
     @Override
@@ -174,7 +174,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional
     public void awardMonster(long playerId, long exp, boolean cleared) {
         players.findByIdForUpdate(playerId).ifPresent(p -> {
-            if (cleared) p.incMonsterKill(); // 칭호(4.35)
+            if (cleared) p.incBossKill(); // 칭호(4.35)
             if (exp > 0) p.addExp(exp);
             recompute(p);
         });
@@ -191,7 +191,7 @@ public class PlayerServiceImpl implements PlayerService {
     public PlayerDtos.PlayerSummary summary(Player p) {
         return new PlayerDtos.PlayerSummary(p.getId(), p.getNickname(), p.getCountry().getCode(), p.getLevel(), p.getExp(),
                 levels.nextRequired(p.getLevel()), p.getCurrentScore(), p.getHoldCount(), p.getAddCount(),
-                p.getCommentScore(), p.getSearchCount(), changeableAt(p), p.getStealCount(), p.getBotWinCount(), p.getActiveDays(), p.getKillCount(), p.getDefeatCount(),
+                p.getCommentScore(), p.getSearchCount(), changeableAt(p), p.getStealCount(), p.getBotWinCount(), p.getActiveDays(), p.getKillCount(), p.getDeathCount(),
                 p.getPopularity(), p.getCreatedAt());
     }
 

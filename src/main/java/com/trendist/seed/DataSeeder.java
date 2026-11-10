@@ -361,7 +361,7 @@ public class DataSeeder implements ApplicationRunner {
             for (String[] t : KILL_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
         // 패배 횟수 칭호(4.31)도 같은 방식으로 한 번 넣는다
-        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("defeat_count"))) {
+        if (titles.findAll().stream().noneMatch(t -> t.getConditionParams().contains("death_count"))) {
             for (String[] t : DEFEAT_TITLES) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
         // 콤보 칭호(4.10, 4.25): 최고 콤보·불꽃 끈 횟수. 같은 방식으로 한 번 넣는다
@@ -406,6 +406,7 @@ public class DataSeeder implements ApplicationRunner {
             {"darkness", "🕶️", "ATTACK", "Digit5", "30", "25"},
             {"cleanse", "✨", "DEFENSE", "Digit6", "30", "30"},
             {"poison", "☠️", "ATTACK", "Digit7", "30", "35"},
+            {"heal", "➕", "DEFENSE", "Digit8", "60", "40"},    // 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
     };
 
     private int seedSkills() {
@@ -473,11 +474,11 @@ public class DataSeeder implements ApplicationRunner {
 
     /** 패배 횟수 칭호(4.31) 5개: 지는 것을 비웃지 않고 다시 일어서는 것을 칭찬하는 이름 */
     private static final String[][] DEFEAT_TITLES = {
-            {"첫 패배", "처음으로 패배했어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":1}"},
-            {"칠전팔기", "10번 패배하고도 다시 일어났어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":10}"},
-            {"백전노장", "50번 패배했지만 계속 도전해요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":50}"},
-            {"불사조", "200번 쓰러지고도 다시 날아올랐어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":200}"},
-            {"끝없는 도전자", "1,000번 패배해도 멈추지 않았어요", "METRIC", "{\"metric\":\"defeat_count\",\"gte\":1000}"},
+            {"첫 패배", "처음으로 패배했어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1}"},
+            {"칠전팔기", "10번 패배하고도 다시 일어났어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":10}"},
+            {"백전노장", "50번 패배했지만 계속 도전해요", "METRIC", "{\"metric\":\"death_count\",\"gte\":50}"},
+            {"불사조", "200번 쓰러지고도 다시 날아올랐어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":200}"},
+            {"끝없는 도전자", "1,000번 패배해도 멈추지 않았어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1000}"},
     };
 
     /** 최고 콤보 칭호(4.25) 5개: 연속으로 빼앗을수록 불꽃이 거세진다 */

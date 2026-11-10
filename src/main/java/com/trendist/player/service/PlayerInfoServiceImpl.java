@@ -78,7 +78,7 @@ public class PlayerInfoServiceImpl implements PlayerInfoService {
     /** 내 정보 창과 같은 기록(지금 레벨 기준 EXP와 다음 레벨 필요량 포함) */
     private PlayerDtos.Stats stats(Player p) {
         return new PlayerDtos.Stats(p.getExp(), levels.nextRequired(p.getLevel()), p.getHoldCount(), p.getAddCount(), p.getSearchCount(),
-                p.getStealCount(), p.getBotWinCount(), p.getKillCount(), p.getDefeatCount(), p.getActiveDays());
+                p.getStealCount(), p.getBotWinCount(), p.getKillCount(), p.getDeathCount(), p.getActiveDays());
     }
 
     /** 장착한 꾸미기 프로필의 원 모양. 효과·그림은 로그인 사용자만 있다(ProfileLooks) */

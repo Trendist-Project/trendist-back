@@ -243,6 +243,19 @@ class HpTest {
     }
 
     @Test
+    void levelingUpRestoresHpToFull() {
+        RoomTest.Out out = new RoomTest.Out();
+        Room r = room(out);
+        Room.Member a = human(r, 1, 100, 800);
+        a.hp = 20;
+        r.applyScore(1, 100, 1);   // 레벨이 그대로면 회복하지 않는다
+        assertThat(a.hp).isEqualTo(20.0);
+        r.applyScore(1, 100, 2);   // 레벨업
+        assertThat(a.hp).isEqualTo(100.0);
+        assertThat(out.texts).anyMatch(m -> "hp".equals(m.get("type")) && m.get("heal") != null); // 회복 알림도 나간다
+    }
+
+    @Test
     void killHealCanBeSwitchedOff() {
         RoomTest.Out out = new RoomTest.Out();
         Room r = new Room(1, RoomTest.T, out);
@@ -252,5 +265,25 @@ class HpTest {
         strong.hp = 50; weak.hp = 5;
         r.tick();
         assertThat(strong.hp).isCloseTo(40.0, within(0.001));
+    }
+
+    @Test
+    void botsWeighFlameAndHpWhenChoosingToChaseOrFlee() {
+        // 봇의 승산(botMatchup): 점수만이 아니라 불꽃 배수와 남은 체력으로 "몇 번 쳐야 쓰러지나"를 비교한다
+        Room r = room(new RoomTest.Out());
+        Room.Member bot = human(r, 1, 100, 800), big = human(r, 2, 130, 5000), small = human(r, 3, 70, 8000);
+        assertThat(r.botMatchup(bot, big)).isEqualTo(-1);   // 점수가 높으면 피한다(체력이 같으면 예전과 같다)
+        assertThat(r.botMatchup(bot, small)).isEqualTo(1);  // 낮으면 쫓는다
+        bot.combo = 5;                                      // 불꽃이 되면 공격력 ×5라 점수가 더 높은 상대도 사냥감이다
+        assertThat(r.botMatchup(bot, big)).isEqualTo(1);
+        bot.combo = 0; big.combo = 5;                       // 상대가 불꽃이면 점수가 낮아도 위협이다
+        assertThat(r.botMatchup(bot, small)).isEqualTo(1);
+        small.combo = 5;
+        assertThat(r.botMatchup(bot, small)).isEqualTo(-1);
+        small.combo = 0; big.combo = 0;
+        bot.hp = 5;                                         // 체력이 얼마 안 남으면 점수가 낮아도 한두 대에 죽으니 쫓지 않는다
+        assertThat(r.botMatchup(bot, small)).isNotEqualTo(1);
+        bot.hp = 100; big.hp = 5;                           // 상대 체력이 바닥이면 점수가 조금 높아도 쫓는다
+        assertThat(r.botMatchup(bot, big)).isEqualTo(1);
     }
 }
