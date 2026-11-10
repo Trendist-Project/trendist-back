@@ -154,7 +154,7 @@ public final class SettingKeys {
 
     /** 관리자 설정 화면의 그룹 순서. 새 설정을 만들면 아래 GROUP_OF에서 그룹을 정한다(없으면 "기타"). */
     public static final List<String> GROUP_ORDER = List.of("트렌드·키워드", "성장·경험치·칭호", "맵·크기", "이동·충돌", "보호·접속",
-            "세이프존", "? 구슬", "NPC 봇", "대시", "스킬", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
+            "세이프존", "? 구슬", "NPC 봇", "스킬", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
 
     private static final java.util.Map<String, String> GROUP_OF = new java.util.HashMap<>();
     private static final java.util.Map<String, List<String>> NAMES_OF_GROUP = new java.util.HashMap<>();
@@ -175,8 +175,8 @@ public final class SettingKeys {
         group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
         group("? 구슬", ORB_DENSITY, ORB_MAX, ORB_SPAWN_SECONDS, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT);
         group("NPC 봇", BOT_PLAYERS, BOT_MIN_PLAYERS, BOT_CAP_RATIO);
-        group("대시", DASH_SPEED_MULTIPLIER, DASH_SECONDS);
-        group("스킬", SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_REACH_PX, SHOCKWAVE_KNOCKBACK,
+        group("스킬", DASH_SPEED_MULTIPLIER, DASH_SECONDS,                                  // 대시
+                SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_REACH_PX, SHOCKWAVE_KNOCKBACK,
                 HOOK_REACH_PX, BOLT_REACH_PX, HOOK_SECONDS, HOOK_PULL_SECONDS,
                 SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS, COMBO_WIPE_ORB_PERCENT);
