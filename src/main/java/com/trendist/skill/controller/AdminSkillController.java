@@ -1,11 +1,10 @@
 package com.trendist.skill.controller;
 
-import com.trendist.common.exception.ApiException;
+import com.trendist.auth.security.AuthUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.trendist.skill.entity.Skill;
 import com.trendist.skill.repository.SkillRepository;
 import com.trendist.skill.service.SkillCatalog;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +18,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/admin/skills")
 @RequiredArgsConstructor
 public class AdminSkillController {
-    public static final double MAX_COOLDOWN = 3600;
-    public static final int MAX_LEVEL = 100;
-
     private final SkillRepository skills;
     private final SkillCatalog catalog;
+    private final com.trendist.skill.service.SkillConfigService config;
 
     public record Item(String code, String icon, String category, String defaultKey, double cooldownSeconds, int requiredLevel,
                        boolean enabled, double defaultCooldown, java.time.Instant updatedAt) {}
@@ -38,23 +35,8 @@ public class AdminSkillController {
     }
 
     @PatchMapping("/{code}")
-    @Transactional
-    public Item update(@PathVariable String code, @RequestBody UpdateRequest req) {
-        Skill s = skills.findByCode(code).orElseThrow(() -> ApiException.notFound("SKILL_NOT_FOUND", "없는 스킬이에요"));
-        if (req.cooldownSeconds() != null) {
-            double c = req.cooldownSeconds();
-            if (Double.isNaN(c) || c < 0 || c > MAX_COOLDOWN) throw ApiException.badRequest("SKILL_COOLDOWN", "쿨타임은 0~" + (int) MAX_COOLDOWN + "초로 정해 주세요");
-            s.changeCooldown(BigDecimal.valueOf(c).setScale(2, RoundingMode.HALF_UP));
-        }
-        if (req.requiredLevel() != null) {
-            int l = req.requiredLevel();
-            if (l < 1 || l > MAX_LEVEL) throw ApiException.badRequest("SKILL_LEVEL", "해금 레벨은 1~" + MAX_LEVEL + "로 정해 주세요");
-            s.changeRequiredLevel(l);
-        }
-        if (req.enabled() != null) s.changeEnabled(req.enabled());
-        skills.saveAndFlush(s);
-        catalog.invalidate(); // 방이 1초마다 읽는 값을 바로 새로 읽게
-        return toItem(s);
+    public Item update(@AuthenticationPrincipal AuthUser user, @PathVariable String code, @RequestBody UpdateRequest req) {
+        return toItem(config.update(code, req.cooldownSeconds(), req.requiredLevel(), req.enabled(), user.userId(), null));
     }
 
     private static Item toItem(Skill s) {

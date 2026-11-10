@@ -43,6 +43,12 @@ public interface KeywordService {
     Optional<LostAll> loseAll(long playerId);
 
     /**
+     * 가진 키워드의 일부를 잃는다(체력 0으로 죽을 때·불꽃에게 부딪혔을 때): 금지되지 않은 키워드 중 max(1, 개수 × percent%의 내림)개를 무작위로 지운다.
+     * percent가 100 이상이면 모두 잃는다(loseAll과 같다). 잃은 것이 없으면 빈 값.
+     */
+    Optional<LostAll> loseFraction(long playerId, int percent);
+
+    /**
      * 빼앗긴 키워드(4.3). result: ADDED(이긴 사람 보관함에 새로 들어감) / RENEWED(이미 가진 키워드라 남은 시간만 24시간으로).
      * gained는 이긴 사람 유행도가 늘어난 양, expiresAt은 이긴 사람 보관함에서 사라지는 시각.
      */

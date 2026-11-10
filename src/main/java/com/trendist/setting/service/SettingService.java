@@ -17,4 +17,7 @@ public interface SettingService {
 
     /** 값을 바꾼다. 숫자 형식·정수 여부·허용 범위를 검사하고, 저장하면 캐시를 비워 바로(방에는 1초 안에) 반영한다. */
     Item update(long adminUserId, String name, String value);
+
+    /** 되돌리기(13.17)에서 쓴다: revertedFromId는 이 변경이 되돌린 이력 번호(일반 변경은 null) */
+    Item update(long adminUserId, String name, String value, Long revertedFromId);
 }

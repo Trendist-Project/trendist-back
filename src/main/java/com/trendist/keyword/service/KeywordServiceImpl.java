@@ -134,7 +134,7 @@ public class KeywordServiceImpl implements KeywordService {
         Instant expires = now.plus(Duration.ofHours(settings.getInt(SettingKeys.PLUS_TTL_HOURS)));
         Country country = p.getCountry();
         long oldTrend = k.getTrendValue();
-        long oldScore = p.getCurrentScore();
+        long oldScore = p.getCurrentScore() - p.getLevel(); // 레벨은 유행도에 1:1로 더해지는데 "얻은 점수"에는 키워드 몫만 센다(레벨이 올라도 늘어난 것으로 보이지 않게)
         boolean newHolder;
         if (existing.isPresent()) {
             existing.get().renew(now, expires); // 만료 행 재사용: 가진 사람 수는 그대로
@@ -157,9 +157,14 @@ public class KeywordServiceImpl implements KeywordService {
         keywords.flush();
         playerKeywords.flush();
         long newScore = playerService.recompute(p);
+        long gainedScore = newScore - p.getLevel() - oldScore;
         publishTrendChange(k, oldTrend, newTrend, p.getId());
-        if (newHolder) events.publishEvent(new GameEvents.HoldingChanged(country.getId(), p.getId(), k.getId(), true));
-        return new KeywordDtos.PlusResult(card(k, p, now), newScore - oldScore, playerService.summary(p));
+        if (newHolder) {
+            events.publishEvent(new GameEvents.HoldingChanged(country.getId(), p.getId(), k.getId(), true));
+            // 체력 회복(4.36): 새로 얻은 키워드의 점수와 얻은 뒤의 내 유행도(💤 키워드는 점수 0이라 회복도 없다)
+            events.publishEvent(new GameEvents.KeywordGained(country.getId(), p.getId(), isState(k, CodeTables.KW_ACTIVE) ? newTrend : 0, newScore));
+        }
+        return new KeywordDtos.PlusResult(card(k, p, now), gainedScore, playerService.summary(p));
     }
 
     /** 이미 가진 키워드의 만료 시각만 지금부터 다시 `plus_ttl_hours`(기본 24시간)로 늘린다. 점수·EXP는 그대로(4.3, 4.20, 4.21). 새 만료 시각을 돌려준다 */
@@ -570,6 +575,33 @@ public class KeywordServiceImpl implements KeywordService {
         p.incLose(); // 칭호(4.10): 한 번 부딪혀 잃은 것이므로 한 번으로 센다
         activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION); // 사이트 통계(13.9)
         for (Long keywordId : keywordIds) removeHolding(p, keywordId, now); // 인원·트렌드 값·점수를 키워드마다 고친다
+        return Optional.of(new LostAll(keywordIds.size(), activeCount, score));
+    }
+
+    @Override
+    @Transactional
+    public Optional<LostAll> loseFraction(long playerId, int percent) {
+        if (percent >= 100) return loseAll(playerId);
+        Player p = players.findByIdForUpdate(playerId).orElse(null);
+        if (p == null || p.getHoldCount() == 0 || percent <= 0) return Optional.empty();
+        Instant now = Instant.now(clock);
+        List<PlayerKeyword> candidates = new ArrayList<>(playerKeywords.findLosableByPlayer(playerId, now, codes.keywordStateId(CodeTables.KW_BANNED)));
+        if (candidates.isEmpty()) return Optional.empty();
+        int count = Math.max(1, candidates.size() * percent / 100); // 내림, 최소 1개(정수 계산이라 소수점이 생기지 않는다)
+        java.util.Collections.shuffle(candidates, ThreadLocalRandom.current());
+        List<PlayerKeyword> lost = candidates.subList(0, Math.min(count, candidates.size()));
+        long score = 0;
+        int activeCount = 0;
+        List<Long> keywordIds = new ArrayList<>();
+        for (PlayerKeyword pk : lost) {
+            if (isState(pk.getKeyword(), CodeTables.KW_ACTIVE)) { score += pk.getKeyword().getTrendValue(); activeCount++; }
+            keywordIds.add(pk.getKeyword().getId());
+        }
+        playerKeywords.deleteAll(lost);
+        playerKeywords.flush();
+        p.incLose(); // 칭호(4.10): 한 번 부딪혀 잃은 것이므로 한 번으로 센다
+        activity.add(p.getCountry().getId(), com.trendist.stats.support.ActivityCounter.Kind.COLLISION);
+        for (Long keywordId : keywordIds) removeHolding(p, keywordId, now);
         return Optional.of(new LostAll(keywordIds.size(), activeCount, score));
     }
 

@@ -101,6 +101,7 @@ public class TitleServiceImpl implements TitleService {
             case "kill_count" -> p.getKillCount();
             case "defeat_count" -> p.getDefeatCount();
             case "tie_count" -> p.getTieCount();
+            case "monster_kill_count" -> p.getMonsterKillCount();
             case "max_combo" -> p.getMaxCombo();
             case "flame_out_count" -> p.getFlameOutCount();
             case "active_days" -> p.getActiveDays();

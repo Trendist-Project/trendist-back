@@ -53,12 +53,18 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     private final com.trendist.player.service.PlayerService playerService;
     private final LevelService levels;
     private final ObjectMapper json;
+    private final com.trendist.monster.service.MonsterCatalog monsterCatalog;
+    private final com.trendist.monster.service.MonsterRecorder monsterRecorder;
 
     public RoomManagerImpl(SettingService settings, KeywordService keywordService, LevelService levels, ObjectMapper json,
+                           com.trendist.monster.service.MonsterCatalog monsterCatalog,
+                           com.trendist.monster.service.MonsterRecorder monsterRecorder,
                            com.trendist.skill.service.SkillCatalog skillCatalog,
                            com.trendist.skill.service.SkillLoadoutService skillLoadouts,
                            @org.springframework.context.annotation.Lazy com.trendist.player.service.PlayerService playerService) {
         this.playerService = playerService;
+        this.monsterCatalog = monsterCatalog;
+        this.monsterRecorder = monsterRecorder;
         this.skillCatalog = skillCatalog;
         this.skillLoadouts = skillLoadouts;
         this.settings = settings;
@@ -71,16 +77,21 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.ZoneTuning z = zoneTuning();
                 Room.ComboTuning c = comboTuning();
                 Room.DashTuning dash = dashTuning();
+                Room.HpTuning hp = hpTuning();
                 Room.SkillTuning skill = skillTuning();
                 java.util.Map<String, Double> extra = extraSkillCooldowns();
                 java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
                 java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
+                java.util.Map<String, java.util.Map<String, Double>> monsterParams = new java.util.HashMap<>();
+                monsterCatalog.all().forEach((code, e) -> monsterParams.put(code, e.params())); // 몬스터 설정값(4.35)
                 rooms.values().forEach(r -> {
+                    r.setMonsterParams(monsterParams);
                     if (!skill.equals(r.skillTuning())) r.setSkillTuning(skill);
                     r.setSkillCooldowns(extra);
                     r.setDisabledSkills(disabledSkills);
                     r.setRequiredLevels(requiredLevels);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
+                    if (!hp.equals(r.hpTuning())) r.setHpTuning(hp);
                     if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);
                     r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
                     r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
@@ -113,12 +124,14 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             Room r = new Room(id, tuning(), this);
             r.setZoneTuning(zoneTuning());
             r.setComboTuning(comboTuning());
+            r.setHpTuning(hpTuning());
             r.setDashTuning(dashTuning());
             r.setSkillTuning(skillTuning());
             r.setSkillCooldowns(extraSkillCooldowns());
             r.setSkillSlotCount(skillLoadouts.slotCount()); // 장착 칸 수는 actions의 SKILL_SLOT 동작 수(4.33)
             r.setDisabledSkills(skillCatalog.disabledCodes());
             r.setRequiredLevels(skillCatalog.requiredLevels());
+            r.setMonsterParams(monsterParamsNow());
             r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
             r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));
             r.setOfflineKeepSeconds(settings.getInt(SettingKeys.OFFLINE_KEEP_SECONDS)); // 연결이 끊겨도 원이 남아 있는 시간(4.32)
@@ -133,6 +146,15 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             return r;
         });
     }
+
+    private java.util.Map<String, java.util.Map<String, Double>> monsterParamsNow() {
+        java.util.Map<String, java.util.Map<String, Double>> m = new java.util.HashMap<>();
+        monsterCatalog.all().forEach((code, e) -> m.put(code, e.params()));
+        return m;
+    }
+
+    @Override
+    public java.util.Collection<Room> rooms() { return rooms.values(); }
 
     @Override
     public Room.Tuning tuning() {
@@ -186,7 +208,17 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     /** 연속 빼앗기 콤보 설정(4.25). */
     private Room.ComboTuning comboTuning() {
         return new Room.ComboTuning(settings.getInt(SettingKeys.COMBO_FLAME_AT), settings.getInt(SettingKeys.COMBO_BOT_COUNTS) > 0,
-                settings.getInt(SettingKeys.COMBO_WIPE_ORB_PERCENT), settings.getInt(SettingKeys.COMBO_MAX_SECONDS));
+                settings.getInt(SettingKeys.COMBO_MAX_SECONDS));
+    }
+
+    /** 체력(HP) 설정(4.36). */
+    private Room.HpTuning hpTuning() {
+        return new Room.HpTuning(settings.getInt(SettingKeys.HP_ENABLED) > 0, settings.getDouble(SettingKeys.HP_MAX),
+                settings.getDouble(SettingKeys.HP_HIT_SECONDS), settings.getDouble(SettingKeys.HP_FLAME_MULTIPLIER),
+                settings.getInt(SettingKeys.HP_FLAME_COUNTER) > 0,
+                settings.getDouble(SettingKeys.HP_SAFE_REGEN_PERCENT), settings.getInt(SettingKeys.HP_PUBLIC) > 0,
+                settings.getInt(SettingKeys.DEATH_LOSE_PERCENT), settings.getInt(SettingKeys.FLAME_HIT_LOSE_PERCENT),
+                settings.getDouble(SettingKeys.HP_KILL_HEAL_PERCENT));
     }
 
     /** 세이프존 설정(4.22). */
@@ -298,6 +330,13 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
         rooms.values().forEach(r -> r.submit(room -> room.announce(msg)));
     }
 
+    /** 키워드를 새로 얻으면 그 점수 비율만큼 체력이 회복된다(4.36) */
+    @TransactionalEventListener(fallbackExecution = true)
+    public void on(GameEvents.KeywordGained e) {
+        Room r = rooms.get(e.countryId());
+        if (r != null) r.submit(room -> room.applyKeywordGain(e.playerId(), e.keywordScore(), e.totalScore()));
+    }
+
     @TransactionalEventListener(fallbackExecution = true)
     public void on(GameEvents.HoldingChanged e) {
         Room r = rooms.get(e.countryId());
@@ -335,6 +374,66 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 }));
             } catch (RuntimeException e) {
                 log.warn("lose keyword failed for player {}", loserId, e);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------ 몬스터(4.35)
+
+    @Override
+    public void monsterStarted(Room room, com.trendist.game.room.Monster.Spec spec, com.trendist.game.room.Monster.Start start) {
+        db(() -> {
+            try { monsterRecorder.started(spec.spawnId(), start); }
+            catch (RuntimeException e) { log.warn("monster start record failed for spawn {}", spec.spawnId(), e); }
+        });
+    }
+
+    /** 끝난 몬스터: 등장 기록·피해를 남기고, 보상(EXP, 🔥 키워드)을 준 뒤 접속 중인 사람에게 알린다 */
+    @Override
+    public void monsterEnded(Room room, com.trendist.game.room.Monster.Result result) {
+        db(() -> {
+            try { monsterRecorder.finish(result); }
+            catch (RuntimeException e) { log.warn("monster finish record failed for spawn {}", result.spec().spawnId(), e); }
+            for (var rw : result.rewards()) {
+                try {
+                    playerService.awardMonster(rw.playerId(), rw.exp(), rw.cleared());
+                    java.util.List<String> texts = new java.util.ArrayList<>();
+                    for (int i = 0; i < rw.keywords(); i++) {
+                        KeywordDtos.OrbResult r = keywordService.openPrizeOrb(rw.playerId()); // ! 구슬과 같은 규칙: 무작위 🔥 키워드 하나
+                        if (("GAINED".equals(r.status()) || "RENEWED".equals(r.status())) && r.text() != null) texts.add(r.text());
+                    }
+                    Map<String, Object> msg = new HashMap<>();
+                    msg.put("type", "monsterReward"); msg.put("name", result.spec().name()); msg.put("en", result.spec().nameEn());
+                    msg.put("cleared", rw.cleared()); msg.put("rank", rw.rank()); msg.put("damage", rw.damage()); msg.put("exp", rw.exp()); msg.put("keywords", texts);
+                    room.submit(r -> { Room.Member m = r.byPlayer(rw.playerId()); if (m != null) sendText(m, msg); });
+                } catch (RuntimeException e) {
+                    log.warn("monster reward failed for player {}", rw.playerId(), e);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void requestMonsterLose(Room room, Room.Member victim, String by, int count) {
+        long victimId = victim.playerId;
+        db(() -> {
+            try {
+                java.util.List<String> texts = new java.util.ArrayList<>();
+                long total = 0;
+                for (int i = 0; i < count; i++) {
+                    var lost = keywordService.loseRandom(victimId);
+                    if (lost.isEmpty()) break;
+                    texts.add(lost.get().text());
+                    total += lost.get().score();
+                }
+                if (texts.isEmpty()) return;
+                long score = total;
+                room.submit(r -> {
+                    Room.Member m = r.byPlayer(victimId);
+                    if (m != null) sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "monster", true, "count", texts.size()));
+                });
+            } catch (RuntimeException e) {
+                log.warn("monster lose failed for player {}", victimId, e);
             }
         });
     }
@@ -397,6 +496,33 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 });
             } catch (RuntimeException e) {
                 log.warn("wipe keywords failed for player {}", loserId, e);
+            }
+        });
+    }
+
+    /** 키워드의 일부를 잃는다(4.36): 불꽃에게 부딪혔거나(death=false) 체력이 0이 되어 죽었다(death=true). 죽은 사람은 이미 방에서 빠졌으므로 넘겨 받은 원 기준으로 알린다 */
+    @Override
+    public void requestHalve(Room room, Room.Member loser, Room.Member winner, int percent, boolean death) {
+        long loserId = loser.playerId, winnerId = winner.playerId;
+        String winnerName = winner.nickname;
+        boolean winnerBot = winner.bot;
+        db(() -> {
+            try {
+                keywordService.loseFraction(loserId, percent).ifPresent(lost -> {
+                    if (!death && !winnerBot) playerService.recordSteal(winnerId); // 불꽃으로 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
+                    room.submit(r -> {
+                        if (!death) r.fightResult(winner, r.byPlayer(loserId), false); // 죽는 경우는 die가 이미 콤보를 처리했다
+                        r.dropPrizeOrbs(loser, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
+                        Map<String, Object> msg = new HashMap<>();
+                        msg.put("type", "lost"); msg.put("by", winnerName); msg.put("wiped", lost.count()); msg.put("score", lost.score());
+                        msg.put("partial", true); msg.put("death", death);
+                        sendText(loser, msg);
+                        Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
+                        if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score(), "partial", true));
+                    });
+                });
+            } catch (RuntimeException e) {
+                log.warn("lose part of keywords failed for player {}", loserId, e);
             }
         });
     }

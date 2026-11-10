@@ -16,6 +16,9 @@ public final class GameEvents {
     /** 보유 색인 갱신(키워드 번호 → 플레이어). */
     public record HoldingChanged(long countryId, long playerId, long keywordId, boolean added) {}
 
+    /** 키워드를 새로 얻었다(체력 회복에 쓴다, 4.36). keywordScore는 그 키워드가 더해 주는 점수(💤면 0), totalScore는 얻은 뒤의 내 유행도. */
+    public record KeywordGained(long countryId, long playerId, long keywordScore, long totalScore) {}
+
     /** 칭호 조건 수치가 바뀌었을 수 있다. 커밋 뒤 METRIC 칭호를 검사한다(4.10). */
     public record TitleCheck(long playerId) {}
 

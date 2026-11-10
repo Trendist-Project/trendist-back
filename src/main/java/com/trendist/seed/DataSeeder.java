@@ -71,6 +71,7 @@ public class DataSeeder implements ApplicationRunner {
     private final UserRepository users;
     private final CodeTables codeTables;
     private final com.trendist.keybinding.service.KeybindingSeeder keybindingSeeder;
+    private final com.trendist.monster.service.MonsterSeeder monsterSeeder;
 
     @Override
     @Transactional
@@ -186,6 +187,7 @@ public class DataSeeder implements ApplicationRunner {
         codeTables.clear();
         added += seedGuides();
         added += keybindingSeeder.seed(); // 키 바인딩 목록: 키·동작(4.33)
+        added += monsterSeeder.seed(); // 몬스터 종류와 설정값(4.35)
         log.info("seed done, {} rows added", added);
     }
 

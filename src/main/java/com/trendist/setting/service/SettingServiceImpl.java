@@ -26,10 +26,12 @@ public class SettingServiceImpl implements SettingService {
     }
 
     private final SettingRepository repository;
+    private final com.trendist.audit.service.ConfigChangeRecorder changes;
     private final LoadingCache<String, Map<String, String>> cache;
 
-    public SettingServiceImpl(SettingRepository repository) {
+    public SettingServiceImpl(SettingRepository repository, com.trendist.audit.service.ConfigChangeRecorder changes) {
         this.repository = repository;
+        this.changes = changes;
         this.cache = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(1)).build(k -> loadAll());
     }
 
@@ -60,7 +62,11 @@ public class SettingServiceImpl implements SettingService {
 
     @Override
     @Transactional
-    public Item update(long adminUserId, String name, String raw) {
+    public Item update(long adminUserId, String name, String raw) { return update(adminUserId, name, raw, null); }
+
+    @Override
+    @Transactional
+    public Item update(long adminUserId, String name, String raw, Long revertedFromId) {
         Setting s = repository.findByName(name).orElseThrow(() -> ApiException.notFound("SETTING_NOT_FOUND", "없는 설정이에요"));
         BigDecimal v;
         try {
@@ -84,6 +90,7 @@ public class SettingServiceImpl implements SettingService {
         repository.saveAndFlush(s);
         invalidate();
         log.info("setting changed by admin {}: {} {} -> {}", adminUserId, name, old, s.getValue());
+        changes.record(com.trendist.audit.service.ConfigChangeRecorder.SETTING, name, "value", normalize(old), s.getValue(), adminUserId, revertedFromId); // 변경 이력(13.17)
         return item(s);
     }
 
@@ -92,5 +99,6 @@ public class SettingServiceImpl implements SettingService {
         return new Item(s.getName(), s.getValue(), s.getValueType(), s.getMinValue(), s.getMaxValue(), s.getDescription(), def, s.getUpdatedAt(), s.getGroup().getName(), s.getUnit());
     }
 
+    private static String normalize(String raw) { try { return plain(new BigDecimal(raw.trim())); } catch (RuntimeException e) { return raw; } }
     private static String plain(BigDecimal v) { return v == null ? "" : v.stripTrailingZeros().toPlainString(); }
 }

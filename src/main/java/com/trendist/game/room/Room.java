@@ -63,10 +63,21 @@ public class Room {
         default void requestTie(Room room, Member member) {}
         /** 사람(loser)이 키워드가 없는 채로 져서 죽었다(패배). 패배 횟수를 올리고 칭호를 확인한다(4.31). 봇은 부르지 않는다. */
         default void requestDefeat(Room room, Member loser) {}
+        /**
+         * 가진 키워드의 percent%(내림, 최소 1개)를 잃는다(4.36): 불꽃에게 부딪혔을 때(death=false)와 체력이 0이 되어 죽을 때(death=true).
+         * 틱 밖에서 무작위로 지우고, 일부는 ! 구슬로 떨어지며, 잃은 사람과 이긴 사람에게 알린다. 죽는 경우의 싸움 결과(콤보)는 die가 이미 처리했다.
+         */
+        default void requestHalve(Room room, Member loser, Member winner, int percent, boolean death) {}
         /** 사람(winner)의 연속 빼앗기 콤보가 최고 기록(이 접속에서 보낸 값)을 넘었다. 저장된 최고 콤보보다 높으면 올리고 칭호를 확인한다(4.25). 봇은 부르지 않는다. */
         default void requestCombo(Room room, Member winner, int combo) {}
         /** 사람(by)이 상대(사람·봇)의 콤보 불꽃을 꺼뜨렸다. 횟수를 올리고 칭호를 확인한다(4.25). */
         default void requestFlameOut(Room room, Member by) {}
+        /** 몬스터가 나왔다(4.35): 정해진 체력과 그때의 접속 사람 수·평균·1등 유행도를 등장 기록에 남긴다 */
+        default void monsterStarted(Room room, Monster.Spec spec, Monster.Start start) {}
+        /** 몬스터가 끝났다(처치·시간 초과·제거, 4.35): 플레이어별 피해를 기록하고 보상을 준다. 틱 밖에서 한다 */
+        default void monsterEnded(Room room, Monster.Result result) {}
+        /** 몬스터(보스)에게 맞아 키워드를 count개 잃는다(빼앗는 사람 없음, 콤보는 끊지 않는다, 4.35). 틱 밖에서 무작위로 잃고 당한 사람에게 알린다 */
+        default void requestMonsterLose(Room room, Member victim, String by, int count) {}
         void send(Member m, ByteBuffer binary);
         void sendText(Member m, Map<String, Object> message);
         /** 오래 응답이 없는 접속을 끊는다(방에서는 이미 뺐다). */
@@ -93,12 +104,24 @@ public class Room {
     /**
      * 연속 빼앗기 콤보(4.25). flameAt번 연속으로 이기면 원 둘레에 불꽃이 타오르고(그림은 클라이언트가 combo로 그린다),
      * 한 번이라도 싸움에서 키워드를 잃으면 콤보와 불꽃이 모두 사라진다. countBots면 봇을 이긴 것도 센다.
-     * 불꽃인 사람이 불꽃이 없는 사람과 부딪히면 점수와 상관없이 이기고 상대는 키워드를 모두 잃는다(4.25).
-     * wipeOrbPercent는 그때 잃은 🔥활성 키워드 수의 몇 %만큼 ! 구슬로 떨어뜨릴지(올림, 4.20).
+     * 불꽃인 사람이 불꽃이 없는 사람과 부딪히면 점수와 상관없이 이기고 상대는 키워드의 절반을 잃는다(4.25, 4.36).
      * maxSeconds는 콤보의 남은 유지시간(초): 마지막으로 콤보가 오른 때부터 이 시간이 지나면 연속 횟수와 불꽃이 사라진다. 콤보가 추가될 때마다 다시 시작한다(0이면 제한 없음, 4.25).
      */
-    public record ComboTuning(int flameAt, boolean countBots, int wipeOrbPercent, int maxSeconds) {
-        public static final ComboTuning DEFAULT = new ComboTuning(5, true, 50, 300);
+    public record ComboTuning(int flameAt, boolean countBots, int maxSeconds) {
+        public static final ComboTuning DEFAULT = new ComboTuning(5, true, 300);
+    }
+
+    /**
+     * 체력(HP, 4.36). max는 최대 체력(화면에는 100%), hitSeconds는 같은 두 사람 사이 피해 간격, flameMultiplier는 불꽃이 불꽃 없는 사람을 칠 때 공격력 배수,
+     * flameCounter는 그때 불꽃 쪽도 맞는지, safeRegenPercent는 가운데 고정 세이프존에서 초당 회복(%),
+     * publicBars는 모두에게 체력바를 보여 줄지, deathLosePercent·flameLosePercent는 죽을 때·불꽃에게 부딪힐 때 잃는 키워드 비율(%),
+     * killHealPercent는 처치했을 때 회복 배율(%): 회복(최대 체력의 %) = 처치당한 사람 유행도 ÷ (처치당한 사람 + 내 유행도) × 이 배율(0이면 없음).
+     */
+    public record HpTuning(boolean enabled, double max, double hitSeconds, double flameMultiplier, boolean flameCounter,
+                           double safeRegenPercent, boolean publicBars, int deathLosePercent, int flameLosePercent, double killHealPercent) {
+        /** 설정을 읽기 전의 기본(꺼짐): 실제 서버는 방을 만들 때 설정(hp_enabled 등)으로 바로 바꾼다 */
+        public static final HpTuning DEFAULT = new HpTuning(false, 100, 1, 5, true, 2, true, 50, 50, 100);
+        public static HpTuning on() { return new HpTuning(true, 100, 1, 5, true, 2, true, 50, 50, 100); }
     }
 
     /**
@@ -160,6 +183,9 @@ public class Room {
         public String title;
         /** 꾸미기(4.9) */
         public Skin skin = Skin.DEFAULT;
+        /** 체력(4.36): 0이면 죽는다. 최대 체력은 설정(hp_max). 소수 둘째 자리까지 들고, 화면에는 올림한 % 로 보인다 */
+        public double hp = 100;
+        boolean hpDirty;
         /** 연속 빼앗기 콤보(4.25) */
         public int combo;
         /** 이 접속에서 이미 저장하라고 알린 최고 콤보(같은 값을 거듭 DB로 보내지 않으려는 것, 4.25) */
@@ -251,12 +277,18 @@ public class Room {
     private double nextOrbAt;
     private volatile ZoneTuning zoneTuning = ZoneTuning.DEFAULT;
     private volatile ComboTuning comboTuning = ComboTuning.DEFAULT;
+    private volatile HpTuning hpTuning = HpTuning.DEFAULT;
     private volatile DashTuning dashTuning = DashTuning.DEFAULT;
     private volatile SkillTuning skillTuning = SkillTuning.DEFAULT;
     /** DB(skills.enabled)에서 꺼 둔 스킬 코드. 쓰려 해도 아무 일도 없다(4.33) */
     private volatile Set<String> disabledSkills = Set.of();
     /** 스킬 코드 → 해금 레벨(DB skills.required_level). 없으면 처음부터 쓴다. 레벨이 모자라면 서버가 막는다(4.33) */
     private volatile Map<String, Integer> requiredLevels = Map.of();
+    /** 몬스터(4.35): 방 번호 → 몬스터. 설정값(종류 코드 → 이름 → 값)은 방이 1초마다 새로 받는다. monsterView는 관리자 모니터링용 복사본 */
+    private final Map<Integer, Monster> monsters = new LinkedHashMap<>();
+    private int nextMonster = 1;
+    private volatile Map<String, Map<String, Double>> monsterParams = Map.of();
+    private volatile List<Map<String, Object>> monsterView = List.of();
     private final List<Shock> shocks = new ArrayList<>();
     private final List<Hook> hooks = new ArrayList<>();
     /**
@@ -296,6 +328,8 @@ public class Room {
     public void setTuning(Tuning t) { this.tuning = t; }
     public void setZoneTuning(ZoneTuning z) { this.zoneTuning = z; }
     public void setComboTuning(ComboTuning c) { this.comboTuning = c; }
+    public void setHpTuning(HpTuning h) { this.hpTuning = h; }
+    public HpTuning hpTuning() { return hpTuning; }
     public void setDashTuning(DashTuning d) { this.dashTuning = d; }
     public DashTuning dashTuning() { return dashTuning; }
     private int skillSlots = DEFAULT_SKILL_SLOTS;
@@ -369,6 +403,7 @@ public class Room {
         Member m = new Member(nextEntity++, playerId, session);
         m.lastHeardNanos = nanoClock.getAsLong();
         m.nickname = nickname; m.level = level; m.score = score;
+        m.hp = hpTuning.max(); // 새로 들어오면(처음·죽은 뒤 다시 들어올 때) 체력은 가득이다
         m.title = look.title(); m.skin = look.skin() == null ? Skin.DEFAULT : look.skin(); m.trail = look.trail();
         m.radius = radiusFor(score); m.displayRadius = m.radius;
         if (areaNow <= 0) areaNow = activeArea(members.size() + 1); // 방의 첫 입장: 처음 크기를 정한다. 그 뒤로는 틱이 속도에 맞춰 키운다
@@ -384,6 +419,8 @@ public class Room {
         outbox.sendText(m, orbListMessage());
         outbox.sendText(m, zonesMessage());
         outbox.sendText(m, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
+        outbox.sendText(m, hpMessage(m, 0));
+        hpPublicDirty = true; // 체력바를 공개 중이면 새로 들어온 사람에게도 다른 사람 체력을 알린다
         return m;
     }
 
@@ -412,6 +449,8 @@ public class Room {
         outbox.sendText(old, orbListMessage());
         outbox.sendText(old, zonesMessage());
         outbox.sendText(old, Map.of("type", "chatHistory", "messages", List.copyOf(chatHistory)));
+        outbox.sendText(old, hpMessage(old, 0)); // 새로고침해도 체력은 그대로다(다시 들어와서 회복하는 일이 없다)
+        hpPublicDirty = true;
         return old;
     }
 
@@ -506,7 +545,7 @@ public class Room {
     }
 
     /** 키워드를 빼앗으면 콤보 +1. 봇을 이긴 경우는 설정(combo_bot_counts)에 따른다. */
-    private void comboWin(Member winner, boolean vsBot) {
+    void comboWin(Member winner, boolean vsBot) {
         if (winner == null || (vsBot && !comboTuning.countBots())) return;
         winner.comboStartedAt = clockSeconds; // 콤보가 추가될 때마다 유지시간이 다시 시작된다(4.25)
         winner.combo++;
@@ -517,7 +556,7 @@ public class Room {
         broadcast(comboMessage(winner, winner.combo == comboTuning.flameAt() ? "start" : "up")); // start: 이번에 불꽃이 붙었다
     }
 
-    private Map<String, Object> comboMessage(Member m, String event) {
+    Map<String, Object> comboMessage(Member m, String event) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "combo"); msg.put("e", m.entityNo); msg.put("nickname", m.nickname);
         msg.put("combo", m.combo); msg.put("event", event); msg.put("flameAt", comboTuning.flameAt());
@@ -566,15 +605,21 @@ public class Room {
      * 죽인 사람에게 {kill, target}을 보낸다. 연결은 그대로 두고, 클라이언트가 {respawn}을 보내 다시 들어올 때까지 기다린다.
      * 이긴 쪽 콤보는 +1, 진 쪽 콤보는 0(4.25)이라 싸움 결과도 함께 처리한다.
      */
-    private void die(Member loser, Member killer) {
+    private void die(Member loser, Member killer) { die(loser, killer, false); }
+
+    /** byHp이면 체력이 0이 되어 죽은 것이다(죽은 사람에게 알리는 {died}에 cause: hp를 싣는다) */
+    private void die(Member loser, Member killer, boolean byHp) {
         if (loser.dead || members.get(loser.entityNo) != loser) return;
         fightResult(killer, loser, loser.bot);
+        healOnKill(killer, loser); // 처치 회복(4.36)
         loser.dead = true;
         members.remove(loser.entityNo);
         if (!killer.bot) outbox.requestKill(this, killer); // 죽인 횟수(4.31): 죽은 쪽이 사람이든 봇이든 센다
         if (loser.bot) {
-            // 봇도 죽는다(4.31): 방에서 빠지고, 다음 봇 채우기(1초마다)에서 새 봇이 가운데 세이프존에서 다시 나온다(리스폰)
+            // 봇도 사람처럼 죽는다(4.31): 방에서 빠지고, 다음 봇 채우기(1초마다)에서 같은 봇이 남은 키워드·EXP를 가지고 가운데 세이프존에서 다시 나온다(리스폰)
             botRespawns++;
+            botRevives.addLast(new BotRevive(loser.botExp, List.copyOf(loser.botKeywords), loser.botStyle, loser.botReact));
+            while (botRevives.size() > 32) botRevives.pollFirst();
             broadcastRoster();
             if (!killer.bot) outbox.sendText(killer, Map.of("type", "kill", "target", loser.nickname));
             return;
@@ -593,11 +638,15 @@ public class Room {
         broadcastRoster();
         Map<String, Object> died = new HashMap<>();
         died.put("type", "died"); died.put("by", killer.nickname); died.put("byE", killer.entityNo);
+        if (byHp) died.put("cause", "hp");
         outbox.sendText(loser, died);
         if (!killer.bot) outbox.sendText(killer, Map.of("type", "kill", "target", loser.nickname));
     }
 
     private int botRespawns; // 죽어서 다시 나와야 하는 봇 수(4.31)
+    /** 죽은 봇이 다시 나올 때 가져갈 것(EXP·남은 키워드·성격). 죽은 순서대로 다시 나온다 */
+    private record BotRevive(long exp, List<BotKw> keywords, int style, double react) {}
+    private final java.util.ArrayDeque<BotRevive> botRevives = new java.util.ArrayDeque<>();
 
     public Member byPlayer(long playerId) { return byPlayer.get(playerId); }
     public Member byEntity(int entityNo) { return members.get(entityNo); }
@@ -729,11 +778,13 @@ public class Room {
         pullHooked(dt, half); // 끌려오는 원은 다른 원이 모두 움직인 뒤에 끌어당긴다(끌어당긴 사람이 같은 틱에 더 움직여서 닿지 않는 일이 없게)
         updateZones(half);
         for (Member m : members.values()) m.safe = inSafeZone(m.x, m.y);
+        updateHp(dt);
         updateShocks(tu);
         updateHooks(tu);
         updateBolts(dt);
         updatePoison();
         collide(tu);
+        tickMonsters(dt);
         finishHooks(tu);
         eatOrbs();
         spawnOrbs(tu, half);
@@ -744,10 +795,107 @@ public class Room {
         if (tick % SNAPSHOT_EVERY == 0) sendSnapshots(half);
         if (tick % MINIMAP_EVERY == 0) sendMinimap();
         if (tick % 20 == 0) {
+            monsterView = monsters.values().stream().map(mo -> mo.viewMessage(this)).toList();
             Map<Long, Live> view = new HashMap<>();
             for (Member m : members.values()) if (!m.bot) view.put(m.playerId, new Live(m.playerId, m.entityNo, m.nickname, m.level, m.score)); // 랭킹·정보 팝업은 사람만
             liveView = view;
         }
+    }
+
+
+    // ------------------------------------------------------------ 몬스터(4.35)
+
+    double clock() { return clockSeconds; }
+    double half() { return currentHalf(); }
+    Tuning tuningNow() { return tuning; }
+    public Map<String, Double> monsterParams(String code) { return monsterParams.get(code); }
+    public void setMonsterParams(Map<String, Map<String, Double>> params) { this.monsterParams = params; }
+    /** 지금 싸우는 몬스터의 요약(관리자 모니터링). 1초마다 갱신되는 복사본이라 아무 스레드에서나 읽는다 */
+    public List<Map<String, Object>> monsterView() { return monsterView; }
+
+    /** 몬스터를 낸다(틱 스레드: submit으로 부른다). 체력을 정하고 모두에게 알린 뒤 DB 기록에 알린다. 이미 같은 종류가 있으면 아무것도 하지 않는다 */
+    public void spawnMonster(Monster.Spec spec) {
+        for (Monster mo : monsters.values()) if (mo.spec.code().equals(spec.code())) return;
+        Monster mo = Monster.create(this, nextMonster++, spec);
+        if (mo == null) return;
+        monsters.put(mo.id, mo);
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "monsterSpawn"); msg.put("id", mo.id); msg.put("name", spec.name()); msg.put("en", spec.nameEn()); msg.put("max", mo.maxHp);
+        msg.put("durationMs", Math.round((mo.endsAt - mo.startedAt) * 1000));
+        broadcast(msg);
+        broadcast(mo.stateMessage(this));
+        monsterView = monsters.values().stream().map(x -> x.viewMessage(this)).toList();
+        outbox.monsterStarted(this, spec, mo.start);
+    }
+
+    /** 몬스터를 끝낸다(처치·시간 초과·제거). 모두에게 결과와 피해 순위를 알리고 DB 기록·보상은 틱 밖에서 한다 */
+    void endMonster(Monster mo, String status) {
+        if (mo.ended) return;
+        mo.ended = true;
+        monsters.remove(mo.id);
+        Monster.Result result = mo.result(this, status);
+        Map<String, Object> msg = mo.topList(5);
+        msg.put("type", "monsterEnd"); msg.put("id", mo.id); msg.put("name", mo.spec.name()); msg.put("en", mo.spec.nameEn());
+        msg.put("result", status); msg.put("max", mo.maxHp); msg.put("hp", Math.max(0, mo.hp));
+        broadcast(msg);
+        monsterView = monsters.values().stream().map(x -> x.viewMessage(this)).toList();
+        outbox.monsterEnded(this, result);
+    }
+
+    /** 관리자: 그 번호의 몬스터를 끝낸다(틱 스레드에서 부른다). status는 KILLED(보상 지급)·REMOVED(보상 없음)·TIMEOUT */
+    public boolean removeMonster(int id, String status) {
+        Monster mo = monsters.get(id);
+        if (mo == null) return false;
+        endMonster(mo, status);
+        return true;
+    }
+
+    /** 테스트와 같은 패키지의 코드가 지금 있는 몬스터를 본다 */
+    Collection<Monster> monsters() { return monsters.values(); }
+
+    private void tickMonsters(double dt) {
+        if (monsters.isEmpty()) return;
+        for (Monster mo : new ArrayList<>(monsters.values())) {
+            if (mo.ended) continue;
+            mo.tick(this, dt);
+            if (!mo.ended && tick % 4 == 0) broadcast(mo.stateMessage(this)); // 5Hz
+        }
+    }
+
+    /** 보스에게 맞은 사람이 보스에게서 튕겨 난다(일반 충돌의 튕김과 같은 식) */
+    void knockFrom(Member m, double nx, double ny, double strength, Tuning tu) { knock(m, nx, ny, strength, tu); }
+
+    /** 무적(보호막) 표시: 모두의 화면에 seconds초 */
+    void shieldFor(Member m, double seconds) {
+        broadcast(Map.of("type", "shield", "e", m.entityNo, "ms", (long) (seconds * 1000)));
+    }
+
+    void monsterLose(Member m, String by, int count) { outbox.requestMonsterLose(this, m, by, count); }
+
+    /** 몬스터의 불꽃에 불꽃이 꺼진다: 콤보를 0으로 하고 모두에게 알린다 */
+    void monsterFlameOut(Member m, String by) {
+        if (m.combo <= 0) return;
+        m.combo = 0;
+        Map<String, Object> msg = comboMessage(m, "broken");
+        msg.put("by", by);
+        broadcast(msg);
+    }
+
+    /** 몬스터에게 즉사한다(4.35): 키워드는 그대로 두고 죽음(4.31)과 같이 방에서 빠져 구경 목록으로 간다 */
+    void monsterKill(Member loser, String by) {
+        if (loser.dead || members.get(loser.entityNo) != loser) return;
+        if (loser.combo > 0) { loser.combo = 0; broadcast(comboMessage(loser, "reset")); }
+        loser.dead = true;
+        members.remove(loser.entityNo);
+        byPlayer.remove(loser.playerId);
+        outbox.requestDefeat(this, loser);
+        size = humanCount();
+        broadcastRoster();
+        if (loser.offline) return;
+        spectators.add(loser);
+        Map<String, Object> died = new HashMap<>();
+        died.put("type", "died"); died.put("by", by); died.put("byE", -1);
+        outbox.sendText(loser, died);
     }
 
     // ------------------------------------------------------------ 내부
@@ -962,16 +1110,15 @@ public class Room {
     }
 
     /**
-     * 불꽃에게 키워드를 모두 잃은 사람 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25). 개수 = 잃은 🔥활성 키워드 수 × wipeOrbPercent%(올림, 활성이 하나라도 있었으면 최소 1개).
+     * 불꽃에게 맞거나 체력이 0이 되어 키워드를 잃은 사람·봇 둘레에 ! 구슬을 떨어뜨린다(4.20, 4.25, 4.36). **개수 = 잃은 🔥활성 키워드 수의 절반**(내림, 💤 비활성은 세지 않는다)이고 **잃은 것이 있으면 최소 1개**는 떨어진다(활성이 하나도 없어도).
      * 원 가장자리 바깥으로 흩어지고, 활동 영역 안·세이프존 밖에만 놓는다. 방 전체 상한을 넘으면 더 만들지 않는다.
      */
     public void dropPrizeOrbs(long playerId, int lostActiveCount) { dropPrizeOrbs(byPlayer.get(playerId), lostActiveCount); }
 
     /** 멤버 버전(봇은 byPlayer에 없다) */
     public void dropPrizeOrbs(Member m, int lostActiveCount) {
-        if (m == null || lostActiveCount <= 0) return;
-        int count = (int) Math.ceil(lostActiveCount * comboTuning.wipeOrbPercent() / 100.0);
-        if (comboTuning.wipeOrbPercent() > 0) count = Math.max(1, count);
+        if (m == null) return; // 호출하는 쪽은 키워드를 실제로 잃었을 때만 부른다: 활성이 없었어도 구슬은 최소 1개
+        int count = Math.max(1, lostActiveCount / 2);
         double half = currentHalf(), expires = clockSeconds + PRIZE_ORB_SECONDS;
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         for (int i = 0; i < count && prizeOrbs.size() < PRIZE_ORB_MAX; i++) {
@@ -1065,7 +1212,7 @@ public class Room {
     /** 방의 모두(관전 포함)에게 글 메시지를 보낸다. 방 스레드에서 부른다(긴급 안내처럼 서버 전체 알림, 4.29). */
     public void announce(Map<String, Object> msg) { broadcast(msg); }
 
-    private void broadcast(Map<String, Object> msg) {
+    void broadcast(Map<String, Object> msg) {
         for (Member m : members.values()) outbox.sendText(m, msg);
         for (Member sp : spectators) outbox.sendText(sp, msg);
     }
@@ -1120,15 +1267,16 @@ public class Room {
                     knock(small, sign * nx, sign * ny, Math.min(ratio, tu.knockbackCap()), tu); small.targetX = null;
                 }
                 boolean aFlame = isFlame(a), bFlame = isFlame(b);
+                if (hpDuel(a, b, key, aFlame, bFlame)) continue; // 체력이 0이 된 사람이 있으면 죽음이 싸움 결과까지 처리했다(키워드를 두 번 잃지 않는다)
                 if (aFlame != bFlame) {
                     // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)
                     Member hot = aFlame ? a : b, cold = hot == a ? b : a;
                     if (cold.protectUntil <= clockSeconds && cold.bot && !cold.botKeywords.isEmpty()) {
-                        botWipe(cold, hot, tu); // 봇의 (메모리) 키워드 점수를 모두 잃는다
+                        botWipe(cold, hot, tu, hpTuning.flameLosePercent()); // 봇의 (메모리) 키워드를 일부(비율은 설정, 100이면 모두) 잃는다(4.36)
                     } else if (cold.protectUntil <= clockSeconds && !cold.bot && !cold.keywords.isEmpty()) {
                         cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
                         shield(cold, tu);
-                        outbox.requestWipe(this, cold, hot); // 이긴 쪽이 봇이어도 모두 잃는다
+                        outbox.requestHalve(this, cold, hot, hpTuning.flameLosePercent(), false); // 이긴 쪽이 봇이어도 잃는다(비율은 설정, 100이면 모두, 4.36)
                     } else if (cold.protectUntil <= clockSeconds) {
                         die(cold, hot); // 이미 키워드가 없으면 죽는다(사람·봇, 4.31)
                     }
@@ -1155,6 +1303,143 @@ public class Room {
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------ 체력(4.36)
+
+    private final Map<Long, Double> hpHitAt = new HashMap<>();
+    private boolean hpPublicDirty;
+    private double hpSentAt;
+
+    private static double round2(double v) { return Math.round(v * 100) / 100.0; }
+
+    /** 공격자(att)가 상대(vic)를 한 번 쳤을 때의 피해(점): 100 × 공격력 ÷ (공격력 + 상대 유행도). 공격자가 불꽃이면 공격력은 항상 유행도 × 배수다. 소수 둘째 자리까지 반올림 */
+    double hpDamage(Member att, Member vic) {
+        double atk = att.score * (isFlame(att) ? hpTuning.flameMultiplier() : 1), v = vic.score;
+        double ratio = atk + v <= 0 ? 0.5 : atk / (atk + v); // 둘 다 0이면 반반
+        return round2(100.0 * ratio);
+    }
+
+    /** 체력이 최대인 상태에서 현재 %(올림, 살아 있으면 최소 1) */
+    private int hpPercent(Member m) {
+        double max = Math.max(0.01, hpTuning.max());
+        return m.hp <= 0 ? 0 : (int) Math.max(1, Math.min(100, Math.ceil(m.hp / max * 100 - 1e-9)));
+    }
+
+    Map<String, Object> hpMessage(Member m, double healedPercent) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "hp"); msg.put("e", m.entityNo); msg.put("hp", round2(m.hp)); msg.put("max", hpTuning.max()); msg.put("pct", hpPercent(m));
+        if (healedPercent > 0) msg.put("heal", round2(healedPercent));
+        return msg;
+    }
+
+    /** 체력이 바뀌었다: 본인에게 알리고(공개 설정이면 아래 hps에서 모두에게도) */
+    private void markHp(Member m) {
+        m.hpDirty = true;
+    }
+
+    /** 세이프존에서 회복하고, 최대 체력이 바뀌었으면 맞추고, 바뀐 체력을 0.25초마다 모아 알린다 */
+    private void updateHp(double dt) {
+        HpTuning hp = hpTuning;
+        if (!hp.enabled()) return;
+        double c = centerSize / 2;
+        for (Member m : members.values()) {
+            if (m.hp > hp.max()) { m.hp = hp.max(); markHp(m); }
+            // 세이프존 회복은 1초에 한 번 통째로(매 틱 조금씩이 아니라): 계산 부담도 줄고 "1초마다 2%"로 알아보기 쉽다
+            boolean inCenter = Math.abs(m.x) <= c && Math.abs(m.y) <= c; // 시간제로 생기는 무작위 세이프존은 회복하지 않는다
+            if (tick % 20 == 0 && inCenter && hp.safeRegenPercent() > 0 && m.hp < hp.max()) {
+                m.hp = Math.min(hp.max(), round2(m.hp + hp.max() * hp.safeRegenPercent() / 100.0));
+                markHp(m);
+            }
+        }
+        if (tick % 5 != 0) return;
+        boolean any = hpPublicDirty;
+        for (Member m : members.values()) {
+            if (!m.hpDirty) continue;
+            m.hpDirty = false; any = true;
+            if (!m.bot) outbox.sendText(m, hpMessage(m, 0));
+        }
+        if (any && hp.publicBars()) {
+            List<List<Integer>> list = new ArrayList<>();
+            for (Member m : members.values()) if (hpPercent(m) < 100) list.add(List.of(m.entityNo, hpPercent(m)));
+            broadcast(Map.of("type", "hps", "list", list));
+        }
+        hpPublicDirty = false;
+    }
+
+    /** 사람이 키워드를 새로 얻었다(서비스 이벤트): 그 키워드 점수가 얻은 뒤 내 유행도에서 차지하는 %만큼 최대 체력의 %로 회복한다(상한 없음, 최대 체력까지) */
+    public void applyKeywordGain(long playerId, long keywordScore, long totalScore) {
+        healFromKeyword(byPlayer.get(playerId), keywordScore, totalScore);
+    }
+
+    private void healFromKeyword(Member m, double keywordScore, double totalScore) {
+        HpTuning hp = hpTuning;
+        if (m == null || m.dead || !hp.enabled() || keywordScore <= 0 || totalScore <= 0 || m.hp >= hp.max()) return;
+        healPercent(m, Math.min(100.0, 100.0 * keywordScore / totalScore));
+    }
+
+    /** 최대 체력의 pct%만큼 회복한다(최대 체력까지). 바뀌면 본인에게 알리고 공개 체력바를 갱신한다 */
+    private void healPercent(Member m, double pct) {
+        HpTuning hp = hpTuning;
+        double before = m.hp;
+        m.hp = Math.min(hp.max(), round2(m.hp + hp.max() * pct / 100.0));
+        if (m.hp <= before) return;
+        m.hpDirty = true; hpPublicDirty = true;
+        if (!m.bot) outbox.sendText(m, hpMessage(m, (m.hp - before) / hp.max() * 100));
+    }
+
+    /**
+     * 처치 회복: 쓰러뜨린 쪽(사람·봇)이 처치당한 사람 유행도와 내 유행도의 비율만큼 회복한다 — 100 × 처치당한 ÷ (처치당한 + 내) × killHealPercent%.
+     * 비슷한 상대는 절반, 나보다 훨씬 약한 상대는 조금, 훨씬 센 상대를 쓰러뜨리면 거의 가득 찬다(약자의 역전 보상).
+     */
+    private void healOnKill(Member killer, Member victim) {
+        HpTuning hp = hpTuning;
+        if (!hp.enabled() || hp.killHealPercent() <= 0 || killer.dead || killer.hp >= hp.max()) return;
+        double v = Math.max(0, victim.score), a = Math.max(0, killer.score);
+        double ratio = v + a <= 0 ? 0.5 : v / (v + a);
+        healPercent(killer, 100.0 * ratio * hp.killHealPercent() / 100.0);
+    }
+
+    /**
+     * 사람끼리 부딪혔을 때의 체력 싸움. 서로 상대 유행도 비율만큼 깎는다(불꽃 쪽 반격은 설정). 같은 두 사람은 hp_hit_seconds에 한 번만 깎는다.
+     * 둘 다 0이 되면 더 크게 맞은 쪽만 죽고 다른 쪽은 1%로 남는다. 누가 죽으면 true(그 싸움의 키워드 판정은 죽음이 처리했다).
+     */
+    private boolean hpDuel(Member a, Member b, long pairKey, boolean aFlame, boolean bFlame) {
+        HpTuning hp = hpTuning;
+        if (!hp.enabled() || a.dead || b.dead) return false;
+        Double last = hpHitAt.get(pairKey);
+        if (last != null && clockSeconds - last < hp.hitSeconds()) return false;
+        hpHitAt.put(pairKey, clockSeconds);
+        if (hpHitAt.size() > 512) hpHitAt.values().removeIf(t -> clockSeconds - t >= hp.hitSeconds());
+        double toA = hpDamage(b, a), toB = hpDamage(a, b);
+        if (aFlame != bFlame && !hp.flameCounter()) { if (aFlame) toA = 0; else toB = 0; } // 불꽃은 반격 피해를 받지 않는다
+        boolean aDies = round2(a.hp - toA) <= 0, bDies = round2(b.hp - toB) <= 0;
+        if (aDies && bDies) {
+            boolean aOut = toA > toB || (toA == toB && a.score <= b.score);
+            if (aOut) bDies = false; else aDies = false;
+        }
+        hurt(a, b, toA, aDies);
+        hurt(b, a, toB, bDies);
+        if (aDies) hpKill(a, b);
+        if (bDies) hpKill(b, a);
+        return aDies || bDies;
+    }
+
+    /** victim의 체력을 dmg점 깎는다. lethal이면 0, 아니면 최소 1%는 남긴다. 맞은 것을 모두에게 알린다({hpHit}: 맞은 원, 때린 원, 깎인 %, 남은 %) */
+    private void hurt(Member victim, Member by, double dmg, boolean lethal) {
+        if (dmg <= 0) return;
+        double max = hpTuning.max(), minAlive = round2(max / 100.0);
+        victim.hp = lethal ? 0 : Math.max(minAlive, round2(victim.hp - dmg));
+        markHp(victim); hpPublicDirty = true;
+        broadcast(Map.of("type", "hpHit", "e", victim.entityNo, "by", by.entityNo, "dmg", round2(Math.min(100.0, dmg / max * 100)), "pct", hpPercent(victim)));
+    }
+
+    /** 체력이 0이 되었다: 가진 키워드의 death_lose_percent%를 한 번만 잃고(이미 불꽃에게 잃었어도 이 싸움에서는 다시 잃지 않는다) 죽는다 */
+    private void hpKill(Member victim, Member killer) {
+        victim.hp = 0;
+        if (!victim.bot) outbox.requestHalve(this, victim, killer, hpTuning.deathLosePercent(), true);
+        else botHalveOnDeath(victim, killer); // 봇도 사람처럼 키워드의 일부를 잃고 ! 구슬이 떨어진다(방 메모리에서만, DB 없음)
+        die(victim, killer, true);
     }
 
     /** 같은 두 원은 이 시간(초) 안에 다시 부딪혀도 한 번만 센다(겹친 채 붙어 있거나 곧바로 다시 닿아 몇 번씩 세지 않게) */
@@ -1560,7 +1845,7 @@ public class Room {
     }
 
     /** 콤보 불꽃이 붙었는지(사람과 봇 모두, 4.25) */
-    private boolean isFlame(Member m) { return m.combo >= comboTuning.flameAt(); }
+    boolean isFlame(Member m) { return m.combo >= comboTuning.flameAt(); }
 
     /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
     private void shield(Member m, Tuning tu) {
@@ -1777,16 +2062,22 @@ public class Room {
         // EXP를 정하고, 많이 추가한 사람은 대개 가진 키워드도 많으므로 EXP에 비례해 가진 키워드 수를 정한다
         // (최근 30번 추가 중 30~100%를 아직 가진 것으로 본다. 추가한 횟수(EXP)보다 많을 수는 없다).
         // 합이 상한(사람 평균)을 넘으면 키워드만 빼지 않고 EXP 범위를 줄여 다시 뽑는다. 작은 원인데 레벨만 높은 봇이 되지 않게
+        BotRevive rv = botRespawns > 0 ? botRevives.pollFirst() : null; // 죽었다 다시 나오는 봇은 새로 뽑지 않고 EXP·남은 키워드를 이어받는다(사람의 리스폰과 같다)
+        if (rv != null) {
+            m.botExp = rv.exp();
+            for (BotKw k : rv.keywords()) if (catalog.containsKey(k.id())) m.botKeywords.add(k);
+            m.botStyle = rv.style(); m.botReact = rv.react();
+        } else {
         double expMax = Math.min(300, cap);
         for (int attempt = 0; attempt < 12; attempt++) {
             m.botExp = expMax < 1 ? 0 : rnd.nextLong((long) expMax + 1);
-            if (Math.min(m.botExp, tu.expScoreCap()) <= cap) break; // EXP만으로 상한을 넘으면 범위를 줄여 다시 뽑는다
+            if (botBase(m.botExp, tu) <= cap) break; // EXP만으로 상한을 넘으면 범위를 줄여 다시 뽑는다
             expMax *= 0.7;
             if (attempt == 11) m.botExp = 0; // 끝내 못 맞추면 가장 작은 봇
         }
         // 그 나라의 🔥 키워드 중에서 무작위로 가져오되, 합이 상한(사람 평균)을 넘지 않는 것만 담는다(없으면 키워드 없는 봇)
         long want = Math.round(Math.min(m.botExp, 30) * (0.3 + rnd.nextDouble() * 0.7));
-        double room = cap - Math.min(m.botExp, tu.expScoreCap());
+        double room = cap - botBase(m.botExp, tu);
         List<CatalogKw> pool = new ArrayList<>(catalog.values());
         Collections.shuffle(pool, rnd);
         for (CatalogKw k : pool) {
@@ -1797,6 +2088,8 @@ public class Room {
         }
         m.botStyle = rnd.nextInt(3);
         m.botReact = 0.25 + rnd.nextDouble() * 0.45;
+        }
+        m.hp = hpTuning.max();
         m.botHeading = rnd.nextDouble() * Math.PI * 2;
         m.botNextPlusAt = clockSeconds + 15 + rnd.nextDouble() * 30;
         botRecompute(m, tu);
@@ -1813,11 +2106,14 @@ public class Room {
 
     /** 봇의 유행도와 레벨을 사람과 같은 식으로 다시 정한다: min(EXP, 100) + Σ 키워드 점수, 레벨은 레벨표. */
     private void botRecompute(Member b, Tuning tu) {
-        b.score = Math.min(b.botExp, tu.expScoreCap()) + botValue(b);
-        b.radius = radiusFor(b.score);
         int lv = levelForExp.applyAsInt(b.botExp);
         if (lv != b.level) { b.level = lv; broadcastRoster(); }
+        b.score = Math.min(b.botExp, tu.expScoreCap()) + lv + botValue(b); // 레벨 값이 유행도에 1:1로 더해진다(4.8)
+        b.radius = radiusFor(b.score);
     }
+
+    /** 봇의 키워드 말고 유행도에 들어가는 몫: min(EXP, 상한) + 레벨(1:1, 4.8). 레벨은 EXP로 레벨표에서 정한다 */
+    private double botBase(long exp, Tuning tu) { return Math.min(exp, tu.expScoreCap()) + levelForExp.applyAsInt(exp); }
 
     /** 방 메모리에서 봇이 가진 키워드의 현재 유행도 합. 목록에 없어진(비활성·금지·삭제된) 키워드는 세지 않는다. */
     private long botValue(Member b) {
@@ -1839,17 +2135,20 @@ public class Room {
         if (b.dead || members.get(b.entityNo) != b || !catalog.containsKey(keywordId) || holds(b, keywordId)) return;
         b.botKeywords.add(new BotKw(keywordId));
         botRecompute(b, tuning);
+        healFromKeyword(b, catalog.get(keywordId).value(), b.score); // 봇도 키워드를 얻으면 체력이 회복된다(4.36)
     }
 
     /** 봇의 "추가": 사람처럼 EXP +1과 🔥 키워드 하나(메모리). 상한(사람 평균)을 넘으면 하지 않는다. */
     private void botPlus(Member b, Tuning tu) {
-        double headroom = botCap(tu) - (Math.min(b.botExp + 1, tu.expScoreCap()) + botValue(b));
+        double headroom = botCap(tu) - (botBase(b.botExp + 1, tu) + botValue(b));
         List<CatalogKw> fit = new ArrayList<>();
         for (CatalogKw k : catalog.values()) if (k.value() <= headroom && !holds(b, k.id())) fit.add(k);
         if (fit.isEmpty()) return;
         b.botExp++;
-        b.botKeywords.add(new BotKw(fit.get(ThreadLocalRandom.current().nextInt(fit.size())).id()));
+        CatalogKw gained = fit.get(ThreadLocalRandom.current().nextInt(fit.size()));
+        b.botKeywords.add(new BotKw(gained.id()));
         botRecompute(b, tu);
+        healFromKeyword(b, gained.value(), b.score);
     }
 
     /** 봇이 충돌로 지면 사람처럼 가진 키워드 하나를 잃는다. 호출하는 쪽이 비어 있지 않은지 보았다. 잃은 키워드를 돌려준다. */
@@ -1888,19 +2187,42 @@ public class Room {
      * 불꽃에 맞은 봇은 가진 키워드 점수를 모두 잃는다(4.25). 사람과 같이 3초 무적, 이긴 쪽 콤보 +1, 진 쪽 콤보·불꽃 없앰,
      * 잃은 개수의 일부만큼 ! 구슬이 떨어진다. 이긴 쪽이 사람이면 알림을 보낸다(봇의 키워드는 이름이 없어 개수와 점수만 알린다).
      */
-    private void botWipe(Member cold, Member hot, Tuning tu) {
-        int n = cold.botKeywords.size();
-        long score = botValue(cold);
-        cold.botKeywords.clear();
+    private void botWipe(Member cold, Member hot, Tuning tu, int percent) {
+        long before = botValue(cold);
+        int count = botLoseFraction(cold, percent); // 사람과 같은 규칙: 내림, 최소 1개
+        long score = before - botValue(cold);
         botRecompute(cold, tu);
         cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
         shield(cold, tu);
         fightResult(hot, cold, true);
-        dropPrizeOrbs(cold, n); // 봇의 키워드는 모두 🔥로 본다
+        dropPrizeOrbs(cold, count); // 봇의 키워드는 모두 🔥로 본다
         if (!hot.bot) {
-            outbox.sendText(hot, Map.of("type", "hit", "target", cold.nickname, "wiped", n, "score", score));
-            outbox.requestSteal(this, hot); // 모두 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
+            Map<String, Object> msg = new HashMap<>();
+            msg.put("type", "hit"); msg.put("target", cold.nickname); msg.put("wiped", count); msg.put("score", score);
+            if (percent < 100) msg.put("partial", true);
+            outbox.sendText(hot, msg);
+            outbox.requestSteal(this, hot); // 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
         }
+    }
+
+    /** 체력이 0이 된 봇: 가진 키워드의 death_lose_percent%(내림, 최소 1개)를 잃고 그 수의 일부만큼 ! 구슬이 떨어진다. 죽인 쪽이 사람이면 사람이 잃은 때와 같은 알림을 받는다 */
+    private void botHalveOnDeath(Member bot, Member killer) {
+        if (bot.botKeywords.isEmpty()) return;
+        long before = botValue(bot);
+        int count = botLoseFraction(bot, hpTuning.deathLosePercent());
+        botRecompute(bot, tuning);
+        long score = before - botValue(bot);
+        dropPrizeOrbs(bot, count);
+        if (!killer.bot) outbox.sendText(killer, Map.of("type", "hit", "target", bot.nickname, "wiped", count, "score", score, "partial", true));
+    }
+
+    /** 봇이 가진 키워드 중 percent%(내림, 최소 1개, 100 이상이면 모두)를 무작위로 잃는다. 잃은 개수를 돌려준다(점수는 부르는 쪽이 다시 계산한다) */
+    private int botLoseFraction(Member bot, int percent) {
+        int total = bot.botKeywords.size();
+        int count = percent >= 100 ? total : Math.min(total, Math.max(1, total * percent / 100));
+        Collections.shuffle(bot.botKeywords, ThreadLocalRandom.current());
+        for (int i = 0; i < count; i++) bot.botKeywords.remove(bot.botKeywords.size() - 1);
+        return count;
     }
 
     /** 봇이 ? 구슬을 먹으면 사람과 같은 확률로 "추가"하고, 나머지는 가진 키워드 점수 하나를 잃는다(없으면 꽝). */

@@ -67,13 +67,22 @@ public final class SettingKeys {
     public static final String SKILL_SHIELD_SECONDS = "skill_shield_seconds";
     public static final String STEALTH_SECONDS = "stealth_seconds";
     public static final String COMBO_FLAME_AT = "combo_flame_at";
-    public static final String COMBO_WIPE_ORB_PERCENT = "combo_wipe_orb_percent";
     public static final String AI_COMMENT_ENABLED = "ai_comment_enabled";
     public static final String AI_COMMENT_BATCH_SIZE = "ai_comment_batch_size";
     public static final String AI_COMMENT_DAILY_MAX = "ai_comment_daily_max";
     public static final String AI_COMMENT_GROUNDING = "ai_comment_grounding";
     public static final String COMBO_BOT_COUNTS = "combo_bot_counts";
     public static final String COMBO_MAX_SECONDS = "combo_max_seconds";
+    public static final String HP_ENABLED = "hp_enabled";
+    public static final String HP_MAX = "hp_max";
+    public static final String HP_HIT_SECONDS = "hp_hit_seconds";
+    public static final String HP_FLAME_MULTIPLIER = "hp_flame_multiplier";
+    public static final String HP_FLAME_COUNTER = "hp_flame_counter";
+    public static final String HP_SAFE_REGEN_PERCENT = "hp_safe_regen_percent";
+    public static final String HP_PUBLIC = "hp_public";
+    public static final String HP_KILL_HEAL_PERCENT = "hp_kill_heal_percent";
+    public static final String DEATH_LOSE_PERCENT = "death_lose_percent";
+    public static final String FLAME_HIT_LOSE_PERCENT = "flame_hit_lose_percent";
 
     public static final List<Def> DEFAULTS = List.of(
             // 트렌드 값(4.8): 가진 비율 s = 가진 사람 / max(활동 인원, 최소 인원). s가 최고점 비율이면 최대 기준값
@@ -145,7 +154,16 @@ public final class SettingKeys {
             new Def(SKILL_SHIELD_SECONDS, "3", 0.5, 60, "방패 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
             new Def(STEALTH_SECONDS, "5", 0.5, 60, "은신(유령)이 유지되는 시간(남에게는 원·이름·테두리·효과가 모두 배경색처럼 안 보이고 미니맵에서도 사라진다. 나에게는 반투명으로 보인다. 충격파·갈고리를 쓰면 풀린다)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
-            new Def(COMBO_WIPE_ORB_PERCENT, "50", 0, 100, "불꽃인 사람에게 부딪혀 키워드를 모두 잃었을 때, 잃은 🔥활성 키워드 개수의 몇 %(올림)만큼 ! 구슬이 그 자리에 떨어지는지(0이면 안 떨어짐). ! 구슬은 먹으면 항상 키워드를 얻는다"),
+            new Def(HP_ENABLED, "1", 0, 1, "체력(HP) 켜기(1) / 끄기(0): 켜면 부딪힐 때마다(사람·봇 모두) 서로의 유행도 비율로 체력이 깎이고, 0이 되면 죽는다(몬스터와의 싸움에는 쓰이지 않는다)"),
+            new Def(HP_MAX, "100", 1, 100000, "최대 체력(화면에는 항상 100%로 보인다). 한 번의 피해는 최대 100점(= 상대 유행도 비율 × 100)이라, 이 값이 클수록 오래 버틴다"),
+            new Def(HP_HIT_SECONDS, "1", 0.1, 30, "같은 두 사람 사이에서 체력 피해가 들어가는 최소 간격(겹쳐 있어도 이 시간에 한 번만 깎는다)"),
+            new Def(HP_FLAME_MULTIPLIER, "5", 1, 100, "불꽃이 붙은 사람이 칠 때 공격력(유행도)에 항상 곱하는 배수"),
+            new Def(HP_FLAME_COUNTER, "1", 0, 1, "불꽃이 불꽃 없는 사람에게 부딪힐 때 불꽃 쪽도 상대의 일반 공격(×5 없음)을 반격으로 맞는지(1이면 맞고, 0이면 불꽃 쪽은 피해가 없다)"),
+            new Def(HP_SAFE_REGEN_PERCENT, "2", 0, 100, "가운데 고정 세이프존 안에서 1초마다 회복하는 체력(최대 체력의 %, 0이면 없음). 시간제로 생기는 무작위 세이프존에서는 회복하지 않는다"),
+            new Def(HP_PUBLIC, "1", 0, 1, "다른 원의 체력바를 모두에게 보여 줄지(1이면 모든 원 위에 체력바가 보이고, 0이면 내 체력만 보인다)"),
+            new Def(HP_KILL_HEAL_PERCENT, "100", 0, 100, "처치했을 때 체력 회복 배율: 회복(최대 체력의 %) = 처치당한 쪽 유행도 ÷ (처치당한 쪽 + 내 유행도) × 이 배율. 비슷한 상대는 절반, 훨씬 약한 상대는 조금, 훨씬 센 상대는 거의 가득 찬다(0이면 회복 없음, 사람·봇 모두)"),
+            new Def(DEATH_LOSE_PERCENT, "50", 0, 100, "체력이 0이 되어 죽을 때 잃는 키워드 비율(보유 키워드 수 × 이 %, 내림, 최소 1개. 100이면 모두)"),
+            new Def(FLAME_HIT_LOSE_PERCENT, "50", 0, 100, "불꽃인 사람에게 부딪혀 잃는 키워드 비율(보유 키워드 수 × 이 %, 내림, 최소 1개. 100이면 예전처럼 모두 잃는다)"),
             new Def(COMBO_MAX_SECONDS, "300", 0, 86400, "콤보 유지시간: 마지막으로 콤보가 오른 때부터 이 시간이 지나면 연속 횟수와 불꽃이 사라진다. 콤보가 추가될 때마다 다시 시작한다(기본 300초 = 5분, 0이면 제한 없음)"),
             new Def(COMBO_BOT_COUNTS, "1", 0, 1, "봇을 이겨 키워드를 얻은 것도 콤보에 넣을지(1이면 넣음, 0이면 사람에게서 빼앗은 것만)"),
             new Def(EXTERNAL_HOLD_HOURS, "168", 1, 2160, "목록형 외부 소스(google)에 오른 키워드의 활성 유지 시간. 목록에 보일 때마다 지금부터 다시 센다"));
@@ -154,7 +172,7 @@ public final class SettingKeys {
 
     /** 관리자 설정 화면의 그룹 순서. 새 설정을 만들면 아래 GROUP_OF에서 그룹을 정한다(없으면 "기타"). */
     public static final List<String> GROUP_ORDER = List.of("트렌드·키워드", "성장·경험치·칭호", "맵·크기", "이동·충돌", "보호·접속",
-            "세이프존", "? 구슬", "NPC 봇", "스킬", "콤보·불꽃", "꾸미기·계정", "AI 설명", "기타");
+            "세이프존", "? 구슬", "NPC 봇", "스킬", "콤보·불꽃", "체력(HP)", "꾸미기·계정", "AI 설명", "기타");
 
     private static final java.util.Map<String, String> GROUP_OF = new java.util.HashMap<>();
     private static final java.util.Map<String, List<String>> NAMES_OF_GROUP = new java.util.HashMap<>();
@@ -179,7 +197,9 @@ public final class SettingKeys {
                 SHOCKWAVE_SPEED_MULTIPLIER, SHOCKWAVE_REACH_PX, SHOCKWAVE_KNOCKBACK,
                 HOOK_REACH_PX, BOLT_REACH_PX, HOOK_SECONDS, HOOK_PULL_SECONDS,
                 SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
-        group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS, COMBO_WIPE_ORB_PERCENT);
+        group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
+        group("체력(HP)", HP_ENABLED, HP_MAX, HP_HIT_SECONDS, HP_FLAME_MULTIPLIER, HP_FLAME_COUNTER,
+                DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, HP_PUBLIC);
         group("꾸미기·계정", CUSTOMIZE_UNLOCK_LEVEL, ART_CHANGE_MINUTES, NICKNAME_CHANGE_MINUTES);
         group("AI 설명", AI_COMMENT_ENABLED, AI_COMMENT_GROUNDING, AI_COMMENT_BATCH_SIZE, AI_COMMENT_DAILY_MAX);
     }
@@ -208,14 +228,14 @@ public final class SettingKeys {
     static {
         unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
                 ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, COMBO_MAX_SECONDS,
-                HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS);
+                HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS, HP_HIT_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
         unit("px", HOOK_REACH_PX, BOLT_REACH_PX, SHOCKWAVE_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        unit("배", BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER,
+        unit("배", HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, SHOCKWAVE_SPEED_MULTIPLIER,
                 SHOCKWAVE_KNOCKBACK);
-        unit("%", ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, COMBO_WIPE_ORB_PERCENT);
+        unit("%", ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE);
         unit("개/1000×1000px", ORB_DENSITY);

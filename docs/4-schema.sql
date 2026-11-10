@@ -1,7 +1,7 @@
 -- Trendist 4부. SQL — 17. 스키마 SQL
 -- 문서 목록과 변경 이력은 docs/README.md. 절 번호는 기획·기술·운영 문서와 이어진다.
 --
--- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 41개, 외래 키 41개. 사람이 읽는 참고용 전체 스키마이고 실제 스키마는 Flyway 마이그레이션(V1~V14)이 만든다(11.3). 마이그레이션을 추가하면 이 파일도 같이 고친다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
+-- ERD Cloud "SQL 가져오기"(MySQL)용 DDL이다. 테이블 46개, 외래 키 44개. 사람이 읽는 참고용 전체 스키마이고 실제 스키마는 Flyway 마이그레이션(V1~V14)이 만든다(11.3). 마이그레이션을 추가하면 이 파일도 같이 고친다. 처음 만드는 DB용이라 기존 테이블을 지우는 문장은 넣지 않았다.
 -- user_notices, blocked_terms, blocked_nicknames는 설계만 있고 엔티티·마이그레이션이 아직 없다(해당 테이블 위에 표시).
 -- guides의 WITH PARSER ngram은 MySQL 전용이다. MariaDB나 ERD Cloud에서 오류가 나면 그 부분만 빼고 실행한다.
 -- keyword_log_dailies, player_score_dailies의 월 파티션은 넣지 않았다(필요해지면 Flyway에서 적용).
@@ -204,7 +204,7 @@ CREATE TABLE players (
   nickname_changed_at DATETIME(6) NULL COMMENT '마지막 닉네임 변경 시각',
   exp                 BIGINT NOT NULL DEFAULT 0 COMMENT '지금 레벨에서 모은 EXP(그 나라, `+`·공격 성공·처치로 쌓인다. 레벨이 오르면 그 레벨에 필요한 만큼 빼고 남은 만큼을 이어 가진다, 4.9)',
   level_id            BIGINT NOT NULL COMMENT '레벨(levels 참조). 누적 EXP로 levels에서 정한 행. 아이콘은 10레벨에서 완성, 꾸미기는 해금 레벨(설정, 기본 10)부터 가능',
-  current_score       BIGINT NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기, 정수). min(EXP, 100) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
+  current_score       BIGINT NOT NULL DEFAULT 0 COMMENT '현재 유행도(실시간 점수, 아이콘 크기, 정수). min(EXP, exp_score_cap) + 레벨(1:1) + 보관함 점수 합. 방 메모리에서 실시간 계산해 클라이언트로 보내고 DB에는 5초마다 모아서 저장',
   hold_count          BIGINT NOT NULL DEFAULT 0 COMMENT '지금 가진(만료되지 않은) 트렌드 키워드 개수(player_keywords 행 수 캐시, 0 아래로 내려가지 않음, 1시간마다 실제 행 수로 보정)',
   add_count           BIGINT NOT NULL DEFAULT 0 COMMENT '추가수(`+` 횟수, 만료 행 재사용 포함, 줄지 않음)',
   comment_score       BIGINT NOT NULL DEFAULT 0 COMMENT '댓글 점수: 댓글을 쓰면 +1, 삭제하면 -1, 내 댓글이 추천을 받으면 +1, 비추천을 받으면 -1(0 아래로 내려가지 않음)',
@@ -212,6 +212,7 @@ CREATE TABLE players (
   steal_count         BIGINT NOT NULL DEFAULT 0 COMMENT '빼앗기 횟수: 공격에 성공한 횟수(칭호용, 줄지 않음, 4.3)',
   bot_win_count       BIGINT NOT NULL DEFAULT 0 COMMENT '봇을 이겨 보상을 받은 횟수(칭호용)',
   kill_count          BIGINT NOT NULL DEFAULT 0 COMMENT '처치 횟수: 키워드가 없는 상대(사람·봇)를 쓰러뜨린 횟수(칭호용, 줄지 않음, 4.31)',
+  monster_kill_count  BIGINT NOT NULL DEFAULT 0 COMMENT '몬스터(보스)를 쓰러뜨린 횟수: 처치 성공 보상을 받은 횟수(4.35, 칭호용)',
   defeat_count        BIGINT NOT NULL DEFAULT 0 COMMENT '패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 칭호용, 4.31)',
   orb_count           BIGINT NOT NULL DEFAULT 0 COMMENT '? 구슬을 먹은 횟수(꽝 포함, 칭호용)',
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
@@ -750,3 +751,92 @@ CREATE TABLE settings (
   CONSTRAINT fk_settings_group FOREIGN KEY (group_id) REFERENCES setting_groups (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='밸런스 설정값';
 
+-- 몬스터(4.35): 종류와 설정값, 등장 기록, 등장마다 플레이어별 피해
+CREATE TABLE monster_types (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '몬스터 종류 ID',
+  code       VARCHAR(30) NOT NULL COMMENT '종류 코드(유일): elder_turtle …',
+  name       VARCHAR(50) NOT NULL COMMENT '이름(한국어). 코드(시더)가 정한다',
+  name_en    VARCHAR(50) NULL COMMENT '이름(영어)',
+  kind       VARCHAR(20) NOT NULL COMMENT '분류: BOSS (이후 ELITE, MINION 등을 더한다)',
+  behavior   VARCHAR(30) NOT NULL COMMENT '서버 코드(Monster 구현)가 행동을 찾는 키: ELDER_TURTLE …',
+  image      VARCHAR(60) NULL COMMENT '프론트가 그리는 그림 키(public/monsters/<키>.svg)',
+  enabled    TINYINT(1) NOT NULL DEFAULT 1 COMMENT '정기 등장 켜기(꺼도 관리자 즉시 소환은 된다)',
+  sort_order BIGINT NOT NULL DEFAULT 0 COMMENT '관리자 화면 순서',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_monster_types_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='몬스터 종류';
+
+CREATE TABLE monster_settings (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '몬스터 설정 ID',
+  monster_type_id BIGINT NOT NULL COMMENT '몬스터 종류(monster_types 참조)',
+  name            VARCHAR(60) NOT NULL COMMENT '설정 이름(종류 안에서 유일): radius, speed_ratio, dash_cooldown …',
+  value_num       DECIMAL(16,4) NOT NULL COMMENT '값. 관리자가 고친다',
+  min_v           DECIMAL(16,4) NOT NULL COMMENT '허용 최솟값(코드가 정한다)',
+  max_v           DECIMAL(16,4) NOT NULL COMMENT '허용 최댓값(코드가 정한다)',
+  description     VARCHAR(400) NOT NULL COMMENT '설명(한글, 관리자 화면용)',
+  unit            VARCHAR(20) NULL COMMENT '값 뒤에 붙일 단위',
+  group_name      VARCHAR(30) NOT NULL COMMENT '관리자 화면 묶음: 등장, 체력, 몸·이동, 싸움 규칙, 분노, 패턴 공통, 돌진, 충격고리, 보상',
+  sort_order      BIGINT NOT NULL DEFAULT 0 COMMENT '화면 순서',
+  created_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_monster_settings (monster_type_id, name),
+  CONSTRAINT fk_monster_settings_type FOREIGN KEY (monster_type_id) REFERENCES monster_types (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='몬스터 설정값';
+
+CREATE TABLE monster_spawns (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '등장 기록 ID',
+  monster_type_id BIGINT NOT NULL COMMENT '몬스터 종류(monster_types 참조)',
+  country_id      BIGINT NOT NULL COMMENT '나라(방)',
+  source          VARCHAR(20) NOT NULL COMMENT 'SCHEDULE(정기) / ADMIN(관리자 즉시 소환)',
+  status          VARCHAR(20) NOT NULL COMMENT 'ACTIVE / KILLED(처치) / TIMEOUT(시간 초과) / REMOVED(관리자 제거·서버 재시작) / SKIPPED(사람이 적어 건너뜀)',
+  started_at      DATETIME(6) NOT NULL COMMENT '등장 시각',
+  ended_at        DATETIME(6) NULL COMMENT '끝난 시각',
+  max_hp          BIGINT NOT NULL DEFAULT 0 COMMENT '정해진 체력(유행도 값)',
+  final_hp        BIGINT NOT NULL DEFAULT 0 COMMENT '끝났을 때 남은 체력',
+  humans          INT NOT NULL DEFAULT 0 COMMENT '등장 때 접속한 사람 수',
+  avg_score       BIGINT NOT NULL DEFAULT 0 COMMENT '등장 때 접속자 평균 유행도',
+  top_score       BIGINT NOT NULL DEFAULT 0 COMMENT '등장 때 1등 유행도',
+  participants    INT NOT NULL DEFAULT 0 COMMENT '피해를 준 사람 수',
+  top_player_id   BIGINT NULL COMMENT '피해 1위 플레이어',
+  top_damage      BIGINT NOT NULL DEFAULT 0 COMMENT '피해 1위의 피해량',
+  created_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  KEY idx_monster_spawns_type_country (monster_type_id, country_id, started_at),
+  CONSTRAINT fk_monster_spawns_type FOREIGN KEY (monster_type_id) REFERENCES monster_types (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='몬스터 등장 기록';
+
+CREATE TABLE monster_damages (
+  id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '피해 기록 ID',
+  spawn_id   BIGINT NOT NULL COMMENT '등장 기록(monster_spawns 참조)',
+  player_id  BIGINT NOT NULL COMMENT '피해를 준 플레이어',
+  damage     BIGINT NOT NULL DEFAULT 0 COMMENT '입힌 피해 합계',
+  hits       INT NOT NULL DEFAULT 0 COMMENT '부딪힌 횟수',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_monster_damages (spawn_id, player_id),
+  CONSTRAINT fk_monster_damages_spawn FOREIGN KEY (spawn_id) REFERENCES monster_spawns (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='몬스터 등장마다 플레이어별 피해';
+
+-- 설정 변경 이력(13.17)
+CREATE TABLE config_changes (
+  id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '변경 이력 ID',
+  scope            VARCHAR(20) NOT NULL COMMENT '범위: SETTING(밸런스 설정) / MONSTER(몬스터 설정) / SKILL(스킬 설정)',
+  target           VARCHAR(120) NOT NULL COMMENT '대상: 설정 이름 / 몬스터코드/설정이름 / 몬스터코드 / 스킬 코드',
+  field            VARCHAR(30) NOT NULL COMMENT '바뀐 항목: value / enabled / cooldown / level',
+  old_value        VARCHAR(100) NULL COMMENT '이전 값(문자열, 켜기·끄기는 true·false)',
+  new_value        VARCHAR(100) NULL COMMENT '이후 값',
+  admin_user_id    BIGINT NOT NULL COMMENT '바꾼 관리자 계정(users.id, 외래 키 없음)',
+  admin_name       VARCHAR(60) NULL COMMENT '그때의 관리자 표시 이름(플레이어 닉네임)',
+  memo             VARCHAR(300) NULL COMMENT '변경 이유 메모',
+  reverted_from_id BIGINT NULL COMMENT '이 변경이 되돌린 이력 ID(일반 변경은 NULL)',
+  created_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '변경 시각',
+  updated_at       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
+  PRIMARY KEY (id),
+  KEY idx_config_changes_scope (scope, id),
+  KEY idx_config_changes_target (target, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='설정 변경 이력';

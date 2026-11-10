@@ -69,4 +69,7 @@ public interface PlayerService {
 
     /** 행을 이미 잠근 트랜잭션 안에서: 죽였다(죽인 횟수 +1, EXP `kill_exp`)를 반영하고 점수·레벨을 다시 정한다(4.31). */
     void awardKill(Player p);
+
+    /** 몬스터(보스) 보상(4.35): 행을 잠그고 EXP를 더하고 처치 참여 횟수를 올린 뒤(cleared일 때만) 점수·레벨을 다시 정한다. 방(틱) 밖의 작업 스레드에서 부른다. */
+    void awardMonster(long playerId, long exp, boolean cleared);
 }

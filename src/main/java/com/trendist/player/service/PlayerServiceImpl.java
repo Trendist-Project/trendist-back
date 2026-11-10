@@ -171,6 +171,16 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    @Transactional
+    public void awardMonster(long playerId, long exp, boolean cleared) {
+        players.findByIdForUpdate(playerId).ifPresent(p -> {
+            if (cleared) p.incMonsterKill(); // 칭호(4.35)
+            if (exp > 0) p.addExp(exp);
+            recompute(p);
+        });
+    }
+
+    @Override
     public void awardKill(Player p) {
         p.incKill(); // 칭호(4.31)
         p.addExp(settings.getInt(SettingKeys.KILL_EXP)); // 죽였을 때 EXP(관리자 설정 kill_exp)
@@ -193,7 +203,7 @@ public class PlayerServiceImpl implements PlayerService {
         var progress = levels.advance(p.getLevel(), p.getExp()); // 레벨이 오르면 필요한 EXP를 빼고 남은 EXP를 이어 가진다
         p.setLevel(progress.row());
         p.setExp(progress.exp());
-        long score = formula.expScore(levels.totalExp(p.getLevel(), p.getExp())) + sum;
+        long score = formula.expScore(levels.totalExp(p.getLevel(), p.getExp())) + sum + p.getLevel(); // 레벨 값이 유행도에 1:1로 더해진다(4.8)
         p.setCurrentScore(score);
         events.publishEvent(new GameEvents.PlayerScoreChanged(p.getCountry().getId(), p.getId(), score, p.getExp(),
                 p.getLevel(), p.getHoldCount()));

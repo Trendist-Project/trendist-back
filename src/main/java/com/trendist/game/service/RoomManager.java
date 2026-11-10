@@ -29,6 +29,9 @@ public interface RoomManager {
 
     void sendText(Room.Member m, Map<String, Object> message);
 
+    /** 지금 있는 모든 나라의 방(몬스터 스케줄·모니터링, 4.35) */
+    Collection<Room> rooms();
+
     /** 관리자 강제 퇴장(13.10): 접속 중이면 이유를 보내고 방에서 뺀 뒤 연결을 닫는다. */
     void kick(long countryId, long playerId, String message);
 

@@ -24,6 +24,11 @@ class RoomTest {
         final List<Long> prizeEaters = new ArrayList<>();
         final List<long[]> wipes = new ArrayList<>();
         public void requestWipe(Room room, Room.Member loser, Room.Member winner) { wipes.add(new long[]{loser.playerId, winner.playerId}); }
+        final List<long[]> halves = new ArrayList<>(); // {잃은 사람, 이긴 사람, 비율, 죽음이면 1}
+        public void requestHalve(Room room, Room.Member loser, Room.Member winner, int percent, boolean death) {
+            halves.add(new long[]{loser.playerId, winner.playerId, percent, death ? 1 : 0});
+            if (!death) wipes.add(new long[]{loser.playerId, winner.playerId}); // 불꽃에게 부딪혀 잃기: 예전 모두 잃기 검사와 같은 자리
+        }
         final List<String> savedSlots = new ArrayList<>(); // 저장 요청된 장착 4칸
         public void saveSkillSlots(Room room, Room.Member member, List<String> slots) { savedSlots.add(member.playerId + ":" + String.join(",", slots.stream().map(x -> x == null ? "" : x).toList())); }
         final List<long[]> poisonLoses = new ArrayList<>(); // {당한 사람, 잃은 개수}
@@ -55,7 +60,7 @@ class RoomTest {
         // 4.25: 콤보 유지시간: 마지막으로 콤보가 오른 때부터 maxSeconds가 지나면 연속 횟수와 불꽃이 사라진다(expired). 콤보가 추가될 때마다 다시 시작한다. 0이면 제한 없음
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, true, 50, 10));
+        r.setComboTuning(new Room.ComboTuning(5, true, 10));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
         r.fightResult(a, b, false); // 콤보 1, 지금부터 10초
@@ -68,7 +73,7 @@ class RoomTest {
         assertThat(a.combo).isZero();     // 마지막 콤보로부터 12초: 사라진다
         assertThat(out.texts).anyMatch(m -> "combo".equals(m.get("type")) && "expired".equals(m.get("event")) && m.get("e").equals(a.entityNo));
         // 제한을 끄면(0) 오래 지나도 유지된다
-        r.setComboTuning(new Room.ComboTuning(5, true, 50, 0));
+        r.setComboTuning(new Room.ComboTuning(5, true, 0));
         r.fightResult(a, b, false);
         for (int i = 0; i < 20 * 30; i++) r.tick();
         assertThat(a.combo).isEqualTo(1);
@@ -79,7 +84,7 @@ class RoomTest {
         // 4.25: 5번 연속 이기면 불꽃이 붙고(start), 한 번이라도 잃으면 콤보와 불꽃이 모두 사라진다(broken)
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, false, 50, 300));
+        r.setComboTuning(new Room.ComboTuning(5, false, 300));
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 4; i++) r.fightResult(1L, 2L, false);
@@ -412,7 +417,7 @@ class RoomTest {
     }
 
     /** 사람 1명 + 봇 n명을 만들고, 봇들이 채워진 뒤 돌려준다. 사람은 멀리 두어 싸움에 끼지 않는다. */
-    private static Room botRoom(Out out, int bots, Room.Member[] humanOut) {
+    static Room botRoom(Out out, int bots, Room.Member[] humanOut) {
         Room r = botRoomOf(withBots(1 + bots), out);
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member human = r.join(1, "s1", "사람", 1, 100, List.of(11L));
@@ -422,7 +427,7 @@ class RoomTest {
         return r;
     }
 
-    private static List<Room.Member> botsOf(Room r) { return r.members().stream().filter(m -> m.bot).toList(); }
+    static List<Room.Member> botsOf(Room r) { return r.members().stream().filter(m -> m.bot).toList(); }
 
     @Test
     void humanFlameWipesBotKeywordsLikeAnyoneElse() {
@@ -437,12 +442,12 @@ class RoomTest {
         bot.score = 900; human.score = 100;
         bot.x = 800; bot.y = 800; human.x = 810; human.y = 800;
         r.tick();
-        assertThat(bot.botKeywords).isEmpty();
+        assertThat(bot.botKeywords).hasSize(1); // 2개 중 절반(내림, 최소 1개)인 1개를 잃는다(4.36)
         assertThat(out.wipes).isEmpty(); // 봇은 DB 키워드가 없어 방 안에서 처리한다
         assertThat(out.steals).containsExactly(human.playerId); // 모두 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
         assertThat(human.combo).isEqualTo(6); // 봇을 이긴 것도 콤보(combo_bot_counts 기본 켜짐)
         assertThat(bot.combo).isZero();       // 잃은 봇의 콤보는 사라진다
-        assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(2).equals(m.get("wiped")));
+        assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(1).equals(m.get("wiped")));
         assertThat(r.prizeOrbCount()).isGreaterThanOrEqualTo(1); // 잃은 개수의 일부만큼 ! 구슬
     }
 
@@ -526,9 +531,9 @@ class RoomTest {
         r.botTakes(bot, 3);  // 이미 가졌으면 두 번 넣지 않는다
         r.botTakes(bot, 99); // 목록에 없는 키워드는 가지지 않는다
         assertThat(bot.botKeywords).extracting(Room.BotKw::id).containsExactly(3L);
-        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + 20); // 점수 = 키워드의 현재 유행도
+        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + bot.level + 20); // 점수 = EXP 몫 + 레벨(1:1) + 키워드의 현재 유행도
         r.setKeywordCatalog(List.of(new Room.CatalogKw(3, "k3", 35))); // 유행도가 바뀌면 봇 점수도 따라간다
-        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + 35);
+        assertThat(bot.score).isEqualTo(Math.min(bot.botExp, 100) + bot.level + 35);
     }
 
     @Test
@@ -584,10 +589,10 @@ class RoomTest {
         r.setZoneTuning(NO_RANDOM_ZONES);
         Room.Member a = r.join(1, "s1", "a", 1, 10, List.of());
         a.x = 1000; a.y = 1000;
-        r.dropPrizeOrbs(1L, 5); // 활성 5개 잃음 → 50% 올림 = 3개
-        assertThat(r.prizeOrbCount()).isEqualTo(3);
-        r.dropPrizeOrbs(1L, 1); // 활성 1개 잃어도 최소 1개
-        r.dropPrizeOrbs(1L, 0); // 활성이 없었으면(💤만 잃음) 구슬 없음
+        r.dropPrizeOrbs(1L, 5); // 잃은 활성 키워드 5개 → 절반 내림 2개(4.36)
+        assertThat(r.prizeOrbCount()).isEqualTo(2);
+        r.dropPrizeOrbs(1L, 1); // 1개 잃으면 절반이 0이어도 최소 1개
+        r.dropPrizeOrbs(1L, 0); // 활성이 없었어도(💤만 잃음) 최소 1개
         assertThat(r.prizeOrbCount()).isEqualTo(4);
         a.x = -900; a.y = -900; // 떨어진 구슬에서 멀리
         r.placePrizeOrb(-903, -900);
@@ -750,7 +755,7 @@ class RoomTest {
         for (Room.Member b : r.members()) {
             if (!b.bot) continue;
             long sum = b.botKeywords.stream().mapToLong(k -> CATALOG.stream().filter(c -> c.id() == k.id()).findFirst().orElseThrow().value()).sum();
-            assertThat(b.score).isEqualTo(Math.min(b.botExp, 100) + sum);
+            assertThat(b.score).isEqualTo(Math.min(b.botExp, 100) + b.level + sum);
             assertThat(b.level).isEqualTo(Room.defaultLevelForExp(b.botExp));
             assertThat(b.score).isLessThanOrEqualTo(600); // 400 × 1.5
             assertThat((long) b.botKeywords.size()).isLessThanOrEqualTo(b.botExp); // 추가한 횟수보다 많이 가질 수 없다
@@ -790,7 +795,7 @@ class RoomTest {
         bot.x = 2000; bot.y = 2000; human.x = 2010; human.y = 2000;
         r.tick();
         assertThat(bot.botKeywords).hasSize(1);
-        assertThat(bot.score).isIn(40.0, 50.0); // 10(EXP) + 남은 키워드 30 또는 40
+        assertThat(bot.score).isIn(43.0, 53.0); // 10(EXP) + 레벨 3(1:1) + 남은 키워드 30 또는 40
         // 이긴 사람은 보상으로 무작위 🔥 키워드를 받는다(틱 밖에서 처리하도록 요청), 봇에게도 무적 카운트다운
         assertThat(out.botWinners).containsExactly(human.playerId);
         assertThat(out.texts).anyMatch(t -> "shield".equals(t.get("type")) && t.get("e").equals(bot.entityNo));
@@ -1396,7 +1401,7 @@ class RoomTest {
         // 4.10, 4.25: 콤보가 오를 때 이 접속에서 보낸 최고 기록을 넘을 때만 저장을 요청한다. 콤보가 끊겼다 다시 쌓여도 기록 이하면 요청하지 않는다
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        r.setComboTuning(new Room.ComboTuning(5, true, 300));
         r.join(1, "s1", "a", 1, 0, List.of());
         r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 3; i++) r.fightResult(1L, 2L, false);
@@ -1413,7 +1418,7 @@ class RoomTest {
         // 4.25: 불꽃(콤보 5 이상)이 붙은 상대를 이겨 꺼뜨린 사람만 센다. 불꽃이 아닌 콤보를 끊거나 사람이 아닌 쪽이 끊은 것은 세지 않는다
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        r.setComboTuning(new Room.ComboTuning(5, true, 300));
         r.join(1, "s1", "a", 1, 0, List.of());
         r.join(2, "s2", "b", 1, 0, List.of());
         for (int i = 0; i < 3; i++) r.fightResult(2L, 1L, false); // b 콤보 3(불꽃 아님)
@@ -1428,7 +1433,7 @@ class RoomTest {
         // 4.25: 새로고침하거나 화면을 떠났다가 원이 남아 있는 동안 다시 들어오면 콤보와 불꽃은 처음부터다(위치·점수는 이어받는다)
         Out out = new Out();
         Room r = new Room(1, T, out);
-        r.setComboTuning(new Room.ComboTuning(5, true, 50, 300));
+        r.setComboTuning(new Room.ComboTuning(5, true, 300));
         Room.Member a = r.join(1, "s1", "a", 1, 40, List.of());
         a.x = 800; a.y = 800;
         for (int i = 0; i < 6; i++) r.fightResult(a, null, true); // 콤보 6(불꽃)

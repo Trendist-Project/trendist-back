@@ -211,6 +211,25 @@ class ApiFlowTest {
         for (int i = 0; i < 20; i++) assertThat(keywordService.openPrizeOrb(pid).status()).isIn("GAINED", "RENEWED");
     }
 
+    @Test
+    void loseFractionTakesRoundedDownShareWithAtLeastOne() throws Exception {
+        // 체력 0·불꽃 충돌로 잃는 키워드(4.36): 개수 × 비율을 내림, 최소 1개. 비율 100이면 모두
+        String t = player("절반러");
+        long pid = playerIdOf(t);
+        keywordService.applyExternalTitles("KR", DataSource.GOOGLE, List.of("절반하나", "절반둘", "절반셋", "절반넷", "절반다섯"));
+        for (int i = 0; i < 5; i++) assertThat(keywordService.openPrizeOrb(pid).status()).isEqualTo("GAINED");
+        var lost = keywordService.loseFraction(pid, 50).orElseThrow();
+        assertThat(lost.count()).isEqualTo(2);            // 5 × 50% = 2.5 → 내림 2개
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(3));
+        assertThat(keywordService.loseFraction(pid, 50).orElseThrow().count()).isEqualTo(1); // 3 × 50% = 1.5 → 1
+        assertThat(keywordService.loseFraction(pid, 50).orElseThrow().count()).isEqualTo(1); // 2 × 50% = 1
+        assertThat(keywordService.loseFraction(pid, 50).orElseThrow().count()).isEqualTo(1); // 1 × 50% = 0 → 최소 1개
+        assertThat(keywordService.loseFraction(pid, 50)).isEmpty();
+        for (int i = 0; i < 4; i++) keywordService.openPrizeOrb(pid);
+        assertThat(keywordService.loseFraction(pid, 100).orElseThrow().count()).isPositive(); // 100%는 모두
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(jsonPath("$.player.holdCount").value(0));
+    }
+
     private long playerIdOf(String token) throws Exception {
         return ((Number) JsonPath.read(mvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
                 .andReturn().getResponse().getContentAsString(), "$.player.id")).longValue();
@@ -745,7 +764,7 @@ class ApiFlowTest {
         // 점수 = 외부 키워드 1명 trend_value 12(활동 인원이 최소 인원 20보다 적어 1/20로 계산), 정수. EXP는 점수에 넣지 않는다(exp_score_cap 기본 0)
         MvcResult me = mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andExpect(status().isOk()).andReturn();
         Object score = JsonPath.read(me.getResponse().getContentAsString(), "$.player.currentScore");
-        assertThat(score).isEqualTo(12);
+        assertThat(score).isEqualTo(14); // 키워드 12 + 레벨 2(1:1, 4.8)
         mvc.perform(get("/api/me/keywords").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$[0].text").value("양쯔 깐루")); // 처음 입력한 표기를 유지한다(4.18)
         // 랭킹은 방에 접속한 사람만 집계한다(4.14). 이 사용자는 REST로만 플레이해서 방에 없다
@@ -974,7 +993,7 @@ class ApiFlowTest {
     }
 
     private void scoreHistoryRecordsOnlyChangedHoursBody(String t) throws Exception {
-        plusKeyword(t, "점수 기록 키워드"); // 💤 키워드: EXP 1 → 유행도 1(이 테스트에서만)
+        plusKeyword(t, "점수 기록 키워드"); // 💤 키워드: EXP 1로 2레벨이 되어 유행도 = EXP 몫 1 + 레벨 2(1:1) = 3
         java.time.Instant lastHour = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS)
                 .minus(1, java.time.temporal.ChronoUnit.HOURS);
         assertThat(scoreHistory.recordHour(lastHour)).isPositive();
@@ -986,12 +1005,12 @@ class ApiFlowTest {
         mvc.perform(get("/api/me/score-history?range=24h").header("Authorization", "Bearer " + t))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.points.length()").value(24))
-                .andExpect(jsonPath("$.points[22].score").value(1))
+                .andExpect(jsonPath("$.points[22].score").value(3))
                 .andExpect(jsonPath("$.points[23].live").value(true))
-                .andExpect(jsonPath("$.points[23].score").value(1));
+                .andExpect(jsonPath("$.points[23].score").value(3));
         mvc.perform(get("/api/me/score-history?range=7d").header("Authorization", "Bearer " + t))
                 .andExpect(jsonPath("$.points.length()").value(7))
-                .andExpect(jsonPath("$.points[6].score").value(1));
+                .andExpect(jsonPath("$.points[6].score").value(3));
         mvc.perform(get("/api/me/score-history?range=all").header("Authorization", "Bearer " + t))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/me/score-history?range=1y").header("Authorization", "Bearer " + t))
@@ -1269,20 +1288,20 @@ class ApiFlowTest {
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
                 .containsExactly("dash", "shield", "hook", "shockwave", "stealth", "darkness", "cleanse", "poison");
         try {
-            var r = adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
+            var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);
             assertThat(r.requiredLevel()).isEqualTo(16);
             assertThat(adminSkills.list().stream().filter(x -> x.code().equals("shield")).findFirst().orElseThrow().cooldownSeconds()).isEqualTo(30.0); // 다른 스킬은 그대로
             mvc.perform(get("/api/skills")).andExpect(jsonPath("$[?(@.code=='hook')].cooldownSeconds").value(12.5))
                     .andExpect(jsonPath("$[?(@.code=='hook')].requiredLevel").value(16));
-            assertThatThrownBy(() -> adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(-1.0, null, null)))
+            assertThatThrownBy(() -> adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(-1.0, null, null)))
                     .hasMessageContaining("쿨타임");
-            assertThatThrownBy(() -> adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(null, 0, null)))
+            assertThatThrownBy(() -> adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(null, 0, null)))
                     .hasMessageContaining("해금 레벨");
-            assertThatThrownBy(() -> adminSkills.update("nope", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(1.0, null, null)))
+            assertThatThrownBy(() -> adminSkills.update(new com.trendist.auth.security.AuthUser(1), "nope", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(1.0, null, null)))
                     .hasMessageContaining("없는 스킬");
         } finally {
-            adminSkills.update("hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 10, true));
+            adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 10, true));
         }
     }
 }
