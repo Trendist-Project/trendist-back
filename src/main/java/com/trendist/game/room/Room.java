@@ -2013,7 +2013,7 @@ public class Room {
         return level;
     }
 
-    /** 사람 수. 방 정원(1000명) 검사와 접속 인원에 쓴다. 봇은 세지 않는다. */
+    /** 사람 수. 방 정원(100명) 검사와 접속 인원에 쓴다. 봇은 세지 않는다. */
     private int humanCount() {
         int n = 0;
         for (Member m : members.values()) if (!m.bot) n++;
@@ -2392,10 +2392,10 @@ public class Room {
         }
     }
 
-    /** 인원이 적으면 활동 영역을 좁힌다(4.2). 1000명에서 기준 맵 한 변, 아무리 적어도 그 1/4보다 좁히지 않는다. */
+    /** 인원이 적으면 활동 영역을 좁힌다(4.2). 100명(방 정원)에서 기준 맵 한 변, 아무리 적어도 그 1/4보다 좁히지 않는다. */
     double activeArea(int n) {
         double full = tuning.worldSize();
-        return clamp(full * Math.sqrt(Math.max(n, 1) / 1000.0), full / 4, full);
+        return clamp(full * Math.sqrt(Math.max(n, 1) / 100.0), full / 4, full);
     }
 
     public double radiusFor(double score) {

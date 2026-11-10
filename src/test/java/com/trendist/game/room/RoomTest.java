@@ -682,10 +682,10 @@ class RoomTest {
 
     @Test
     void activeAreaScalesWithWorldSize() {
-        // 적은 인원에서도 기준 맵 한 변의 1/4, 1000명이면 한 변 전체(4.2)
+        // 적은 인원에서도 기준 맵 한 변의 1/4, 100명이면 한 변 전체(4.2)
         Room small = new Room(1, new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 0, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0), new Out());
         assertThat(small.activeArea(1)).isEqualTo(6000);
-        assertThat(small.activeArea(1000)).isEqualTo(24000);
+        assertThat(small.activeArea(100)).isEqualTo(24000);
         assertThat(new Room(1, T, new Out()).activeArea(1)).isEqualTo(3000);
     }
 
@@ -696,7 +696,7 @@ class RoomTest {
         Room r = new Room(1, tu, new Out());
         assertThat(r.orbTarget(tu, 1500)).isEqualTo(20);     // 3,000px 영역
         assertThat(r.orbTarget(tu, 3000)).isEqualTo(79);     // 6,000px 영역
-        assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(1000명)
+        assertThat(r.orbTarget(tu, 12000)).isEqualTo(1267);  // 24,000px 영역(100명)
         Room.Tuning capped = new Room.Tuning(24000, 16, 600, 2000, 240, 170, 1.15, 3, 0.4, 0.6, 10, 100, 3, 2.2, 5, 33, 0, 0, 1.5, 100, 0);
         assertThat(r.orbTarget(capped, 12000)).isEqualTo(100);
     }
@@ -881,7 +881,7 @@ class RoomTest {
 
     @Test
     void randomZonesSpawnUpToTargetAndExpire() {
-        // 24,000px 기준 맵 1000명이면 넓이 비례로 여러 개, 맵이 3,000px이면 1개. 유지 시간이 지나면 사라진다
+        // 24,000px 기준 맵 100명이면 넓이 비례로 여러 개, 맵이 3,000px이면 1개. 유지 시간이 지나면 사라진다
         Out out = new Out();
         Room r = new Room(1, T, out);
         r.setZoneTuning(new Room.ZoneTuning(0.06, 600, 0.035, 400, 6, 40, 2));

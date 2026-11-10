@@ -17,7 +17,7 @@ CREATE TABLE countries (
   default_locale VARCHAR(10) NOT NULL COMMENT '기본 언어(ko/en/ja/zh-CN/hi)',
   timezone       VARCHAR(50) NOT NULL COMMENT '시간대(Asia/Seoul, UTC 등)',
   enabled        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '오픈 여부',
-  max_room_size  BIGINT NOT NULL DEFAULT 1000 COMMENT '방 인원 상한',
+  max_room_size  BIGINT NOT NULL DEFAULT 100 COMMENT '방 인원 상한',
   sort_order     BIGINT NOT NULL DEFAULT 0 COMMENT '표시 순서',
   created_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
