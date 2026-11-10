@@ -48,18 +48,21 @@ final class GuideSeed {
             )),
             new Category("score-and-size", "⚔️ 점수와 대결", GuideCategory.ARTICLE, List.of(
                     new Article("현재 유행도와 원의 크기", """
-                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 키워드의 점수를 모두 더한 값이에요. **레벨과 경험치는 크기에 영향이 없어요.**
+                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 🔥활성 키워드의 점수를 모두 더하고 **내 레벨**(1레벨당 1점)을 더한 값이에요. **경험치(EXP)는 크기에 영향이 없어요.**
 
                             - 내가 가진 키워드를 다른 사람도 많이 가지면 그 키워드 점수가 올라 내 원도 커져요.
                             - 키워드가 사라지거나 빼앗기면 작아져요.
-                            - 원이 커지면 화면이 조금씩 넓게 보여요. 크기와 관계없이 속도는 모두 같아요."""),
+                            - 원이 커지면 화면이 조금씩 넓게 보여요. 크기와 관계없이 속도는 모두 같아요.
+
+                            > 점수를 계산하는 방법은 '유행도는 어떻게 계산하나요?' 글을 보세요."""),
                     new Article("부딪히면 어떻게 되나요?", """
                             - 원끼리 부딪히면 서로 튕겨 나가요. 크기 차이가 크면 작은 쪽만 멀리 튕겨요.
                             - 두 사람 중 **현재 유행도가 낮은 쪽**이 키워드 하나를 잃고, 이긴 쪽이 그 키워드를 **빼앗아** 와요. 점수가 같으면 아무도 잃지 않아요. 크기는 승패와 상관없어요.
-                            - 단, **🔥 불꽃**이 붙은 사람은 예외예요. 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 **전부** 잃어요. (아래 '연속 빼앗기와 불꽃' 참고)
+                            - 단, **🔥 불꽃**이 붙은 사람은 예외예요. 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고, 상대는 키워드의 **절반**을 잃어요. (아래 '연속 빼앗기와 불꽃' 참고)
                             - 빼앗은 키워드가 이미 내 보관함에 있으면, 그 키워드의 남은 시간이 다시 24시간으로 늘어나요.
                             - 잃은 키워드는 바로 다시 검색해서 추가할 수 있어요.
-                            - **키워드가 하나도 없는데 지면** 죽어요. (아래 '죽음과 리스폰' 글을 보세요.)
+                            - 부딪힐 때마다 **체력(HP)**도 깎여요. 계산은 '체력(HP)과 피해량, 불꽃 계산' 글을 보세요.
+                            - **체력이 0%가 되거나, 키워드가 하나도 없는데 지면** 죽어요. (아래 '죽음과 리스폰' 글을 보세요.)
                             - **세이프존** 안에서는 아무와도 부딪히지 않아요.
 
                             ## 화면 위에 뜨는 알림 카드
@@ -76,7 +79,7 @@ final class GuideSeed {
                             부딪혀서 키워드를 **연속으로** 빼앗으면 콤보가 쌓여요. 화면 위에 **⚔️ 3 Combo**처럼 보여요.
 
                             - **5 Combo**가 되면 내 원 둘레가 **🔥 불꽃**으로 타올라요. 다른 사람에게도 그대로 보여요.
-                            - 봇을 이겨 키워드를 얻은 것도 콤보에 들어가요.
+                            - 봇을 이겨 키워드를 얻은 것도, **보스를 치는 것**도 콤보에 들어가요.
                             - 한 번이라도 싸움에서 키워드를 **잃으면** 콤보가 0이 되고 불꽃도 꺼져요. 불타는 사람을 이기면 불꽃을 끌 수 있어요!
                             - 마지막으로 콤보가 오른 뒤 **5분** 동안 새 콤보가 없으면 콤보와 불꽃이 저절로 사라져요. 콤보가 오를 때마다 5분이 다시 시작돼요. 콤보 카드(오른쪽 위 리더보드 아래)에 남은 시간이 보여요.
                             - 새로고침하거나 나갔다가 다시 들어오면 콤보는 **0부터** 다시 시작해요.
@@ -84,11 +87,11 @@ final class GuideSeed {
 
                             ## 🔥 불꽃의 힘
 
-                            - **불꽃인 사람이 불꽃 없는 사람과 부딪히면**: 유행도(점수)와 상관없이 불꽃 쪽이 이기고, 상대는 가진 키워드를 **전부** 잃어요. 불꽃 쪽은 콤보가 1 올라가요.
+                            - **불꽃인 사람이 불꽃 없는 사람과 부딪히면**: 유행도(점수)와 상관없이 불꽃 쪽이 이기고, 상대는 가진 키워드의 **절반**을 잃어요. 불꽃 쪽은 콤보가 1 올라가요. 체력 피해도 **공격력 5배**로 들어가요.
                             - **둘 다 불꽃이면**: 평소처럼 유행도가 높은 쪽이 이겨요. 진 쪽은 콤보와 불꽃이 사라지고 키워드 하나를 빼앗겨요.
-                            - **봇**과 부딪힐 때도 같은 규칙이에요. 불꽃인 내가 불꽃 없는 봇과 부딪히면 봇의 키워드를 모두 날리고, 불꽃인 봇이 불꽃 없는 나와 부딪히면 내가 키워드를 모두 잃어요.
+                            - **봇**과 부딪힐 때도 같은 규칙이에요. 불꽃인 내가 불꽃 없는 봇과 부딪히면 봇의 키워드 절반을 날리고, 불꽃인 봇이 불꽃 없는 나와 부딪히면 내가 키워드의 절반을 잃어요.
                             - 불꽃이 붙은 쪽은 부딪혀도 **제자리**에 있고, 불꽃 없는 상대만 튕겨 나가요.
-                            - 키워드를 전부 잃으면 3초 동안 무적이에요. 그리고 잃은 키워드 중 **🔥활성 키워드 개수의 절반**(올림, 활성이 하나라도 있었다면 최소 1개)만큼 **빨간 ! 구슬**이 그 자리 둘레에 떨어져요. 누구나 주워 갈 수 있어요.
+                            - 키워드를 잃으면 3초 동안 무적이에요. 그리고 잃은 키워드 중 **🔥활성 키워드 개수의 절반**(올림, 활성이 하나라도 있었다면 최소 1개)만큼 **빨간 ! 구슬**이 그 자리 둘레에 떨어져요. 누구나 주워 갈 수 있어요.
 
                             > 불꽃은 자랑거리이자 무기예요. 크기에는 영향이 없지만, 한 번 지면 꺼지니 조심하세요."""),
                     new Article("NPC 봇", """
@@ -277,6 +280,50 @@ final class GuideSeed {
     record Fix(String categoryCode, String title, String oldBody) {}
 
     static final List<Fix> FIXES = List.of(
+            new Fix("score-and-size", "현재 유행도와 원의 크기", """
+                            내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 키워드의 점수를 모두 더한 값이에요. **레벨과 경험치는 크기에 영향이 없어요.**
+
+                            - 내가 가진 키워드를 다른 사람도 많이 가지면 그 키워드 점수가 올라 내 원도 커져요.
+                            - 키워드가 사라지거나 빼앗기면 작아져요.
+                            - 원이 커지면 화면이 조금씩 넓게 보여요. 크기와 관계없이 속도는 모두 같아요."""),
+            new Fix("score-and-size", "부딪히면 어떻게 되나요?", """
+                            - 원끼리 부딪히면 서로 튕겨 나가요. 크기 차이가 크면 작은 쪽만 멀리 튕겨요.
+                            - 두 사람 중 **현재 유행도가 낮은 쪽**이 키워드 하나를 잃고, 이긴 쪽이 그 키워드를 **빼앗아** 와요. 점수가 같으면 아무도 잃지 않아요. 크기는 승패와 상관없어요.
+                            - 단, **🔥 불꽃**이 붙은 사람은 예외예요. 불꽃 없는 사람과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 **전부** 잃어요. (아래 '연속 빼앗기와 불꽃' 참고)
+                            - 빼앗은 키워드가 이미 내 보관함에 있으면, 그 키워드의 남은 시간이 다시 24시간으로 늘어나요.
+                            - 잃은 키워드는 바로 다시 검색해서 추가할 수 있어요.
+                            - **키워드가 하나도 없는데 지면** 죽어요. (아래 '죽음과 리스폰' 글을 보세요.)
+                            - **세이프존** 안에서는 아무와도 부딪히지 않아요.
+
+                            ## 화면 위에 뜨는 알림 카드
+
+                            키워드를 얻거나 잃으면 화면 위에 카드가 떠요. 카드 위의 작은 표시로 구분해요.
+
+                            - **뺏음**: 사람이나 봇을 이겨서 키워드를 가져왔어요. 얻은 점수(`+`)가 같이 보여요.
+                            - **뺏김**: 사람이나 봇에게 져서 키워드를 잃었어요. 잃은 점수(`-`)가 같이 보여요.
+                            - **획득**·**잃음**: ? 구슬에서 키워드를 얻거나 잃었어요.
+                            - 불꽃으로 키워드를 모두 날리거나 모두 잃었을 때, 상대를 쓰러뜨렸을 때도 같은 카드로 알려 줘요.
+
+                            > 키워드를 잃으면 3초 동안 무적이에요(원 위에 🛡가 보이고, 다른 원을 그냥 통과해요). 처음 들어오거나 리스폰할 때는 가운데 세이프존에서 시작해서 안전해요."""),
+            new Fix("score-and-size", "연속 빼앗기와 불꽃", """
+                            부딪혀서 키워드를 **연속으로** 빼앗으면 콤보가 쌓여요. 화면 위에 **⚔️ 3 Combo**처럼 보여요.
+
+                            - **5 Combo**가 되면 내 원 둘레가 **🔥 불꽃**으로 타올라요. 다른 사람에게도 그대로 보여요.
+                            - 봇을 이겨 키워드를 얻은 것도 콤보에 들어가요.
+                            - 한 번이라도 싸움에서 키워드를 **잃으면** 콤보가 0이 되고 불꽃도 꺼져요. 불타는 사람을 이기면 불꽃을 끌 수 있어요!
+                            - 마지막으로 콤보가 오른 뒤 **5분** 동안 새 콤보가 없으면 콤보와 불꽃이 저절로 사라져요. 콤보가 오를 때마다 5분이 다시 시작돼요. 콤보 카드(오른쪽 위 리더보드 아래)에 남은 시간이 보여요.
+                            - 새로고침하거나 나갔다가 다시 들어오면 콤보는 **0부터** 다시 시작해요.
+                            - 봇도 콤보를 쌓고 불꽃이 붙어요.
+
+                            ## 🔥 불꽃의 힘
+
+                            - **불꽃인 사람이 불꽃 없는 사람과 부딪히면**: 유행도(점수)와 상관없이 불꽃 쪽이 이기고, 상대는 가진 키워드를 **전부** 잃어요. 불꽃 쪽은 콤보가 1 올라가요.
+                            - **둘 다 불꽃이면**: 평소처럼 유행도가 높은 쪽이 이겨요. 진 쪽은 콤보와 불꽃이 사라지고 키워드 하나를 빼앗겨요.
+                            - **봇**과 부딪힐 때도 같은 규칙이에요. 불꽃인 내가 불꽃 없는 봇과 부딪히면 봇의 키워드를 모두 날리고, 불꽃인 봇이 불꽃 없는 나와 부딪히면 내가 키워드를 모두 잃어요.
+                            - 불꽃이 붙은 쪽은 부딪혀도 **제자리**에 있고, 불꽃 없는 상대만 튕겨 나가요.
+                            - 키워드를 전부 잃으면 3초 동안 무적이에요. 그리고 잃은 키워드 중 **🔥활성 키워드 개수의 절반**(올림, 활성이 하나라도 있었다면 최소 1개)만큼 **빨간 ! 구슬**이 그 자리 둘레에 떨어져요. 누구나 주워 갈 수 있어요.
+
+                            > 불꽃은 자랑거리이자 무기예요. 크기에는 영향이 없지만, 한 번 지면 꺼지니 조심하세요."""),
             new Fix("getting-started", "움직이기", """
                             [[조작]]
 
@@ -420,7 +467,8 @@ final class GuideSeed {
     record Added(String categoryCode, String title, String body, String titleEn, String bodyEn) {}
 
     static final List<AddedCategory> ADDED_CATEGORIES = List.of(
-            new AddedCategory("skills", "⚔️ 스킬", "⚔️ Skills", GuideCategory.ARTICLE, "icons-and-titles"));
+            new AddedCategory("skills", "⚔️ 스킬", "⚔️ Skills", GuideCategory.ARTICLE, "icons-and-titles"),
+            new AddedCategory("boss", "👑 보스", "👑 Boss", GuideCategory.ARTICLE, "skills"));
 
     static final List<Added> ADDED = List.of(
             new Added("icons-and-titles", "레벨별 필요 경험치", """
@@ -433,7 +481,7 @@ final class GuideSeed {
                     - 표의 값은 **지금 적용 중인 값**이에요. 운영 중에 바뀔 수 있어요.
                     - 레벨이 오르면 필요한 경험치만큼 쓰고 **남은 경험치는 다음 레벨로 이어져요.** 레벨은 나라마다 따로 쌓여요.
 
-                    > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 거북이 아이콘이 자라고, 꾸미기와 스킬이 열리는 열쇠예요.""",
+                    > 레벨은 현재 유행도에 **1레벨당 1점**씩만 더해져요(원 크기에는 거의 영향이 없어요). 거북이 아이콘이 자라고, 꾸미기와 스킬이 열리는 열쇠예요.""",
                     "EXP needed per level", """
                     Your level goes up as you collect **experience (EXP)**. The table below shows the **EXP needed to reach each level from the one before it**.
 
@@ -444,7 +492,7 @@ final class GuideSeed {
                     - The values in the table are the ones **in use right now**. They can change while the game runs.
                     - When you level up, the EXP it needed is spent and **any leftover EXP carries over** to the next level. Levels are tracked separately for each country.
 
-                    > Your level does not affect keyword score or circle size. It makes your turtle icon grow and unlocks customizing and skills."""),
+                    > Your level adds just **1 point per level** to your trend score (barely changing circle size). It makes your turtle icon grow and unlocks customizing and skills."""),
             new Added("skills", "스킬 한눈에 보기", """
                     레벨이 오르면 쓸 수 있는 **스킬**이 늘어나요. **⚡ 대시**는 처음부터 쓸 수 있는 기본 스킬이고, 나머지는 아래 레벨이 되어야 해요. 화면 아래 가운데 줄의 버튼을 누르거나 키보드 키로 써요. 어떤 스킬을 어느 칸에 둘지는 **스킬창(K 키)**에서 골라요("스킬 장착하기" 글을 보세요).
 
@@ -458,7 +506,7 @@ final class GuideSeed {
                     - 공격 스킬인 **갈고리·충격파·독·암흑은 세이프존 안에서는 쓸 수 없어요.** 정화는 쓸 수 있어요.
                     - 갈고리·충격파·독·암흑의 **사거리는 모두 내 원 가장자리에서 화면에 보이는 길이**가 기준이라, 원이 작아도 커도 화면에서 비슷한 길이로 나가요.
 
-                    > 레벨은 키워드 점수나 원의 크기에는 영향이 없어요. 스킬을 쓸 수 있게 하는 열쇠예요. 각 스킬이 내 화면과 상대 화면에서 어떻게 보이는지는 아래 글마다 움직이는 그림으로 볼 수 있어요.""",
+                    > 레벨은 현재 유행도에 **1레벨당 1점**씩만 더해져요(원 크기에는 거의 영향이 없어요). 스킬을 쓸 수 있게 하는 열쇠예요. 각 스킬이 내 화면과 상대 화면에서 어떻게 보이는지는 아래 글마다 움직이는 그림으로 볼 수 있어요.""",
                     "Skills at a glance", """
                     As your level rises, you can use more **skills**. **⚡ Dash** is the default skill you have from the start; the others need the levels below. Use the buttons in the bottom center bar, or press the keys. Choose which skill goes in which slot in the **skill window (K key)** (see the "Equipping skills" article).
 
@@ -472,7 +520,7 @@ final class GuideSeed {
                     - The attack skills, **Hook, Shockwave, Poison and Darkness, can't be used inside safe zones.** Cleanse can be used.
                     - The **range of Hook, Shockwave, Poison and Darkness is measured as a length on your screen from your circle's edge**, so it looks about the same whether your circle is small or large.
 
-                    > Your level does not affect keyword score or circle size. It is the key that unlocks skills. Each article below shows, with a moving picture, how the skill looks on your screen and on the other player's screen."""),
+                    > Your level adds just **1 point per level** to your trend score (barely changing circle size). It is the key that unlocks skills. Each article below shows, with a moving picture, how the skill looks on your screen and on the other player's screen."""),
             new Added("skills", "스킬 장착하기", """
                     스킬은 **장착 칸 4개**에 끼운 것만 쓸 수 있어요(⚡ 대시는 늘 쓸 수 있어요). 칸은 처음부터 모두 열려 있고, 레벨이 돼서 풀린 스킬만 끼울 수 있어요. **K 키**나 아래 가운데 줄의 스킬창 버튼으로 **스킬창**을 열어요.
 
@@ -656,25 +704,27 @@ final class GuideSeed {
                     - It also counts when the opponent is a bot with the same trend score.
                     - You can see your progress in the bar under **My info → 🏅 Titles**.""")
             ,new Added("score-and-size", "죽음과 리스폰", """
-                    **키워드가 하나도 없는 채로 충돌에서 지면** 죽어요. 키워드가 있으면 하나를 잃을 뿐이에요.
+                    **체력(HP)이 0%가 되거나, 키워드가 하나도 없는 채로 충돌에서 지면** 죽어요. 체력이 남아 있고 키워드가 있으면 하나를 잃을 뿐이에요.
 
+                    - 체력이 0%가 되어 죽으면 가진 키워드의 **절반**(최소 1개)을 잃어요.
                     - 세이프존 안에 있거나, 키워드를 잃은 직후 3초 동안은 죽지 않아요.
                     - 죽으면 화면이 흑백으로 어두워지고 누가 쓰러뜨렸는지 알려 줘요. 다른 사람들의 움직임은 계속 구경할 수 있어요.
-                    - **리스폰** 버튼을 누르면 가운데 파란 세이프존에서 다시 시작해요. 레벨, 경험치, 칭호, 꾸미기는 그대로예요.
-                    - 쓰러뜨린 사람은 경험치를 더 받고(기본 5) **처치** 횟수가 올라가요. 화면에는 처치 카드가 떠요. 처치와 패배 횟수에 따른 칭호도 있어요.
+                    - **리스폰** 버튼을 누르면 가운데 파란 세이프존에서 **체력이 가득 찬 채** 다시 시작해요. 레벨, 경험치, 칭호, 꾸미기는 그대로예요.
+                    - 쓰러뜨린 사람은 경험치를 더 받고(기본 5) **처치** 횟수가 올라가요. 화면에는 처치 카드가 떠요. 처치와 사망 횟수에 따른 칭호도 있어요.
                     - 봇도 같은 규칙으로 쓰러지고, 새 봇이 가운데에서 나와요.
 
-                    > 처치·패배 횟수는 **내 정보**에서 볼 수 있어요.""",
+                    > 처치·사망 횟수는 **내 정보**에서 볼 수 있어요.""",
                     "Knockouts and respawning", """
-                    If you **lose a collision while holding no keywords**, you are knocked out. If you have keywords, you only lose one.
+                    If **your HP reaches 0%, or you lose a collision while holding no keywords**, you are knocked out. If you still have HP and keywords, you only lose one keyword.
 
+                    - If you are knocked out at 0% HP, you lose **half** of your keywords (at least 1).
                     - You can't be knocked out inside a safe zone, or during the 3 seconds right after losing a keyword.
                     - When you are knocked out, the screen fades to black and white and tells you who did it. You can keep watching everyone else move.
-                    - Press **Respawn** to start again in the blue safe zone in the middle. Your level, EXP, titles and customization stay.
-                    - Whoever knocked you out earns extra EXP (5 by default) and their **takedown** count goes up. A takedown card appears on their screen. There are titles for takedowns and defeats too.
+                    - Press **Respawn** to start again in the blue safe zone in the middle **with full HP**. Your level, EXP, titles and customization stay.
+                    - Whoever knocked you out earns extra EXP (5 by default) and their **takedown** count goes up. A takedown card appears on their screen. There are titles for takedowns and deaths too.
                     - Bots are knocked out by the same rules, and a new bot appears in the middle.
 
-                    > You can see your takedown and defeat counts in **My info**.""")
+                    > You can see your takedown and death counts in **My info**.""")
             ,new Added("arena", "플레이어 검색과 인기도", """
                     **👥 플레이어** 탭(오른쪽 패널, 모바일은 🔍 안의 탭)에서 닉네임 일부로 같은 나라 플레이어를 찾을 수 있어요. 접속 중이 아니어도 찾아져요.
 
@@ -698,5 +748,221 @@ final class GuideSeed {
                     If you leave, refresh or lose your connection, your orb **stays where it was for 1 minute.** If another player or a bot hits it in the meantime, you can lose keywords.
 
                     - If you come back within 1 minute, you take that orb over. Your **combo and flame start again from 0**, but skill cooldowns carry on.
-                    - After 1 minute the orb is gone, and when you come back you start in the blue safe zone in the middle."""));
+                    - After 1 minute the orb is gone, and when you come back you start in the blue safe zone in the middle.""")
+            ,new Added("score-and-size", "유행도는 어떻게 계산하나요?", """
+                    **현재 유행도 = 내가 가진 🔥활성 키워드의 점수 합 + 내 레벨**이에요. 원의 크기와 싸움의 승패는 모두 이 값으로 정해져요.
+
+                    ## 키워드 하나의 점수
+
+                    - 키워드 점수는 **3~50점**이에요. 그 키워드를 **가진 사람의 비율**이 높을수록 올라가요. 대략 가진 사람이 1%면 5점, 10%면 19점, 25%면 34점, 50% 이상이면 최고 50점이에요.
+                    - 인기 많은 키워드 하나가 흔한 키워드 여럿보다 값져요. 모두가 같은 키워드로 몰려도 50점이 최고라서 이득이 더 커지진 않아요.
+                    - 점수가 있는 건 **🔥활성 키워드**뿐이에요. 💤비활성·⛔금지 키워드는 0점이에요.
+                    - 그 키워드를 가진 사람 수가 바뀌면 점수도 바로 따라 바뀌어요.
+
+                    ## 레벨과 경험치
+
+                    - **레벨**은 1레벨당 **1점**씩 더해져요(10레벨이면 +10).
+                    - **경험치(EXP)**는 유행도에 들어가지 않아요.
+
+                    ## 원의 크기
+
+                    - 반지름 = 30 + 270 × (유행도 ÷ 2,000) px 이에요. 유행도 **2,000**에서 최대 크기예요.
+                    - 예) 유행도 0 → 30px, 100 → 44px, 300 → 71px, 1,000 → 165px, 2,000 이상 → 300px.
+                    - 크기는 속도와 상관없고, 싸움의 승패는 **크기가 아니라 유행도**로 정해져요.""",
+                    "How is trend score calculated?", """
+                    **Current trend score = the total score of the 🔥 active keywords you hold + your level.** Your orb's size and who wins a fight are both decided by this number.
+
+                    ## The score of one keyword
+
+                    - A keyword's score is **3 to 50 points**. It rises as the **share of players who hold it** rises. Roughly: 5 points when 1% hold it, 19 at 10%, 34 at 25%, and the maximum of 50 at 50% or more.
+                    - One popular keyword is worth more than several common ones. Even if everyone crowds onto the same keyword, 50 is the cap, so there is no extra gain.
+                    - Only **🔥 active keywords** have a score. 💤 Inactive and ⛔ banned keywords are worth 0.
+                    - When the number of holders changes, the score follows right away.
+
+                    ## Level and EXP
+
+                    - Your **level** adds **1 point per level** (level 10 adds 10).
+                    - **EXP** does not count toward trend score.
+
+                    ## Orb size
+
+                    - Radius = 30 + 270 × (trend score ÷ 2,000) px. The maximum size is reached at a trend score of **2,000**.
+                    - Examples: 0 → 30px, 100 → 44px, 300 → 71px, 1,000 → 165px, 2,000 or more → 300px.
+                    - Size has nothing to do with speed, and fights are decided by **trend score, not size**.""")
+            ,new Added("score-and-size", "체력(HP)과 피해량, 불꽃 계산", """
+                    부딪힐 때마다 **체력(HP)**이 깎여요. 체력은 화면 아래 **빨간 막대**(`HP 82%`)와 원 위 체력바로 보여요. **0%가 되면 죽어요.**
+
+                    ## 피해량 계산
+
+                    **피해(%) = 100 × 공격력 ÷ (공격력 + 맞는 사람의 유행도)**
+
+                    - **공격력**은 때리는 사람의 현재 유행도예요. **🔥 불꽃이면 공격력이 5배**가 돼요.
+                    - 서로 때려요. 예) 내 유행도 300, 상대 100이면 상대는 **75%**, 나는 **25%** 깎여요(두 피해의 합은 항상 100%).
+                    - 내가 🔥 불꽃이면 공격력이 300×5=1,500이라 상대는 약 **94%** 깎여요. 상대의 반격(일반 공격)으로 나도 25% 깎여요.
+                    - 유행도 차이가 클수록 센 쪽은 조금 맞고 약한 쪽은 많이 맞아요.
+                    - 같은 두 사람 사이의 피해는 **1초에 한 번**만 들어가요. 세이프존이나 무적(🛡 방패, 키워드를 잃은 뒤 3초) 중에는 부딪혀도 피해가 없어요.
+                    - 둘 다 같은 순간에 0%가 되면 더 크게 맞은 쪽만 죽어요.
+
+                    ## 🔥 불꽃 정리
+
+                    - 불꽃(콤보 5)이면 **공격력 5배**예요. 불꽃이 불꽃 없는 사람과 부딪히면 유행도와 상관없이 이기고, 상대는 키워드의 **절반**을 잃어요.
+                    - 불꽃끼리는 평소처럼 유행도가 높은 쪽이 이겨요.
+                    - 한 번 지면 콤보와 불꽃이 사라져요.
+
+                    ## 죽으면, 회복하면
+
+                    - 체력이 0%가 되면 죽고, 가진 키워드의 **절반**(최소 1개)을 잃어요. 다시 들어오면 체력이 가득이에요.
+                    - **체력 회복**: 키워드를 **새로** 얻으면 그 점수가 내 유행도에서 차지하는 비율만큼 회복해요. 상대를 **쓰러뜨리면** 100 × 상대 유행도 ÷ (상대 + 내 유행도)%만큼 회복해요(나보다 센 상대일수록 많이). 가운데 **세이프존**에서는 1초에 2%씩 차올라요. **레벨업**하면 가득 차고, ➕ **회복 스킬**도 있어요.""",
+                    "Health, damage and flame math", """
+                    Every collision costs **health (HP)**. You can see it as the **red bar** at the bottom of the screen (`HP 82%`) and the health bar above your orb. **At 0% you are knocked out.**
+
+                    ## How damage is calculated
+
+                    **Damage (%) = 100 × attack power ÷ (attack power + the victim's trend score)**
+
+                    - **Attack power** is the attacker's current trend score. **With a 🔥 flame, attack power is 5x.**
+                    - Both sides hit each other. Example: with a trend score of 300 against 100, the other player takes **75%** and you take **25%** (the two always add up to 100%).
+                    - If you have a 🔥 flame, your attack power is 300×5 = 1,500, so the opponent takes about **94%**. You still take 25% from their counter (a normal attack).
+                    - The bigger the gap, the less the stronger side takes and the more the weaker side takes.
+                    - Damage between the same two players lands **once per second**. Inside a safe zone, or while invincible (🛡 Shield, or 3 seconds after losing a keyword), colliding does no damage.
+                    - If both reach 0% at the same moment, only the one who was hit harder is knocked out.
+
+                    ## 🔥 Flame in short
+
+                    - With a flame (combo 5) you have **5x attack power**. A flame player hitting someone without a flame wins regardless of score, and the other player loses **half** of their keywords.
+                    - Between two flames, the higher trend score wins as usual.
+                    - Losing once removes your combo and flame.
+
+                    ## Knocked out, and healing
+
+                    - At 0% you are knocked out and lose **half** of your keywords (at least 1). You return with full HP.
+                    - **Healing**: gaining a **new** keyword heals by that score's share of your trend score. **Knocking someone out** heals 100 × their trend score ÷ (theirs + yours)% (more for stronger opponents). The **safe zone** in the middle refills 2% per second. **Leveling up** fills you up, and there is also the ➕ **Heal skill**.""")
+            ,new Added("skills", "➕ 회복", """
+                    **체력을 바로 채워요.** 최대 체력의 **50%**를 한 번에 회복해요. 세이프존 밖 어디서든 쓸 수 있어요.
+
+                    - **언제 쓸까요**: 싸우다 체력이 줄었을 때, 보스에게 맞은 뒤, 세이프존까지 가기 어려울 때 써요.
+                    - 체력이 **이미 가득이면** 쓰지 않아요. 쿨타임도 쓰지 않아요.
+                    - 쓰면 내 원 안에 **초록 ➕**가 떠올라요. 다른 사람 화면에도 보여요.
+                    - 해금 레벨·키·쿨타임은 위 표를 보세요. 장착한 스킬만 쓸 수 있어요.
+
+                    > 키워드를 새로 얻거나 상대를 쓰러뜨릴 때, 레벨업할 때도 체력이 회복돼요. (자세히는 '체력(HP)과 피해량' 글)""",
+                    "➕ Heal", """
+                    **Refill your health at once.** Restores **50%** of your max HP in one go. You can use it anywhere outside the safe zone as well.
+
+                    - **When to use it**: when a fight has worn you down, after getting hit by a boss, or when the safe zone is too far away.
+                    - If your HP is **already full**, it isn't used, and no cooldown is spent.
+                    - When used, **green ➕ icons** float up inside your orb. Other players see them too.
+                    - See the table above for the unlock level, key and cooldown. Only equipped skills can be used.
+
+                    > You also heal when you gain a new keyword, take someone down, or level up. (See 'Health, damage and flame math'.)""")
+            ,new Added("arena", "🎡 돌림판", """
+                    메뉴(☰)의 **🎡 돌림판**에서 **하루에 한 번** 돌려요. **10레벨부터** 쓸 수 있어요.
+
+                    - 칸에는 **1·2·3·4·5·6·8·10·15·20**이 적혀 있어요. 멈춘 칸의 숫자만큼 🔥활성 키워드를 **바로** 받아요(최대 20개).
+                    - 어느 칸에 멈출지는 **확률**로 정해져요. 작은 숫자가 더 자주 나오고 큰 숫자일수록 드물어요.
+                    - 받은 키워드는 바로 **보관함**에 들어가요. 이미 가진 키워드가 나오면 남은 시간이 다시 24시간으로 늘어나요.
+                    - 하루가 지나면(보통 **00:00**에 초기화돼요) 다시 돌릴 수 있어요. 아직 안 돌렸으면 메뉴에 빨간 점이 떠요.
+
+                    > 초기화 시각은 운영 중에 바뀔 수 있어요.""",
+                    "🎡 Daily Wheel", """
+                    Spin the **🎡 Daily Wheel** in the menu (☰) **once a day**. It unlocks at **level 10**.
+
+                    - The slices read **1, 2, 3, 4, 5, 6, 8, 10, 15, 20**. You get that many 🔥 active keywords **right away** (up to 20).
+                    - Which slice it stops on is decided by **chance**. Small numbers come up more often and big numbers are rarer.
+                    - The keywords go straight into your **stash**. If you land on one you already hold, its remaining time resets to 24 hours.
+                    - You can spin again after the day rolls over (it usually resets at **00:00**). A red dot appears on the menu while you haven't spun yet.
+
+                    > The reset time may change during the service.""")
+            ,new Added("boss", "장로 거북이 (보스)", """
+                    매시 **정각**에 **🐢 장로 거북이**가 나타나요(1명 이상 접속 중일 때, 나타나기 1분 전에 알림이 떠요). **10분** 안에 함께 쓰러뜨리면 보상을 받아요. 나타나는 곳은 세이프존 밖이에요.
+
+                    ## 공격하기
+
+                    - 보스 몸에 **부딪히면** 내 **유행도만큼** 보스 체력이 깎여요. **🔥 불꽃이면 5배**예요. 부딪힌 나는 튕겨 나가고 **체력이 5%** 깎여요(1초에 한 번).
+                    - 보스 체력은 접속한 사람 수와 유행도에 맞춰 정해져서, 10분 안에 아슬아슬하게 잡을 수 있게 돼요.
+                    - 화면 위 보스 카드에서 **남은 체력**과 **내가 입힌 피해(전체 체력의 몇 %)**를 볼 수 있어요. 숫자가 분홍색이면 🔥 불꽃 타격이에요.
+                    - 보스는 **무적이 아니에요.** 쓰러지면 천천히 흐려지며 사라져요.
+
+                    ## 보스의 공격
+
+                    - **따라오기**: 가장 가까운 사람을 따라와요. 세이프존 안이나 은신 중이면 따라오지 않아요. 속도는 내 속도와 같아요.
+                    - 💨 **돌진**: 바닥에 붉은 길이 보이면 비켜요. 맞으면 체력이 **10%** 깎여요.
+                    - 🌊 **충격고리**: 3초 예고 뒤 몸에서 맵 전체로 퍼져요. **가까울수록 최대 33%**, 멀수록 적게(최소 5%) 깎여요. 남은 체력이 그보다 적으면 죽어요.
+                    - 공격을 쓴 뒤에는 **1초 동안 멈춰요**. 이때가 기회예요.
+                    - **세이프존 안**이거나 **🛡 무적** 중이면 보스의 공격에 맞지 않아요.
+
+                    ## 분노와 불꽃
+
+                    - 보스 체력이 **20% 이하**이거나 남은 시간이 **2분 이하**가 되면 **분노**해요. 공격을 더 자주 쓰고, **몸 접촉과 공격 피해가 2배**가 돼요(돌진 20%, 충격고리 최대 66%).
+                    - 분노하면 보스에 **🔥 불꽃**이 붙어요. **불꽃 없이 부딪히면 즉사**해요(보스에게 피해는 줘요). **🔥 불꽃이 있으면** 죽지 않고 부딪혀 싸울 수 있어요.
+
+                    > 혼자서는 어려워요. 함께 모여 불꽃을 만들고, 충격고리는 멀리서 맞으면 덜 아파요.""",
+                    "Elder Turtle (boss)", """
+                    Every hour **on the hour**, the **🐢 Elder Turtle** appears (when at least 1 player is online; a notice shows 1 minute before). Defeat it together within **10 minutes** to earn rewards. It appears outside the safe zone.
+
+                    ## Attacking
+
+                    - **Colliding** with the boss deals damage equal to your **trend score**, **5x with a 🔥 flame**. You get knocked back and lose **5% HP** (once per second).
+                    - The boss's HP is set from how many players are online and their trend scores, so it can just barely be beaten within 10 minutes.
+                    - The boss card at the top of the screen shows its **remaining HP** and **your damage (as a % of its total HP)**. Pink numbers are 🔥 flame hits.
+                    - The boss is **not invincible.** When it falls, it slowly fades away.
+
+                    ## The boss's attacks
+
+                    - **Chasing**: it follows the nearest player. It does not follow anyone inside a safe zone or in stealth. Its speed equals yours.
+                    - 💨 **Dash**: when a red path appears on the floor, step aside. Getting hit costs **10% HP**.
+                    - 🌊 **Shock ring**: after a 3-second warning it spreads from its body across the whole map. It costs **up to 33% when close** and less when far (down to 5%). If your HP is lower than that, you are knocked out.
+                    - After an attack it **freezes for 1 second**. That is your opening.
+                    - Inside a **safe zone**, or while **🛡 invincible**, the boss's attacks don't hit you.
+
+                    ## Rage and flame
+
+                    - When its HP drops to **20% or less**, or **2 minutes or less** remain, it goes into **rage**. It attacks more often, and **contact and attack damage doubles** (Dash 20%, Shock ring up to 66%).
+                    - In rage the boss gets a **🔥 flame**. **Colliding without a flame kills you instantly** (you still damage it). **With a 🔥 flame** you survive and can fight it head-on.
+
+                    > It's hard alone. Gather together, light your flames, and remember the shock ring hurts less from far away.""")
+            ,new Added("boss", "보스 보상", """
+                    **보스를 쓰러뜨리면** 보상을 받아요. 전체 피해의 **0.5% 이상** 입힌 사람이 모두 받아요.
+
+                    ## 기본 보상
+
+                    - 🔥 **활성 키워드 10개**를 받아요. 구슬과 같은 규칙으로 무작위 키워드가 보관함에 들어와요.
+
+                    ## 기여도 보상
+
+                    - 전체 피해 중 **내가 입힌 몫**만큼 **내 레벨업 바**를 채워 줘요. 몫이 30%면 **다음 레벨까지 필요한 경험치의 30%**를 받아요.
+                    - 사람마다 필요한 경험치가 달라서, 같은 30%여도 **각자 자기 레벨 기준**으로 받아요.
+                    - 혼자 거의 다 쳤다면 한 레벨을 통째로 얻을 수도 있어요.
+
+                    ## 피해 1~3위
+
+                    - 추가로 **경험치 30**과 **키워드 2개**를 더 받아요.
+
+                    ## 못 잡았다면
+
+                    - 10분 안에 못 쓰러뜨리면 참여한 사람은 **경험치 5**만 받아요. 보스를 쓰러뜨린 횟수는 올라가지 않아요.
+
+                    > 보스 처치에 참여한 횟수에 따라 **칭호**(보스 사냥 입문 → 보스 사냥꾼 → 보스 슬레이어 → 보스 정복자)도 받아요.""",
+                    "Boss rewards", """
+                    **Defeat the boss** and you earn rewards. Everyone who dealt **at least 0.5%** of its total damage gets them.
+
+                    ## Base reward
+
+                    - You get **10 🔥 active keywords**. They are random keywords added to your stash, using the same rules as orbs.
+
+                    ## Contribution reward
+
+                    - Your **share of the total damage** fills your **level bar**. A 30% share gives you **30% of the EXP needed for your next level**.
+                    - Since each player needs a different amount of EXP, the same 30% is calculated **from your own level**.
+                    - If you dealt nearly all the damage by yourself, you could even gain a whole level.
+
+                    ## Damage ranks 1 to 3
+
+                    - You get an extra **30 EXP** and **2 keywords**.
+
+                    ## If it got away
+
+                    - If the boss isn't defeated within 10 minutes, participants get only **5 EXP**, and your boss defeat count does not go up.
+
+                    > Your number of boss defeats also earns **titles** (Boss Hunt Rookie → Boss Hunter → Boss Slayer → Boss Conqueror)."""));
 }

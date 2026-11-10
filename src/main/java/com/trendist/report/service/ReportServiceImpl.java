@@ -43,6 +43,7 @@ public class ReportServiceImpl implements ReportService {
     private final com.trendist.user.service.SanctionService sanctionService;
     private final com.trendist.user.service.AdminUserService adminUsers;
     private final java.time.Clock clock;
+    private final com.trendist.common.support.DailyReset daily;
 
     @Override
     @Transactional
@@ -88,7 +89,7 @@ public class ReportServiceImpl implements ReportService {
 
         ReportType type = types.findByName(typeName).orElseThrow(() -> new IllegalStateException("report type missing: " + typeName));
         // 같은 대상은 하루에 한 번만 신고할 수 있다(신고한 사람 나라 시간대의 날짜). 플레이어 상세에서 하는 신고는 방에서 연 카드든 검색에서 연 카드든 모두 그 플레이어 신고다
-        java.time.LocalDate day = java.time.LocalDate.now(clock.withZone(java.time.ZoneId.of(me.getCountry().getTimezone())));
+        java.time.LocalDate day = daily.today(java.time.ZoneId.of(me.getCountry().getTimezone())); // 하루 경계는 설정(daily_reset_*, 기본 00:00)
         if (reports.existsByReportTypeIdAndTargetIdAndPlayerIdAndReportDate(type.getId(), targetId, me.getId(), day)) throw duplicate();
         String reason = rawReason == null ? "" : TextRules.clean(rawReason, true); // 길이(500자)는 요청 검증이 막는다
         try {

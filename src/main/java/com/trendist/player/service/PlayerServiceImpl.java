@@ -172,12 +172,14 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     @Transactional
-    public void awardMonster(long playerId, long exp, boolean cleared) {
-        players.findByIdForUpdate(playerId).ifPresent(p -> {
+    public long awardMonster(long playerId, long exp, double levelPercent, boolean cleared) {
+        return players.findByIdForUpdate(playerId).map(p -> {
             if (cleared) p.incBossKill(); // 칭호(4.35)
-            if (exp > 0) p.addExp(exp);
+            long total = exp + (levelPercent > 0 ? Math.round(levels.nextRequired(p.getLevel()) * levelPercent / 100.0) : 0); // 사람마다 다음 레벨까지 필요한 EXP가 달라 같은 %도 EXP는 다르다
+            if (total > 0) p.addExp(total);
             recompute(p);
-        });
+            return Math.max(0, total);
+        }).orElse(0L);
     }
 
     @Override

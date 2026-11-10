@@ -457,21 +457,21 @@ zoom      = 1 / (1 + (radius − 30) / 280)               // 화면 배율(4.2)
 | 29 | 호기심 많은 | 키워드를 10번 검색했어요 | METRIC | `{"metric":"search_count","gte":10}` |
 | 30 | 탐색가 | 키워드를 100번 검색했어요 | METRIC | `{"metric":"search_count","gte":100}` |
 | 31 | 정보통 | 키워드를 1,000번 검색했어요 | METRIC | `{"metric":"search_count","gte":1000}` |
-| 32 | 첫 승리 | 다른 플레이어에게서 키워드를 처음 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":1}` |
-| 33 | 사냥꾼의 본능 | 다른 플레이어에게서 키워드를 50번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":50}` |
-| 34 | 아레나의 포식자 | 다른 플레이어에게서 키워드를 300번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":300}` |
+| 32 | 첫 승리 | 키워드를 처음 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":1}` |
+| 33 | 사냥꾼의 본능 | 키워드를 50번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":50}` |
+| 34 | 아레나의 포식자 | 키워드를 300번 빼앗았어요 | METRIC | `{"metric":"steal_count","gte":300}` |
 | 35 | 봇 사냥 입문 | 봇을 10번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":10}` |
 | 36 | 봇 사냥꾼 | 봇을 100번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":100}` |
 | 37 | 기계 파괴자 | 봇을 500번 이겼어요 | METRIC | `{"metric":"bot_win_count","gte":500}` |
-| 38 | 행운 탐색자 | ? 구슬을 10개 먹었어요 | METRIC | `{"metric":"orb_count","gte":10}` |
-| 39 | 구슬 수집가 | ? 구슬을 100개 먹었어요 | METRIC | `{"metric":"orb_count","gte":100}` |
-| 40 | 구슬 마니아 | ? 구슬을 1,000개 먹었어요 | METRIC | `{"metric":"orb_count","gte":1000}` |
+| 38 | 행운 탐색자 | 구슬을 10개 먹었어요 | METRIC | `{"metric":"orb_count","gte":10}` |
+| 39 | 구슬 수집가 | 구슬을 100개 먹었어요 | METRIC | `{"metric":"orb_count","gte":100}` |
+| 40 | 구슬 마니아 | 구슬을 1,000개 먹었어요 | METRIC | `{"metric":"orb_count","gte":1000}` |
 | 41 | 오뚝이 | 키워드를 50번 잃고도 다시 일어났어요 | METRIC | `{"metric":"lose_count","gte":50}` |
 | 42 | 불굴 | 키워드를 300번 잃고도 포기하지 않았어요 | METRIC | `{"metric":"lose_count","gte":300}` |
-| 43 | 새내기 | 3일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":3}` |
-| 44 | 단골 | 7일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":7}` |
-| 45 | 터줏대감 | 30일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":30}` |
-| 46 | 산증인 | 100일 동안 키워드를 모았어요 | METRIC | `{"metric":"active_days","gte":100}` |
+| 43 | 새내기 | 키워드를 모은 날이 3일이 됐어요 | METRIC | `{"metric":"active_days","gte":3}` |
+| 44 | 단골 | 키워드를 모은 날이 7일이 됐어요 | METRIC | `{"metric":"active_days","gte":7}` |
+| 45 | 터줏대감 | 키워드를 모은 날이 30일이 됐어요 | METRIC | `{"metric":"active_days","gte":30}` |
+| 46 | 산증인 | 키워드를 모은 날이 100일이 됐어요 | METRIC | `{"metric":"active_days","gte":100}` |
 | 47 | 키워드 새싹 | 키워드를 동시에 5개 가졌어요 | METRIC | `{"metric":"hold_count","gte":5}` |
 | 48 | 키워드 달인 | 키워드를 동시에 40개 가졌어요 | METRIC | `{"metric":"hold_count","gte":40}` |
 | 49 | 키워드 거물 | 키워드를 동시에 70개 가졌어요 | METRIC | `{"metric":"hold_count","gte":70}` |
@@ -482,20 +482,24 @@ zoom      = 1 / (1 + (radius − 30) / 280)               // 화면 배율(4.2)
 | 54 | 저승사자 | 상대를 50번 쓰러뜨렸어요 | METRIC | `{"metric":"kill_count","gte":50}` |
 | 55 | 아레나의 지배자 | 상대를 200번 쓰러뜨렸어요 | METRIC | `{"metric":"kill_count","gte":200}` |
 | 56 | 최후의 승자 | 상대를 1,000번 쓰러뜨렸어요 | METRIC | `{"metric":"kill_count","gte":1000}` |
-| 57 | 첫 패배 | 처음으로 패배했어요 | METRIC | `{"metric":"death_count","gte":1}` |
-| 58 | 칠전팔기 | 10번 패배하고도 다시 일어났어요 | METRIC | `{"metric":"death_count","gte":10}` |
-| 59 | 백전노장 | 50번 패배했지만 계속 도전해요 | METRIC | `{"metric":"death_count","gte":50}` |
+| 57 | 첫 패배 | 처음으로 사망했어요 | METRIC | `{"metric":"death_count","gte":1}` |
+| 58 | 칠전팔기 | 10번 사망하고도 다시 일어났어요 | METRIC | `{"metric":"death_count","gte":10}` |
+| 59 | 백전노장 | 50번 사망했지만 계속 도전해요 | METRIC | `{"metric":"death_count","gte":50}` |
 | 60 | 불사조 | 200번 쓰러지고도 다시 날아올랐어요 | METRIC | `{"metric":"death_count","gte":200}` |
-| 61 | 끝없는 도전자 | 1,000번 패배해도 멈추지 않았어요 | METRIC | `{"metric":"death_count","gte":1000}` |
-| 62 | 연속 타격 | 연속으로 3번 빼앗았어요 | METRIC | `{"metric":"max_combo","gte":3}` |
-| 63 | 불꽃 점화 | 연속으로 5번 빼앗아 불꽃을 붙였어요 | METRIC | `{"metric":"max_combo","gte":5}` |
-| 64 | 연쇄 반응 | 연속으로 10번 빼앗았어요 | METRIC | `{"metric":"max_combo","gte":10}` |
-| 65 | 폭주 기관차 | 연속으로 20번 빼앗았어요 | METRIC | `{"metric":"max_combo","gte":20}` |
-| 66 | 멈추지 않는 불꽃 | 연속으로 40번 빼앗았어요 | METRIC | `{"metric":"max_combo","gte":40}` |
+| 61 | 끝없는 도전자 | 1,000번 사망해도 멈추지 않았어요 | METRIC | `{"metric":"death_count","gte":1000}` |
+| 62 | 연속 타격 | 콤보를 3 달성했어요 | METRIC | `{"metric":"max_combo","gte":3}` |
+| 63 | 불꽃 점화 | 콤보를 5 달성해 불꽃을 붙였어요 | METRIC | `{"metric":"max_combo","gte":5}` |
+| 64 | 연쇄 반응 | 콤보를 10 달성했어요 | METRIC | `{"metric":"max_combo","gte":10}` |
+| 65 | 폭주 기관차 | 콤보를 20 달성했어요 | METRIC | `{"metric":"max_combo","gte":20}` |
+| 66 | 멈추지 않는 불꽃 | 콤보를 40 달성했어요 | METRIC | `{"metric":"max_combo","gte":40}` |
 | 67 | 불 끄미 | 상대의 불꽃을 처음 꺼뜨렸어요 | METRIC | `{"metric":"flame_out_count","gte":1}` |
 | 68 | 소방관 | 상대의 불꽃을 10번 꺼뜨렸어요 | METRIC | `{"metric":"flame_out_count","gte":10}` |
 | 69 | 화재 진압 대장 | 상대의 불꽃을 50번 꺼뜨렸어요 | METRIC | `{"metric":"flame_out_count","gte":50}` |
-| 70 | 100 콤보 | 연속으로 100번 빼앗았어요 | METRIC | `{"metric":"max_combo","gte":100}` |
+| 70 | 100 콤보 | 콤보를 100 달성했어요 | METRIC | `{"metric":"max_combo","gte":100}` |
+| 71 | 보스 사냥 입문 | 보스 처치에 처음 참여했어요 | METRIC | `{"metric":"boss_kill_count","gte":1}` |
+| 72 | 보스 사냥꾼 | 보스 처치에 5번 참여했어요 | METRIC | `{"metric":"boss_kill_count","gte":5}` |
+| 73 | 보스 슬레이어 | 보스 처치에 25번 참여했어요 | METRIC | `{"metric":"boss_kill_count","gte":25}` |
+| 74 | 보스 정복자 | 보스 처치에 100번 참여했어요 | METRIC | `{"metric":"boss_kill_count","gte":100}` |
 
 ### 4.11 다른 플레이어 정보 팝업
 
@@ -954,7 +958,7 @@ AI 한 줄 설명
 
 **보상과 실패**
 - 참여 인정: 입힌 피해가 보스 최대 체력의 `reward_min_share`(0.5%) 이상.
-- 처치 성공(**기여도 비례**, 4.35): 참여자 모두 기본 EXP `reward_exp`(30)와 무작위 🔥 키워드 `reward_keywords`(2)개를 받고, **전체 피해 중 내 몫**만큼 EXP `reward_exp_pool`(300 × 몫)과 키워드 `reward_keyword_pool`(4 × 몫, 반올림)을 더 받는다(기본+기여도 키워드는 `reward_keywords_max`(5)개까지). **피해 1~3위**는 EXP `reward_top_exp`(+30)와 키워드 `reward_top_keywords`(+2)를 더 받는다. 키워드는 ! 구슬과 같은 규칙(이미 가진 키워드면 남은 시간만 갱신)이고, 처치 횟수(`players.boss_kill_count`)가 +1이다. 접속 중이면 보상 카드가 뜬다.
+- 처치 성공(**기여도 비례**, 4.35): 참여자 모두 기본 EXP `reward_exp`(0, 없음)와 무작위 🔥 활성 키워드 `reward_keywords`(10)개를 받고(키워드는 ! 구슬과 같은 규칙이라 이미 가진 키워드면 남은 시간만 갱신), **전체 피해 중 내 몫**만큼 **레벨 진행 %**를 받는다: 내 몫 × `reward_level_percent`(100)%를, **받는 사람 자신의 "다음 레벨까지 필요한 EXP"**에 곱해 EXP로 준다(몫 30%면 자기 레벨업 바의 30%이고, 레벨마다 필요 EXP가 달라 사람마다 EXP는 다르다). 피해 1~3위는 EXP `reward_top_exp`(+30)와 키워드 `reward_top_keywords`(+2)를 더 받는다. 처치 횟수(`players.boss_kill_count`)가 +1이다. 접속 중이면 보상 카드가 뜬다(받은 EXP와 키워드).
 - 시간 초과: 참여자에게 EXP `fail_exp`(5)만 준다(키워드·처치 횟수 없음, 패널티 없음). 관리자 [제거]는 보상이 없고 [처치 처리]는 처치와 같다.
 - 모두에게: 끝나면 결과와 **피해 TOP 5**가 카드로 뜬다.
 

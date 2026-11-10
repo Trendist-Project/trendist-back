@@ -7,7 +7,6 @@ import com.trendist.player.entity.Player;
 import com.trendist.player.entity.PopularityVote;
 import com.trendist.player.repository.PlayerRepository;
 import com.trendist.player.repository.PopularityVoteRepository;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -29,7 +28,7 @@ public class PopularityServiceImpl implements PopularityService {
     private final PlayerRepository players;
     private final PopularityVoteRepository votes;
     private final RateLimiter rateLimiter;
-    private final Clock clock;
+    private final com.trendist.common.support.DailyReset daily;
 
     @Override
     @Transactional
@@ -81,7 +80,7 @@ public class PopularityServiceImpl implements PopularityService {
     }
 
     private LocalDate today(Player me) {
-        return LocalDate.now(clock.withZone(ZoneId.of(me.getCountry().getTimezone())));
+        return daily.today(ZoneId.of(me.getCountry().getTimezone())); // 하루 경계는 설정(daily_reset_*, 기본 00:00)
     }
 
     private static ApiException done() {

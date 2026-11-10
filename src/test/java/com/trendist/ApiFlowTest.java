@@ -407,7 +407,7 @@ class ApiFlowTest {
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("행운 탐색자", "트렌드 워처");
         java.util.List<String> all = JsonPath.read(json, "$.titles[*].name");
-        assertThat(all).hasSize(71);
+        assertThat(all).hasSize(75);
         // 칭호함은 종류별 순서다: 트렌드 워처 다음이 새로 넣은 트렌드 탐험가
         assertThat(all.subList(0, 3)).containsExactly("트렌드 워처", "트렌드 탐험가", "트렌드 수집가");
     }
@@ -426,6 +426,43 @@ class ApiFlowTest {
         String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
         java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
         assertThat(names).contains("첫 처치");
+    }
+
+    @Test
+    void bossRewardGivesTheContributionAsAPercentOfThePlayersOwnNextLevelExp() throws Exception {
+        // 4.35: 보스 보상의 기여도 몫은 "레벨 진행 %"다. 받는 사람 자신의 다음 레벨까지 필요한 EXP의 그 %를 EXP로 준다(사람마다 EXP는 다르다)
+        String t = player("보스보상");
+        long pid = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.id"));
+        long exp0 = totalExp(pid);
+        long need = Long.parseLong(body(mvc.perform(get("/api/me").header("Authorization", "Bearer " + t)).andReturn(), "$.player.nextLevelExp"));
+        long got = playerService.awardMonster(pid, 7, 50.0, true);       // 고정 7 + 다음 레벨 필요 EXP의 50%
+        assertThat(got).isEqualTo(7 + Math.round(need * 0.5));
+        assertThat(totalExp(pid)).isEqualTo(exp0 + got);
+        assertThat(playerRepo.findById(pid).orElseThrow().getBossKillCount()).isEqualTo(1);
+        playerService.recordSteal(pid); // 보스 처치 참여 칭호는 처치 보상 뒤 칭호 검사에서 받는다(검사를 한 번 더 돌려 확인)
+        String json = mvc.perform(get("/api/me/titles").header("Authorization", "Bearer " + t)).andReturn().getResponse().getContentAsString();
+        java.util.List<String> names = JsonPath.read(json, "$.titles[?(@.owned == true)].name");
+        assertThat(names).contains("보스 사냥 입문");
+    }
+
+    @Test
+    void dailyWheelCanBeSpunOnlyOncePerDayAndPaysTheNumberOnTheSlice() throws Exception {
+        String t = player("돌림판시험");
+        mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t)) // 10레벨부터: 1레벨은 잠겨 있다
+                .andExpect(status().isOk()).andExpect(jsonPath("$.locked").value(true)).andExpect(jsonPath("$.available").value(false)).andExpect(jsonPath("$.requiredLevel").value(10));
+        mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
+        level(t, 12);
+        mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.locked").value(false)).andExpect(jsonPath("$.available").value(true)).andExpect(jsonPath("$.slices.length()").value(10))
+                .andExpect(jsonPath("$.slices[9]").value(20)).andExpect(jsonPath("$.todayReward").doesNotExist());
+        String json = mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        int index = JsonPath.read(json, "$.index"), reward = JsonPath.read(json, "$.reward");
+        assertThat(index).isBetween(0, 9);
+        assertThat(reward).isEqualTo(com.trendist.wheel.service.WheelService.SLICES[index]).isLessThanOrEqualTo(20);
+        mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t))
+                .andExpect(jsonPath("$.available").value(false)).andExpect(jsonPath("$.todayReward").value(reward));
+        mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isConflict()); // 오늘은 이미 돌렸다
     }
 
     @Test

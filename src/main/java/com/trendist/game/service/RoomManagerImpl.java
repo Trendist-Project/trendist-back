@@ -397,15 +397,15 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             catch (RuntimeException e) { log.warn("monster finish record failed for spawn {}", result.spec().spawnId(), e); }
             for (var rw : result.rewards()) {
                 try {
-                    playerService.awardMonster(rw.playerId(), rw.exp(), rw.cleared());
+                    long gotExp = playerService.awardMonster(rw.playerId(), rw.exp(), rw.levelPercent(), rw.cleared());
                     java.util.List<String> texts = new java.util.ArrayList<>();
                     for (int i = 0; i < rw.keywords(); i++) {
-                        KeywordDtos.OrbResult r = keywordService.openPrizeOrb(rw.playerId()); // ! 구슬과 같은 규칙: 무작위 🔥 키워드 하나
+                        KeywordDtos.OrbResult r = keywordService.grantRewardKeyword(rw.playerId()); // ! 구슬과 같은 규칙(구슬 횟수는 세지 않음): 무작위 🔥 키워드 하나
                         if (("GAINED".equals(r.status()) || "RENEWED".equals(r.status())) && r.text() != null) texts.add(r.text());
                     }
                     Map<String, Object> msg = new HashMap<>();
                     msg.put("type", "monsterReward"); msg.put("name", result.spec().name()); msg.put("en", result.spec().nameEn());
-                    msg.put("cleared", rw.cleared()); msg.put("rank", rw.rank()); msg.put("damage", rw.damage()); msg.put("exp", rw.exp()); msg.put("keywords", texts);
+                    msg.put("cleared", rw.cleared()); msg.put("rank", rw.rank()); msg.put("damage", rw.damage()); msg.put("exp", gotExp); msg.put("levelPercent", Math.round(rw.levelPercent() * 10) / 10.0); msg.put("keywords", texts);
                     room.submit(r -> { Room.Member m = r.byPlayer(rw.playerId()); if (m != null) sendText(m, msg); });
                 } catch (RuntimeException e) {
                     log.warn("monster reward failed for player {}", rw.playerId(), e);

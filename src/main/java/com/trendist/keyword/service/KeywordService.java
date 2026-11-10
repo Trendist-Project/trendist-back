@@ -127,6 +127,9 @@ public interface KeywordService {
     /** ! 구슬을 먹었다(4.20). 꽝 없이 항상 🔥 키워드를 얻는다(가능하면 내 보관함에 없는 것). */
     KeywordDtos.OrbResult openPrizeOrb(long playerId);
 
+    /** 보스 처치 보상 키워드 하나(4.35): ! 구슬과 같은 규칙으로 🔥 키워드를 얻지만 구슬을 먹은 횟수(orb_count)와 구슬 통계에는 세지 않는다. */
+    KeywordDtos.OrbResult grantRewardKeyword(long playerId);
+
     /**
      * 봇을 이긴 보상(4.21): 그 나라 🔥 키워드 중 하나를 무작위로 얻는다. 없던 키워드는 일반 추가와 같이 넣고(EXP +1, 24시간),
      * 이미 가진 키워드면 사람에게서 빼앗을 때(4.3)처럼 남은 시간만 지금부터 다시 24시간으로 늘린다(점수·EXP 그대로).

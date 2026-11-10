@@ -375,6 +375,10 @@ public class DataSeeder implements ApplicationRunner {
         for (String[] t : COMBO_EXTRA_TITLES) {
             if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
         }
+        // 보스 처치 참여 횟수 칭호(4.35): 나중에 더했으므로 같은 조건의 칭호가 없을 때만 한 번 넣는다
+        for (String[] t : BOSS_TITLES) {
+            if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
+        }
         // 유행도가 같은 상대와 부딪힌 횟수 칭호(4.3): 나중에 더했으므로 같은 조건의 칭호가 없을 때만 한 번 넣는다
         for (String[] t : TIE_TITLES) {
             if (titles.findAll().stream().noneMatch(x -> x.getName().equals(t[0]) || sameCondition(x.getConditionParams(), t[3]))) { titles.save(new Title(t[0], t[1], t[2], t[3], titleOrder(t[0]))); added++; }
@@ -441,21 +445,21 @@ public class DataSeeder implements ApplicationRunner {
             {"호기심 많은", "키워드를 10번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":10}"},
             {"탐색가", "키워드를 100번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":100}"},
             {"정보통", "키워드를 1,000번 검색했어요", "METRIC", "{\"metric\":\"search_count\",\"gte\":1000}"},
-            {"첫 승리", "다른 플레이어에게서 키워드를 처음 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":1}"},
-            {"사냥꾼의 본능", "다른 플레이어에게서 키워드를 50번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":50}"},
-            {"아레나의 포식자", "다른 플레이어에게서 키워드를 300번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":300}"},
+            {"첫 승리", "키워드를 처음 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":1}"},
+            {"사냥꾼의 본능", "키워드를 50번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":50}"},
+            {"아레나의 포식자", "키워드를 300번 빼앗았어요", "METRIC", "{\"metric\":\"steal_count\",\"gte\":300}"},
             {"봇 사냥 입문", "봇을 10번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":10}"},
             {"봇 사냥꾼", "봇을 100번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":100}"},
             {"기계 파괴자", "봇을 500번 이겼어요", "METRIC", "{\"metric\":\"bot_win_count\",\"gte\":500}"},
-            {"행운 탐색자", "? 구슬을 10개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":10}"},
-            {"구슬 수집가", "? 구슬을 100개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":100}"},
-            {"구슬 마니아", "? 구슬을 1,000개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":1000}"},
+            {"행운 탐색자", "구슬을 10개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":10}"},
+            {"구슬 수집가", "구슬을 100개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":100}"},
+            {"구슬 마니아", "구슬을 1,000개 먹었어요", "METRIC", "{\"metric\":\"orb_count\",\"gte\":1000}"},
             {"오뚝이", "키워드를 50번 잃고도 다시 일어났어요", "METRIC", "{\"metric\":\"lose_count\",\"gte\":50}"},
             {"불굴", "키워드를 300번 잃고도 포기하지 않았어요", "METRIC", "{\"metric\":\"lose_count\",\"gte\":300}"},
-            {"새내기", "3일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":3}"},
-            {"단골", "7일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":7}"},
-            {"터줏대감", "30일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":30}"},
-            {"산증인", "100일 동안 키워드를 모았어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":100}"},
+            {"새내기", "키워드를 모은 날이 3일이 됐어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":3}"},
+            {"단골", "키워드를 모은 날이 7일이 됐어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":7}"},
+            {"터줏대감", "키워드를 모은 날이 30일이 됐어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":30}"},
+            {"산증인", "키워드를 모은 날이 100일이 됐어요", "METRIC", "{\"metric\":\"active_days\",\"gte\":100}"},
             {"키워드 새싹", "키워드를 동시에 5개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":5}"},
             {"키워드 달인", "키워드를 동시에 40개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":40}"},
             {"키워드 거물", "키워드를 동시에 70개 가졌어요", "METRIC", "{\"metric\":\"hold_count\",\"gte\":70}"},
@@ -474,20 +478,28 @@ public class DataSeeder implements ApplicationRunner {
 
     /** 패배 횟수 칭호(4.31) 5개: 지는 것을 비웃지 않고 다시 일어서는 것을 칭찬하는 이름 */
     private static final String[][] DEFEAT_TITLES = {
-            {"첫 패배", "처음으로 패배했어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1}"},
-            {"칠전팔기", "10번 패배하고도 다시 일어났어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":10}"},
-            {"백전노장", "50번 패배했지만 계속 도전해요", "METRIC", "{\"metric\":\"death_count\",\"gte\":50}"},
+            {"첫 패배", "처음으로 사망했어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1}"},
+            {"칠전팔기", "10번 사망하고도 다시 일어났어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":10}"},
+            {"백전노장", "50번 사망했지만 계속 도전해요", "METRIC", "{\"metric\":\"death_count\",\"gte\":50}"},
             {"불사조", "200번 쓰러지고도 다시 날아올랐어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":200}"},
-            {"끝없는 도전자", "1,000번 패배해도 멈추지 않았어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1000}"},
+            {"끝없는 도전자", "1,000번 사망해도 멈추지 않았어요", "METRIC", "{\"metric\":\"death_count\",\"gte\":1000}"},
+    };
+
+    /** 보스 처치 참여 횟수 칭호(4.35): 처치에 성공하고 참여 보상을 받은 횟수(boss_kill_count) */
+    private static final String[][] BOSS_TITLES = {
+            {"보스 사냥 입문", "보스 처치에 처음 참여했어요", "METRIC", "{\"metric\":\"boss_kill_count\",\"gte\":1}"},
+            {"보스 사냥꾼", "보스 처치에 5번 참여했어요", "METRIC", "{\"metric\":\"boss_kill_count\",\"gte\":5}"},
+            {"보스 슬레이어", "보스 처치에 25번 참여했어요", "METRIC", "{\"metric\":\"boss_kill_count\",\"gte\":25}"},
+            {"보스 정복자", "보스 처치에 100번 참여했어요", "METRIC", "{\"metric\":\"boss_kill_count\",\"gte\":100}"},
     };
 
     /** 최고 콤보 칭호(4.25) 5개: 연속으로 빼앗을수록 불꽃이 거세진다 */
     private static final String[][] COMBO_TITLES = {
-            {"연속 타격", "연속으로 3번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":3}"},
-            {"불꽃 점화", "연속으로 5번 빼앗아 불꽃을 붙였어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":5}"},
-            {"연쇄 반응", "연속으로 10번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":10}"},
-            {"폭주 기관차", "연속으로 20번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":20}"},
-            {"멈추지 않는 불꽃", "연속으로 40번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":40}"},
+            {"연속 타격", "콤보를 3 달성했어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":3}"},
+            {"불꽃 점화", "콤보를 5 달성해 불꽃을 붙였어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":5}"},
+            {"연쇄 반응", "콤보를 10 달성했어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":10}"},
+            {"폭주 기관차", "콤보를 20 달성했어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":20}"},
+            {"멈추지 않는 불꽃", "콤보를 40 달성했어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":40}"},
     };
 
     /** 유행도가 같은 상대와 부딪힌 횟수 칭호(4.3): 승패가 없는 박빙의 싸움을 놀리듯 부르는 이름 */
@@ -497,7 +509,7 @@ public class DataSeeder implements ApplicationRunner {
 
     /** 나중에 더한 최고 콤보 칭호(4.25): 100 콤보 */
     private static final String[][] COMBO_EXTRA_TITLES = {
-            {"100 콤보", "연속으로 100번 빼앗았어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":100}"},
+            {"100 콤보", "콤보를 100 달성했어요", "METRIC", "{\"metric\":\"max_combo\",\"gte\":100}"},
     };
 
     /** 불꽃 끄기 칭호(4.25) 3개: 불타는 상대를 쓰러뜨린 사람 */
@@ -526,6 +538,7 @@ public class DataSeeder implements ApplicationRunner {
             "연속 타격", "불꽃 점화", "연쇄 반응", "폭주 기관차", "멈추지 않는 불꽃",
             "100 콤보",
             "불 끄미", "소방관", "화재 진압 대장",
+            "보스 사냥 입문", "보스 사냥꾼", "보스 슬레이어", "보스 정복자",
             "새내기", "단골", "터줏대감", "산증인");
 
     /** 이동 효과(4.23): 코드, 이름, 설명. 처음에는 모두 조건 없이(FREE) 쓸 수 있다. 순서가 고르는 화면의 순서다 */

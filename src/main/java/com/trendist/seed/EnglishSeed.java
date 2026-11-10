@@ -51,9 +51,9 @@ final class EnglishSeed {
             t("호기심 많은", "Curious", "Searched for keywords 10 times"),
             t("탐색가", "Seeker", "Searched for keywords 100 times"),
             t("정보통", "Insider", "Searched for keywords 1,000 times"),
-            t("첫 승리", "First Win", "Stole a keyword from another player for the first time"),
-            t("사냥꾼의 본능", "Hunter's Instinct", "Stole keywords from other players 50 times"),
-            t("아레나의 포식자", "Arena Predator", "Stole keywords from other players 300 times"),
+            t("첫 승리", "First Win", "Stole a keyword for the first time"),
+            t("사냥꾼의 본능", "Hunter's Instinct", "Stole keywords 50 times"),
+            t("아레나의 포식자", "Arena Predator", "Stole keywords 300 times"),
             t("봇 사냥 입문", "Bot Hunting 101", "Beat a bot 10 times"),
             t("봇 사냥꾼", "Bot Hunter", "Beat a bot 100 times"),
             t("기계 파괴자", "Machine Breaker", "Beat a bot 500 times"),
@@ -62,30 +62,34 @@ final class EnglishSeed {
             t("저승사자", "Reaper", "Took down opponents 50 times"),
             t("아레나의 지배자", "Arena Overlord", "Took down opponents 200 times"),
             t("최후의 승자", "Last One Standing", "Took down opponents 1,000 times"),
-            t("첫 패배", "First Defeat", "Lost for the first time"),
-            t("칠전팔기", "Never Give Up", "Got back up after 10 defeats"),
-            t("백전노장", "Battle-Hardened", "Lost 50 times but keep challenging"),
+            t("첫 패배", "First Defeat", "Died for the first time"),
+            t("칠전팔기", "Never Give Up", "Got back up after dying 10 times"),
+            t("백전노장", "Battle-Hardened", "Died 50 times but keep challenging"),
             t("불사조", "Phoenix", "Fell 200 times and rose again"),
-            t("끝없는 도전자", "Endless Challenger", "Kept going after 1,000 defeats"),
+            t("끝없는 도전자", "Endless Challenger", "Kept going after dying 1,000 times"),
             t("도토리 키재기", "Acorn Contest", "Bumped into equally matched opponents 10 times"),
-            t("연속 타격", "Combo Starter", "Took keywords 3 times in a row"),
-            t("불꽃 점화", "Ignition", "Took keywords 5 times in a row and lit the flame"),
-            t("연쇄 반응", "Chain Reaction", "Took keywords 10 times in a row"),
-            t("폭주 기관차", "Runaway Train", "Took keywords 20 times in a row"),
-            t("멈추지 않는 불꽃", "Unstoppable Flame", "Took keywords 40 times in a row"),
-            t("100 콤보", "100 Combo", "Took keywords 100 times in a row"),
+            t("연속 타격", "Combo Starter", "Reached a combo of 3"),
+            t("불꽃 점화", "Ignition", "Reached a combo of 5 and lit the flame"),
+            t("연쇄 반응", "Chain Reaction", "Reached a combo of 10"),
+            t("폭주 기관차", "Runaway Train", "Reached a combo of 20"),
+            t("멈추지 않는 불꽃", "Unstoppable Flame", "Reached a combo of 40"),
+            t("100 콤보", "100 Combo", "Reached a combo of 100"),
+            t("보스 사냥 입문", "Boss Hunt Rookie", "Took part in defeating a boss for the first time"),
+            t("보스 사냥꾼", "Boss Hunter", "Took part in defeating bosses 5 times"),
+            t("보스 슬레이어", "Boss Slayer", "Took part in defeating bosses 25 times"),
+            t("보스 정복자", "Boss Conqueror", "Took part in defeating bosses 100 times"),
             t("불 끄미", "Flame Snuffer", "Put out an opponent's flame for the first time"),
             t("소방관", "Firefighter", "Put out opponents' flames 10 times"),
             t("화재 진압 대장", "Fire Chief", "Put out opponents' flames 50 times"),
-            t("행운 탐색자", "Lucky Seeker", "Ate 10 ? orbs"),
-            t("구슬 수집가", "Orb Collector", "Ate 100 ? orbs"),
-            t("구슬 마니아", "Orb Maniac", "Ate 1,000 ? orbs"),
+            t("행운 탐색자", "Lucky Seeker", "Ate 10 orbs"),
+            t("구슬 수집가", "Orb Collector", "Ate 100 orbs"),
+            t("구슬 마니아", "Orb Maniac", "Ate 1,000 orbs"),
             t("오뚝이", "Comeback Kid", "Lost 50 keywords and got back up"),
             t("불굴", "Unyielding", "Lost 300 keywords and never gave up"),
-            t("새내기", "Newcomer", "Collected keywords for 3 days"),
-            t("단골", "Regular", "Collected keywords for 7 days"),
-            t("터줏대감", "Old-Timer", "Collected keywords for 30 days"),
-            t("산증인", "Living Witness", "Collected keywords for 100 days"));
+            t("새내기", "Newcomer", "Collected keywords on 3 different days"),
+            t("단골", "Regular", "Collected keywords on 7 different days"),
+            t("터줏대감", "Old-Timer", "Collected keywords on 30 different days"),
+            t("산증인", "Living Witness", "Collected keywords on 100 different days"));
 
     private static Map.Entry<String, Title> t(String ko, String nameEn, String descriptionEn) {
         return Map.entry(ko, new Title(nameEn, descriptionEn));
@@ -156,18 +160,21 @@ final class EnglishSeed {
             )),
             new Category("score-and-size", "⚔️ Score and fights", List.of(
                     new Article("Trend score and orb size", """
-                            Your orb's size is set by your **trend score**: the total of the scores of the keywords you hold. **Your level and EXP do not affect size.**
+                            Your orb's size is set by your **trend score**: the total of the scores of the 🔥 active keywords you hold plus **your level** (1 point per level). **EXP does not affect size.**
 
                             - When others also hold a keyword you hold, its score rises and your orb grows.
                             - When a keyword expires or is stolen, your orb shrinks.
-                            - As your orb grows, the view zooms out a little. Speed is the same for everyone regardless of size."""),
+                            - As your orb grows, the view zooms out a little. Speed is the same for everyone regardless of size.
+
+                            > To see how scores are calculated, read 'How is trend score calculated?'."""),
                     new Article("What happens when orbs collide?", """
                             - Orbs bounce off each other. If the size gap is big, only the smaller one gets knocked far away.
                             - Of the two, the one with the **lower trend score** loses a keyword, and the winner **steals** it. If the scores are equal, nobody loses anything. Size doesn't decide who wins.
-                            - The exception is anyone on **🔥 flame**. Against someone without a flame they win no matter the score, and the other player loses **all** their keywords. (See "Combos and flame" below.)
+                            - The exception is anyone on **🔥 flame**. Against someone without a flame they win no matter the score, and the other player loses **half** of their keywords. (See "Combos and flame" below.)
                             - If the stolen keyword is already in your stash, its remaining time resets to 24 hours.
                             - You can search for a keyword you lost and add it again right away.
-                            - **If you lose while holding no keywords**, you are knocked out. (See 'Knockouts and respawning' below.)
+                            - Every collision also costs **health (HP)**. See 'Health, damage and flame math' for the numbers.
+                            - **If your HP reaches 0%, or you lose while holding no keywords**, you are knocked out. (See 'Knockouts and respawning' below.)
                             - Inside a **safe zone** you don't collide with anyone.
 
                             ## The result cards at the top of the screen
@@ -184,7 +191,7 @@ final class EnglishSeed {
                             Steal keywords **back to back** from collisions and you build a combo. You'll see something like **⚔️ 3 Combo** at the top of the screen.
 
                             - At **5 Combo**, a **🔥 flame** ignites around your orb. Everyone can see it.
-                            - Keywords you win from bots count toward the combo too.
+                            - Keywords you win from bots, and **hitting a boss**, count toward the combo too.
                             - If you lose a keyword in a fight even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
                             - If **5 minutes** pass after your last combo gain without a new one, the combo and flame fade away. Every new combo restarts the 5 minutes. The time left shows on the combo card (under the leaderboard at the top right).
                             - If you refresh or leave and come back, your combo starts again from **0**.
@@ -192,11 +199,11 @@ final class EnglishSeed {
 
                             ## 🔥 The power of flame
 
-                            - **When a flame player hits a player without a flame**: The flame side wins regardless of trend score, and the other player loses **all** their keywords. The flame side's combo goes up by 1.
+                            - **When a flame player hits a player without a flame**: The flame side wins regardless of trend score, and the other player loses **half** of their keywords. The flame side's combo goes up by 1. The HP damage uses **5x attack power** too.
                             - **When both have a flame**: As usual, the higher trend score wins. The loser's combo and flame disappear and they lose one keyword.
-                            - Against a **bot** the same rules apply. If you have a flame and hit a bot without one, you wipe out its keywords; if a flaming bot hits you and you have no flame, you lose all your keywords.
+                            - Against a **bot** the same rules apply. If you have a flame and hit a bot without one, you take half of its keywords; if a flaming bot hits you and you have no flame, you lose half of your keywords.
                             - The flame side stays **in place** when you collide; only the player without a flame is knocked back.
-                            - If you lose all your keywords, you're invincible for 3 seconds. Also, as many **red ! orbs** as **half of your lost 🔥 Active keywords** (rounded up, at least 1 if you had any active) drop around that spot. Anyone can pick them up.
+                            - If you lose keywords, you're invincible for 3 seconds. Also, as many **red ! orbs** as **half of your lost 🔥 Active keywords** (rounded up, at least 1 if you had any active) drop around that spot. Anyone can pick them up.
 
                             > A flame is both a trophy and a weapon. It doesn't affect your size, but it goes out the moment you lose, so be careful."""),
                     new Article("NPC bots", """

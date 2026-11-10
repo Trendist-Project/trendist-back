@@ -213,7 +213,7 @@ CREATE TABLE players (
   bot_win_count       BIGINT NOT NULL DEFAULT 0 COMMENT '봇을 이겨 보상을 받은 횟수(칭호용)',
   kill_count          BIGINT NOT NULL DEFAULT 0 COMMENT '처치 횟수: 키워드가 없는 상대(사람·봇)를 쓰러뜨린 횟수(칭호용, 줄지 않음, 4.31)',
   boss_kill_count  BIGINT NOT NULL DEFAULT 0 COMMENT '보스를 쓰러뜨린 횟수: 처치 성공 보상을 받은 횟수(4.35, 칭호용)',
-  death_count        BIGINT NOT NULL DEFAULT 0 COMMENT '사망한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 칭호용, 4.31)',
+  death_count        BIGINT NOT NULL DEFAULT 0 COMMENT '사망한 횟수: 져서 죽은 모든 경우(사람만, 칭호용, 4.31)',
   orb_count           BIGINT NOT NULL DEFAULT 0 COMMENT '? 구슬을 먹은 횟수(꽝 포함, 칭호용)',
   lose_count          BIGINT NOT NULL DEFAULT 0 COMMENT '충돌로 키워드를 잃은 횟수(칭호용)',
   popularity          BIGINT NOT NULL DEFAULT 0 COMMENT '인기도(다른 플레이어가 하루 한 번 올리면 +1, 내리면 -1, 음수 가능, 4.34)',

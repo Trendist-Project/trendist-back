@@ -21,7 +21,7 @@ public abstract class Monster {
     public record Result(Spec spec, String status, long maxHp, long finalHp, List<Part> parts, List<Reward> rewards) {}
     public record Part(long playerId, String nickname, long damage, int hits) {}
     /** exp·keywords는 줄 양, cleared는 처치 성공 보상인지(처치 횟수 +1) */
-    public record Reward(long playerId, int rank, long damage, long exp, int keywords, boolean cleared) {}
+    public record Reward(long playerId, int rank, long damage, long exp, double levelPercent, int keywords, boolean cleared) {}
     /** 등장 직후 정해진 체력과 그때의 접속 사람 수·평균·1등 유행도 */
     public record Start(long maxHp, int humans, long avgScore, long topScore) {}
 
@@ -96,14 +96,16 @@ public abstract class Monster {
             if (l.damage <= 0 || l.damage < minShare) continue;
             boolean top = rank <= 3;
             if (KILLED.equals(status)) {
-                // 기여도 비례: 전체 피해에서 내가 차지한 몫(0~1)만큼 EXP 풀과 키워드 풀을 나눠 받는다. 참여만 해도 기본 보상은 있다
+                // 기여도 비례: 전체 피해에서 내가 차지한 몫(0~1)만큼 레벨 진행(%)을 받는다. 그 %는 받는 사람 자신의 "다음 레벨까지 필요 EXP" 기준이라 사람마다 EXP가 다르다
+                // (실제 EXP로 바꾸는 것은 보상을 줄 때 PlayerService). 기본 EXP·키워드는 참여만 해도 받는다
                 double share = totalDamage > 0 ? l.damage / totalDamage : 0;
-                long exp = Math.round(p(room, "reward_exp") + p(room, "reward_exp_pool") * share + (top ? p(room, "reward_top_exp") : 0));
+                double levelPercent = p(room, "reward_level_percent") * share;
+                long exp = Math.round(p(room, "reward_exp") + (top ? p(room, "reward_top_exp") : 0));
                 int kw = (int) Math.round(Math.min(p(room, "reward_keywords_max"), p(room, "reward_keywords") + p(room, "reward_keyword_pool") * share) + (top ? p(room, "reward_top_keywords") : 0));
-                rewards.add(new Reward(e.getKey(), rank, l.damage, exp, kw, true));
+                rewards.add(new Reward(e.getKey(), rank, l.damage, exp, levelPercent, kw, true));
             } else if (TIMEOUT.equals(status)) {
                 long exp = Math.round(p(room, "fail_exp"));
-                if (exp > 0) rewards.add(new Reward(e.getKey(), rank, l.damage, exp, 0, false));
+                if (exp > 0) rewards.add(new Reward(e.getKey(), rank, l.damage, exp, 0, 0, false));
             }
         }
         return new Result(spec, status, maxHp, Math.max(0, hp), parts, rewards);

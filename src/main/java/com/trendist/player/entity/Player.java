@@ -41,21 +41,21 @@ public class Player extends BaseTimeEntity {
     /** 마지막으로 키워드를 얻은 시각(처음 만든 시각 포함). 활동한 날을 셀 때 하루에 한 번만 세는 기준이다 */
     @Column(name = "last_played_at", columnDefinition = "DATETIME(6)") private Instant lastPlayedAt;
     // 칭호용 누적 수치(4.10). 모두 줄지 않는다. 컬럼을 추가할 때 기존 행에도 0이 들어가게 DEFAULT를 둔다
-    /** 다른 플레이어에게서 키워드를 빼앗은 횟수(4.3) */
+    /** 공격에 성공한 횟수(키워드를 빼앗거나 잃게 했을 때, 사람·봇 모두, 4.3) */
     @Column(name = "steal_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long stealCount;
     /** 봇을 이겨 보상을 받은 횟수(4.21) */
     @Column(name = "bot_win_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long botWinCount;
-    /** ? 구슬을 먹은 횟수(꽝 포함, 4.20) */
+    /** 구슬(? 구슬·! 구슬)을 먹은 횟수(꽝 포함, 보스 보상은 제외, 4.20) */
     @Column(name = "orb_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long orbCount;
     /** 충돌로 키워드를 잃은 횟수(4.3) */
     @Column(name = "lose_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long loseCount;
     /** 죽인 횟수: 키워드가 없는 사람·봇을 쓰러뜨린 횟수(4.31) */
     @Column(name = "kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long killCount;
-    /** 패배한 횟수: 키워드가 없는 채로 져서 죽은 횟수(사람만, 4.31) */
+    /** 사망한 횟수: 져서 죽은 모든 경우(키워드 없이·체력 0·보스 즉사, 사람만, 4.31) */
     @Column(name = "death_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long deathCount;
     /** 현재 유행도가 같은 원과 부딪힌 횟수(사람만, 같은 상대와는 1초에 한 번만 센다, 4.3) */
     @Column(name = "tie_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long tieCount;
-    /** 몬스터(보스)를 쓰러뜨리는 데 참여한 횟수(4.35) */
+    /** 보스 처치에 참여해 보상을 받은 횟수(4.35) */
     @Column(name = "boss_kill_count", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long bossKillCount;
     /** 가장 높았던 연속 빼앗기 콤보(최고 기록, 줄지 않는다, 4.25) */
     @Column(name = "max_combo", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0") private long maxCombo;
