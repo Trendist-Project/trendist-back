@@ -46,7 +46,7 @@ class IntegrationLinkTest {
         String admin = token(true);
         mvc.perform(get("/api/admin/integrations").header("Authorization", admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$.length()").value(5))
                 .andExpect(jsonPath("$[0].code").value("NAVER_SEARCH_ADVISOR"))
                 .andExpect(jsonPath("$[2].code").value("GOOGLE_ANALYTICS"));
         mvc.perform(patch("/api/admin/integrations/GOOGLE_ANALYTICS").header("Authorization", admin)

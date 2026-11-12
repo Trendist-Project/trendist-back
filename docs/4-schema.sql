@@ -476,7 +476,7 @@ CREATE TABLE emergency_notices (
 
 CREATE TABLE integration_links (
   id         BIGINT NOT NULL AUTO_INCREMENT COMMENT '연동 항목 ID',
-  code       VARCHAR(30) NOT NULL COMMENT '항목 코드(NAVER_SEARCH_ADVISOR, GOOGLE_SEARCH_CONSOLE, GOOGLE_ANALYTICS, GOOGLE_AI_STUDIO). 화면이 아이콘을 고르는 기준',
+  code       VARCHAR(30) NOT NULL COMMENT '항목 코드(NAVER_SEARCH_ADVISOR, GOOGLE_SEARCH_CONSOLE, GOOGLE_ANALYTICS, GOOGLE_AI_STUDIO, INSTAGRAM). 화면이 아이콘을 고르는 기준',
   label      VARCHAR(50) NOT NULL COMMENT '표시 이름',
   url        VARCHAR(500) NOT NULL COMMENT '바로가기 주소(관리자가 고침, http/https만)',
   sort_order INT NOT NULL COMMENT '화면 순서',
