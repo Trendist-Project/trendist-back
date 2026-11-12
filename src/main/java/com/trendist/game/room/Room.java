@@ -2266,7 +2266,7 @@ public class Room {
     private void thinkBots(Tuning tu, double half) {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         Set<Integer> claimed = new HashSet<>();
-        for (Member m : members.values()) if (m.bot && m.botOrb != null && orbs.containsKey(m.botOrb)) claimed.add(m.botOrb);
+        for (Member m : members.values()) if (m.bot && m.botOrb != null && (orbs.containsKey(m.botOrb) || prizeOrbs.containsKey(m.botOrb))) claimed.add(m.botOrb);
         BotGrid grid = null; // 이번 틱에 생각할 봇이 있을 때만, 한 번 만든다
         for (Member b : members.values()) {
             if (!b.bot) continue;
@@ -2278,7 +2278,7 @@ public class Room {
             double fleeRange = b.botStyle == 0 ? 900 : 450, chaseRange = b.botStyle == 1 ? 1000 : 450, orbRange = b.botStyle == 2 ? 1600 : 700;
             Member threat = null, prey = null;
             double threatD = Double.MAX_VALUE, preyD = Double.MAX_VALUE;
-            if (grid == null) grid = new BotGrid(members.values(), orbs);
+            if (grid == null) grid = new BotGrid(members.values(), orbs, prizeOrbs); // ? 구슬과 ! 구슬을 같이 본다(번호는 함께 쓴다)
             // 방 전체가 아니라 이 봇 주변 칸에 있는 원만 본다(공간 격자). 볼 수 있는 가장 먼 거리 = 도망·쫓기 범위 + 내 반지름 + 가장 큰 원의 반지름
             double look = Math.max(fleeRange, chaseRange) + b.displayRadius + grid.maxRadius;
             for (Member o : grid.membersNear(b.x, b.y, look)) {
@@ -2393,12 +2393,15 @@ public class Room {
         final Map<Long, List<Map.Entry<Integer, double[]>>> orbs = new HashMap<>();
         double maxRadius;
 
-        BotGrid(Collection<Member> ms, Map<Integer, double[]> orbMap) {
+        BotGrid(Collection<Member> ms, Map<Integer, double[]> orbMap, Map<Integer, double[]> prizeMap) {
             for (Member m : ms) {
                 members.computeIfAbsent(key(m.x, m.y), k -> new ArrayList<>()).add(m);
                 maxRadius = Math.max(maxRadius, m.displayRadius);
             }
             for (Map.Entry<Integer, double[]> o : orbMap.entrySet()) {
+                orbs.computeIfAbsent(key(o.getValue()[0], o.getValue()[1]), k -> new ArrayList<>()).add(o);
+            }
+            for (Map.Entry<Integer, double[]> o : prizeMap.entrySet()) {
                 orbs.computeIfAbsent(key(o.getValue()[0], o.getValue()[1]), k -> new ArrayList<>()).add(o);
             }
         }

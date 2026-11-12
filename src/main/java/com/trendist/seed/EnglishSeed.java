@@ -160,7 +160,7 @@ final class EnglishSeed {
             )),
             new Category("score-and-size", "⚔️ Score and fights", List.of(
                     new Article("Trend score and orb size", """
-                            Your orb's size is set by your **trend score**: the total of the scores of the 🔥 active keywords you hold plus **your level** (1 point per level). **EXP does not affect size.**
+                            Your orb's size is set by your **trend score**: the total of the scores of the 🔥 active keywords you hold plus **your level** (1 point per level).
 
                             - When others also hold a keyword you hold, its score rises and your orb grows.
                             - When a keyword expires or is stolen, your orb shrinks.
