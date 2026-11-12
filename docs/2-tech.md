@@ -9,7 +9,7 @@
 | 프론트엔드 | React + TypeScript, Vite. 아레나는 Canvas 2D(부족하면 PixiJS) |
 | 백엔드 | Spring Boot 4.1.2, Java 25, Gradle 9.8.2(Kotlin DSL). REST API, WebSocket 게임 서버, 배치를 한 애플리케이션으로 시작 |
 | 실시간 통신 | Spring WebSocket(순수 WebSocket, 바이너리 프레임), 서버 권위. 20Hz 시뮬레이션, 10~15Hz 스냅샷. STOMP 미사용 |
-| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 스키마는 Flyway가 바꾼다(로컬 개발·운영, 11.3). 로컬 개발은 우분투의 MariaDB 10.11(DB `trendist`), 자동 테스트는 H2 메모리 DB에 JPA가 스키마를 만든다 |
+| DB | MySQL 8, InnoDB, `utf8mb4`, UTC 저장. 스키마는 Flyway가 바꾼다(로컬 개발·운영, 11.3). 개발(`dev` 프로필)은 개발용 서버의 MySQL(DB `trendist_dev`, 원격), 자동 테스트는 H2 메모리 DB에 JPA가 스키마를 만든다 |
 | 캐시 | Caffeine(서버 1대). 여러 대가 되면 Redis |
 | 배치 | Spring `@Scheduled`. 서버 1대 기준이라 ShedLock은 아직 붙이지 않았다(여러 대가 되면 추가) |
 | 이미지 | 픽셀 그림은 값으로 DB에 두고 서버가 PNG로 그린다. 이미지 업로드용 S3 호환 객체 저장소와 자동 검열(ONNX Runtime)은 업로드를 만들 때 붙인다(아직 없음) |
@@ -451,7 +451,7 @@ java {
 - 주요 의존성: spring-boot-starter-webmvc, starter-websocket, starter-data-jpa, starter-security, starter-validation, starter-flyway와 flyway-mysql(테스트에서는 끈다), Caffeine, spring-security-oauth2-jose(구글 ID 토큰 검증), MariaDB·MySQL JDBC, 테스트용 H2. ShedLock·ONNX Runtime·Testcontainers는 아직 쓰지 않는다.
 - `spring.threads.virtual.enabled=true`(게임 틱 스레드는 플랫폼 스레드).
 - `./gradlew bootJar` → Docker 이미지. 프론트엔드는 따로 빌드해 Nginx로 제공한다.
-- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 로컬 DB는 같은 PC의 MariaDB(DB `trendist`)이고, DB 계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
+- 로컬 개발: 브라우저는 http://localhost:8080 하나로 접속한다. 프론트 개발 서버(Vite)가 8080에서 화면을 주고 `/api`·`/ws`를 백엔드(8081)로 넘긴다(운영의 Nginx 역할). 개발 DB는 개발용 서버의 MySQL(DB `trendist_dev`, 원격)이고, DB 주소·계정은 git에 올리지 않는 `src/main/resources/application.env`에 둔다.
 - 설정은 `application.yml`(공통), `application-dev.yml`(로컬, 기본 프로필), `application-prod.yml`(운영)로 나누고, DB 연결은 환경 변수(`DEV_MYSQL_URL`·`PROD_MYSQL_URL`·`MYSQL_USERNAME`·`MYSQL_PASSWORD`, 운영 포트 `PROD_SERVER_PORT`)로 받는다. 스키마는 Flyway가 바꾸므로 로컬은 `ddl-auto=validate`, 운영은 `ddl-auto=none`이다(11.3, 16.1).
 - 백엔드 배포: `main`에 push하면 GitHub Actions가 테스트·`bootJar` 뒤 Docker 이미지(`dlrudgjs104/trendist-back:latest`)를 Docker Hub에 올리고, 서버에서 기존 컨테이너를 내린 뒤 새로 띄운다(단일 컨테이너 중단 배포). 운영 환경 변수는 GitHub 시크릿 `ENV_FILE`을 배포 때 서버 `/home/ubuntu/trendist/.env`로 보내고(WebSocket 허용 주소 `PROD_ALLOWED_ORIGINS`, 기본 `https://trendist.kr`), 실행 설정(포트 4001, 네트워크)은 서버의 docker compose 파일이 맡고, nginx는 `trendist-back:4001`로 넘긴다.
 - 카카오톡 공유(4.24): 카카오 앱의 JavaScript 키(공개 키, 브라우저에 그대로 실린다)는 `trendist-front/src/kakaoShare.ts`에 기본값으로 둔다. 다른 키를 쓰려면 빌드 환경 변수 `VITE_KAKAO_JS_KEY`로 덮어쓴다(로컬은 git 제외 파일 `.env.local`). GitHub 저장소 변수는 쓰지 않는다. 카카오 개발자 콘솔(developers.kakao.com, 2025-12 개편 메뉴)에서 사이트 도메인(운영 주소, 로컬은 `http://localhost:8080`)을 두 곳에 등록해야 한다: [앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인](SDK 호출 허용)과 [앱 → 제품 링크 관리 → 웹 도메인](공유 메시지의 링크·스크랩 주소). SDK는 `t1.kakaocdn.net`의 카카오 JavaScript SDK 2.7.2를 공유 카드를 열 때만 불러온다.

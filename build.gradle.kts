@@ -33,7 +33,7 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok")
     testAnnotationProcessor("org.projectlombok:lombok")
 
-    runtimeOnly("org.mariadb.jdbc:mariadb-java-client") // 로컬 개발 DB(우분투 MariaDB)
+    runtimeOnly("org.mariadb.jdbc:mariadb-java-client") // MariaDB 접속용(현재 개발 DB는 mysql 드라이버를 쓴다)
     runtimeOnly("com.mysql:mysql-connector-j")         // mysql 프로필(MySQL 8)
     testRuntimeOnly("com.h2database:h2")               // 테스트는 H2 메모리 DB
 

@@ -1436,9 +1436,11 @@ public class Room {
     private void hurt(Member victim, Member by, double dmg, boolean lethal) {
         if (dmg <= 0) return;
         double max = hpTuning.max(), minAlive = round2(max / 100.0);
+        double before = victim.hp;
         victim.hp = lethal ? 0 : Math.max(minAlive, round2(victim.hp - dmg));
         markHp(victim); hpPublicDirty = true;
-        broadcast(Map.of("type", "hpHit", "e", victim.entityNo, "by", by.entityNo, "dmg", round2(Math.min(100.0, dmg / max * 100)), "pct", hpPercent(victim)));
+        double lost = lethal ? dmg : Math.min(dmg, before - victim.hp); // 살아 남으면 실제로 줄어든 만큼만 알린다(1% 하한에 걸려도 -100%로 보이지 않게)
+        broadcast(Map.of("type", "hpHit", "e", victim.entityNo, "by", by.entityNo, "dmg", round2(Math.min(100.0, lost / max * 100)), "pct", hpPercent(victim)));
     }
 
     /** 체력이 0이 되었다: 가진 키워드의 death_lose_percent%를 한 번만 잃고(이미 불꽃에게 잃었어도 이 싸움에서는 다시 잃지 않는다) 죽는다 */

@@ -3,7 +3,7 @@ spring:
   config:
     import: optional:file:./src/main/resources/application.env[.properties]
 
-  # 로컬 DB: 이 PC(우분투)의 MariaDB, DB 이름 trendist
+  # 개발 DB: 개발용 서버의 MySQL(원격), DB 이름 trendist_dev
   datasource:
     url: ${DEV_MYSQL_URL}
     username: ${MYSQL_USERNAME}
