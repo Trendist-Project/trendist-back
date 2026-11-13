@@ -1226,7 +1226,7 @@ class ApiFlowTest {
         skillCatalog.invalidate();
         mvc.perform(get("/api/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(9))
+                .andExpect(jsonPath("$.length()").value(14))
                 .andExpect(jsonPath("$[1].code").value("shield"))      // 대시 다음은 해금 레벨 순서
                 .andExpect(jsonPath("$[1].defaultKey").value("Digit1"))
                 .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
@@ -1236,9 +1236,9 @@ class ApiFlowTest {
                 .andExpect(jsonPath("$[2].code").value("hook"))
                 .andExpect(jsonPath("$[2].defaultKey").value("Digit2"))
                 .andExpect(jsonPath("$[2].requiredLevel").value(10))   // 갈고리 10레벨
-                .andExpect(jsonPath("$[3].code").value("shockwave"))
-                .andExpect(jsonPath("$[3].defaultKey").value("Digit3"))
-                .andExpect(jsonPath("$[3].requiredLevel").value(15))   // 충격파 15레벨
+                .andExpect(jsonPath("$[3].code").value("slow"))
+                .andExpect(jsonPath("$[3].defaultKey").value("Digit9"))
+                .andExpect(jsonPath("$[3].requiredLevel").value(15))   // 슬로우 15레벨
                 .andExpect(jsonPath("$[4].code").value("stealth"))
                 .andExpect(jsonPath("$[4].defaultKey").value("Digit4"))
                 .andExpect(jsonPath("$[4].requiredLevel").value(20))   // 은신 20레벨
@@ -1255,7 +1255,7 @@ class ApiFlowTest {
             skillRepository.saveAndFlush(hook);
             skillCatalog.invalidate();
             assertThat(skillCatalog.disabledCodes()).contains("hook");
-            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(8));
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(13));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
             skillRepository.saveAndFlush(hook);
@@ -1325,12 +1325,24 @@ class ApiFlowTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}")).andExpect(jsonPath("$.popularity").value(0));
     }
     @Test
+    void adminSkillListCarriesEachSkillsSeedDefaultsForTheDefaultButtons() {
+        // 13.3: 관리자 화면의 "기본값으로" 버튼들은 스킬마다 시더의 기본 쿨타임·해금 레벨을 쓴다(회복 쿨타임 60초처럼 스킬마다 다르다)
+        var list = adminSkills.list();
+        var heal = list.stream().filter(i -> i.code().equals("heal")).findFirst().orElseThrow();
+        var hook = list.stream().filter(i -> i.code().equals("hook")).findFirst().orElseThrow();
+        assertThat(heal.defaultCooldown()).isEqualTo(60.0);
+        assertThat(heal.defaultRequiredLevel()).isEqualTo(40);
+        assertThat(hook.defaultCooldown()).isEqualTo(30.0);
+        assertThat(hook.defaultRequiredLevel()).isEqualTo(10);
+    }
+
+    @Test
     void adminEditsEachSkillCooldownAndLevelAndItReachesThePublicList() throws Exception {
         // 13.3: 스킬마다 쿨타임·해금 레벨·사용 여부를 관리자가 따로 고친다. 관리자가 아니면 403
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("dash", "shield", "hook", "shockwave", "stealth", "darkness", "cleanse", "poison", "heal");
+                .containsExactly("dash", "shield", "hook", "slow", "stealth", "shockwave", "cleanse", "darkness", "heal", "poison", "stun", "quake", "flame", "absorb");
         try {
             var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);

@@ -188,11 +188,12 @@ final class EnglishSeed {
 
                             > After losing a keyword you're invincible for 3 seconds (you'll see a 🛡 above your orb, and others pass right through you). When you join or respawn you start in the safe zone in the middle, so you're safe."""),
                     new Article("Combos and flame", """
-                            Steal keywords **back to back** from collisions and you build a combo. You'll see something like **⚔️ 3 Combo** at the top of the screen.
+                            **Land an attack** and you build a combo, +1 per hit. Winning a collision and stealing a keyword, or landing an attack skill, are each **one hit = +1**. You'll see something like **⚔️ 3 Combo** at the top of the screen.
 
                             - At **5 Combo**, a **🔥 flame** ignites around your orb. Everyone can see it.
                             - Keywords you win from bots, and **hitting a boss**, count toward the combo too.
-                            - If you lose a keyword in a fight even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
+                            - **Only attack skills** build combo (CC, defense and utility skills don't). Hook gives +1 per hit, 🔥 Fireball +1 for each of its 3 hits (up to +3), 💥 Shockwave +1 per circle it hits, 🧲 Absorb +1 every time it steals a keyword (+9 if it steals from three circles to the end), and ☠️ Poison +1 each time it makes the target lose keywords.
+                            - If you lose a keyword in a fight or to an attack skill even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
                             - If **5 minutes** pass after your last combo gain without a new one, the combo and flame fade away. Every new combo restarts the 5 minutes. The time left shows on the combo card (under the leaderboard at the top right).
                             - If you refresh or leave and come back, your combo starts again from **0**.
                             - Bots build combos and get flames too.

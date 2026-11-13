@@ -1106,7 +1106,7 @@ class RoomTest {
     void loadoutRejectsLockedUnknownDuplicateOrWrongSizeAndKeepsTheOldOne() {
         Out out = new Out();
         Room r = boltRoom(out);
-        r.setRequiredLevels(java.util.Map.of("poison", 40, "darkness", 30, "heal", 40));
+        r.setRequiredLevels(levels("poison", 40, "darkness", 30, "heal", 40, "slow", 45, "stun", 50, "flame", 55, "quake", 60, "absorb", 65));
         Room.Member a = r.join(1, "s1", "a", 20, 0, List.of());
         r.setLoadout(a, java.util.Arrays.asList("shockwave", null, null, null));
         r.setLoadout(a, java.util.Arrays.asList("poison", null, null, null));          // 40레벨 전이라 잠겨 있다
@@ -1138,7 +1138,7 @@ class RoomTest {
     void defaultLoadoutFillsInUnlockOrderAndRestoreReadsTheSavedSlots() {
         Out out = new Out();
         Room r = boltRoom(out);
-        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "darkness", 30, "cleanse", 35, "poison", 40, "heal", 40));
+        r.setRequiredLevels(levels("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "darkness", 30, "cleanse", 35, "poison", 40, "heal", 40, "slow", 45, "stun", 50, "flame", 55, "quake", 60, "absorb", 65));
         Room.Member a = r.join(1, "s1", "a", 12, 0, List.of());
         assertThat(r.equippedSkills(a)).containsExactly("shield");
         a.level = 40;
@@ -1508,7 +1508,7 @@ class RoomTest {
         Out out = new Out();
         Room r = new Room(1, T, out);
         r.setZoneTuning(NO_RANDOM_ZONES);
-        r.setRequiredLevels(java.util.Map.of("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "heal", 40));
+        r.setRequiredLevels(levels("shield", 10, "hook", 15, "shockwave", 20, "stealth", 25, "heal", 40, "slow", 45, "stun", 50, "flame", 55, "quake", 60, "absorb", 65));
         Room.Member a = r.join(1, "s1", "a", 9, 0, List.of());
         a.x = 800; a.y = 800;
         r.tick();
@@ -1710,5 +1710,175 @@ class RoomTest {
         r.tick();
         assertThat(out.orbEaters).isEmpty();
         assertThat(r.orbCount()).isEqualTo(1);
+    }
+
+    /** 슬로우·스턴·불꽃·충격파·흡수 테스트용: 한 칸씩 장착해 입장시킨다 */
+    private static Room.Member joinWith(Room r, long id, String name, String skill, List<Long> kws) {
+        Room.Member m = r.join(id, "s" + id, name, 1, 0, kws);
+        r.setLoadout(m, java.util.Arrays.asList(skill, "cleanse", null, null));
+        return m;
+    }
+
+    @Test
+    void slowBoltHalvesSpeedForThreeSecondsAndStacksUpToThree() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "slow", List.of());
+        Room.Member b = joinWith(r, 2, "b", "slow", List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "slow", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(b.slowStacks).isEqualTo(1);
+        r.setSkillCooldowns(java.util.Map.of());
+        a.skillReadyAt[Room.SKILLS.indexOf("slow")] = 0;
+        r.skill(a, "slow", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(b.slowStacks).isEqualTo(2);              // 겹친다
+        tickSeconds(r, 3.2);
+        assertThat(b.slowStacks).isZero();                  // 3초가 지나 풀린다
+    }
+
+    @Test
+    void stunBoltFreezesTheTargetForOneSecondAndBlocksSkills() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "stun", List.of());
+        Room.Member b = joinWith(r, 2, "b", "stun", List.of());
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "stun", b.x, b.y);
+        tickSeconds(r, 0.6);
+        assertThat(b.stunUntil).isGreaterThan(0);
+        double x = b.x;
+        r.setInput(b, 0, 1);
+        tickSeconds(r, 0.5);
+        assertThat(b.x).isEqualTo(x);                       // 스턴 중에는 움직이지 않는다
+        r.skill(b, "stun", a.x, a.y);
+        assertThat(r.boltCount()).isZero();                 // 스킬도 못 쓴다
+        tickSeconds(r, 1.0);
+        r.setInput(b, 0, 1);
+        double y = b.y;
+        tickSeconds(r, 0.5);
+        assertThat(b.y).isNotEqualTo(y);                    // 1초가 지나 다시 움직인다
+    }
+
+    @Test
+    void flameThrowsThreeGuaranteedHitsEachLosingOneKeyword() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "flame", List.of());
+        Room.Member b = joinWith(r, 2, "b", "flame", List.of(11L, 12L, 13L));
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "flame", b.x + 20, b.y + 20);
+        tickSeconds(r, 2);
+        assertThat(out.poisonLoses).hasSize(3);             // 한 발에 1개, 총 3개
+        assertThat(out.poisonLoses).allSatisfy(l -> assertThat(l).containsExactly(2, 1));
+    }
+
+    @Test
+    void flameWithoutATargetInReachDoesNothingAndKeepsTheCooldown() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "flame", List.of());
+        a.x = 800; a.y = 800;
+        r.tick();
+        r.skill(a, "flame", 900, 800);
+        tickSeconds(r, 1);
+        assertThat(out.poisonLoses).isEmpty();
+        assertThat(a.skillReadyAt[Room.SKILLS.indexOf("flame")]).isZero();
+    }
+
+    @Test
+    void quakeMakesTouchedCirclesLoseThreeKeywordsWithoutKnockback() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "quake", List.of());
+        Room.Member b = joinWith(r, 2, "b", "quake", List.of(11L));
+        a.x = 800; a.y = 800; b.x = 1000; b.y = 800;
+        r.tick();
+        r.skill(a, "quake", 0, 0);
+        tickSeconds(r, 2);
+        assertThat(out.poisonLoses).hasSize(1);             // 한 번만 맞고 3개를 잃는다
+        assertThat(out.poisonLoses.get(0)).containsExactly(2, 3);
+    }
+
+    @Test
+    void absorbLinksEveryCircleInRangeAndStealsOneAtOnceThenEverySecondForThreeTotal() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "absorb", List.of());
+        Room.Member b = joinWith(r, 2, "b", "absorb", List.of(11L, 12L, 13L, 14L));
+        Room.Member c = joinWith(r, 3, "c", "absorb", List.of(21L, 22L, 23L, 24L));
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800; c.x = 800; c.y = 1100;
+        r.tick();
+        r.skill(a, "absorb", 0, 0);                         // 조준하지 않아도 사거리 안의 모든 원과 이어진다
+        assertThat(out.loses).hasSize(2);                   // 0초에 둘에게서 1개씩
+        tickSeconds(r, 0.5);
+        assertThat(out.loses).hasSize(2);
+        tickSeconds(r, 0.6);
+        assertThat(out.loses).hasSize(4);                   // 1초 뒤 1개씩
+        tickSeconds(r, 1.0);
+        assertThat(out.loses).hasSize(6);                   // 2초 뒤 1개씩, 원마다 총 3개
+        assertThat(out.loses.get(0)).containsExactly(2, 1); // 빼앗는 쪽은 쓴 사람
+        tickSeconds(r, 3);
+        assertThat(out.loses).hasSize(6);                   // 끝난 뒤에는 더 빼앗지 않는다
+
+        Out out2 = new Out();
+        Room r2 = boltRoom(out2);
+        Room.Member d = joinWith(r2, 1, "d", "absorb", List.of());
+        Room.Member e = joinWith(r2, 2, "e", "absorb", List.of(11L, 12L, 13L));
+        Room.Member f = joinWith(r2, 3, "f", "absorb", List.of(21L, 22L, 23L));
+        d.x = 800; d.y = 800; e.x = 1100; e.y = 800; f.x = 800; f.y = 1100;
+        r2.tick();
+        r2.skill(d, "absorb", 0, 0);
+        e.x = 3000;                                          // 사거리 밖으로 벗어난 원의 선만 끊긴다
+        tickSeconds(r2, 3.3);
+        assertThat(out2.loses).hasSize(4);                   // e는 처음 1개만, f는 3개
+        long fromE = out2.loses.stream().filter(l -> l[0] == 2).count();
+        assertThat(fromE).isEqualTo(1);
+    }
+
+    @Test
+    void attackSkillsBuildComboPerHitButCcSkillsDoNot() {
+        Out out = new Out();
+        Room r = boltRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "flame", List.of());
+        Room.Member b = joinWith(r, 2, "b", "flame", List.of(11L, 12L, 13L));
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "flame", b.x, b.y);
+        tickSeconds(r, 2);
+        assertThat(a.combo).isEqualTo(3);                   // 화염구 3발이 맞았으니 히트 3번 = +3
+
+        Out out2 = new Out();
+        Room r2 = boltRoom(out2);
+        Room.Member c = joinWith(r2, 1, "c", "quake", List.of());
+        Room.Member d = joinWith(r2, 2, "d", "quake", List.of(11L, 12L, 13L, 14L));
+        Room.Member e = joinWith(r2, 3, "e", "quake", List.of(21L, 22L, 23L, 24L));
+        c.x = 800; c.y = 800; d.x = 1000; d.y = 800; e.x = 800; e.y = 1000;
+        r2.tick();
+        r2.skill(c, "quake", 0, 0);
+        tickSeconds(r2, 2);
+        assertThat(c.combo).isEqualTo(2);                   // 충격파에 맞은 원마다 +1
+
+        Out out3 = new Out();
+        Room r3 = boltRoom(out3);
+        Room.Member f = joinWith(r3, 1, "f", "stun", List.of());
+        Room.Member g = joinWith(r3, 2, "g", "stun", List.of(11L));
+        f.x = 800; f.y = 800; g.x = 1100; g.y = 800;
+        r3.tick();
+        r3.skill(f, "stun", g.x, g.y);
+        tickSeconds(r3, 1);
+        assertThat(g.stunUntil).isGreaterThan(0);
+        assertThat(f.combo).isZero();                       // CC 스킬은 콤보가 쌓이지 않는다
+    }
+
+    /** 해금 레벨 표(코드, 레벨, 코드, 레벨 …)를 만든다. Map.of는 쌍이 10개까지라서 스킬이 늘면 쓸 수 없다 */
+    private static java.util.Map<String, Integer> levels(Object... kv) {
+        java.util.Map<String, Integer> m = new java.util.HashMap<>();
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], (Integer) kv[i + 1]);
+        return m;
     }
 }

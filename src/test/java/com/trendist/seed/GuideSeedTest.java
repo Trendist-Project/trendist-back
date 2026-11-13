@@ -43,9 +43,9 @@ class GuideSeedTest {
             assertThat(a.titleEn()).isNotBlank();
             assertThat(embeds(a.bodyEn())).as("영어 본문의 게임 그림 수: " + a.title()).isEqualTo(embeds(a.body()));
         }
-        // 스킬마다 움직이는 그림이 하나씩 있다(대시·방패·갈고리·충격파·은신·암흑·독·정화)
+        // 스킬마다 움직이는 그림이 하나씩 있다(대시·방패·갈고리·반발·충격파·은신·암흑·독·정화·슬로우·스턴·불꽃·흡수)
         List<String> skillBodies = GuideSeed.ADDED.stream().filter(a -> a.categoryCode().equals("skills")).map(GuideSeed.Added::body).toList();
-        for (String token : List.of("[[스킬 대시]]", "[[스킬 방패]]", "[[스킬 갈고리]]", "[[스킬 충격파]]", "[[스킬 은신]]", "[[스킬 암흑]]", "[[스킬 독]]", "[[스킬 정화]]")) {
+        for (String token : List.of("[[스킬 대시]]", "[[스킬 방패]]", "[[스킬 갈고리]]", "[[스킬 반발]]", "[[스킬 충격파 키워드]]", "[[스킬 은신]]", "[[스킬 암흑]]", "[[스킬 독]]", "[[스킬 정화]]", "[[스킬 슬로우]]", "[[스킬 스턴]]", "[[스킬 불꽃]]", "[[스킬 흡수]]")) {
             assertThat(skillBodies.stream().filter(b -> b.contains(token)).count()).as(token).isEqualTo(1);
         }
     }

@@ -399,19 +399,37 @@ public class DataSeeder implements ApplicationRunner {
     /**
      * 스킬(4.33): 코드가 있는데 DB에 없는 스킬을 채우고, 이미 있는 스킬은 목록 순서만 코드(배열 순서, 대시가 맨 앞)와 맞춘다(운영에서 고친 쿨타임·기본 키는 건드리지 않는다). 스킬을 늘릴 때는 여기에 한 줄을 더하거나 DB에 행을 넣고,
      * 동작은 Room.SKILLS와 Room.skill에, 이름·설명은 프론트엔드 번역 파일(skills.<코드>_name·_desc)에 더한다. 기본 단축키는 KeyboardEvent.code(Space, Digit1, KeyQ …).
+     * 종류: ATTACK(직접 키워드를 빼앗거나 잃게 함) / DEFENSE(밀어내기·보호) / CC(이동·시야를 막는 방해: 암흑·스턴·슬로우) / UTILITY(대시·은신·회복·정화).
      * 필드: 코드, 아이콘, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬).
      */
     private static final String[][] SKILL_ROWS = {
-            {"dash", "⚡", "MOVE", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서)
-            {"shield", "🛡", "DEFENSE", "Digit1", "30", "5"},   // 그다음은 해금 레벨 순서
-            {"hook", "🪝", "ATTACK", "Digit2", "30", "10"},
-            {"shockwave", "💥", "ATTACK", "Digit3", "30", "15"},
-            {"stealth", "👻", "STEALTH", "Digit4", "30", "20"},
-            {"darkness", "🕶️", "ATTACK", "Digit5", "30", "25"},
-            {"cleanse", "✨", "DEFENSE", "Digit6", "30", "30"},
-            {"poison", "☠️", "ATTACK", "Digit7", "30", "35"},
-            {"heal", "➕", "DEFENSE", "Digit8", "60", "40"},    // 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
+            {"dash", "⚡", "UTILITY", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서, 이후는 해금 레벨 순서)
+            {"shield", "🛡", "DEFENSE", "Digit1", "30", "5"},   // 방어: 첫 생존 수단
+            {"hook", "🪝", "ATTACK", "Digit2", "30", "10"},     // 공격: 첫 빼앗기 수단
+            {"slow", "🧊", "CC", "Digit9", "30", "15"},         // CC: 가장 약한 CC. 이동 속도 50%↓ 3초, 겹침(최대 3겹)
+            {"stealth", "👻", "UTILITY", "Digit4", "30", "20"}, // 유틸: 여기까지 4칸이 방어·공격·CC·유틸로 완성된다
+            {"shockwave", "🌀", "DEFENSE", "Digit3", "30", "25"}, // 방어: 반발(밀어내기)
+            {"cleanse", "✨", "UTILITY", "Digit6", "30", "30"}, // 유틸: 뒤에 나오는 CC·독의 카운터를 먼저 준다
+            {"darkness", "🕶️", "CC", "Digit5", "30", "35"},     // CC: 시야만 가린다
+            {"heal", "➕", "UTILITY", "Digit8", "60", "40"},    // 유틸: 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
+            {"poison", "☠️", "ATTACK", "Digit7", "30", "45"},   // 공격: 지속 피해(정화로 해제)
+            {"stun", "💫", "CC", "Digit0", "30", "50"},         // CC: 1초 동안 움직이지도 스킬을 쓰지도 못함(가장 강한 CC)
+            {"quake", "💥", "ATTACK", "KeyX", "30", "55"},      // 공격: 충격파. 범위 안 원이 키워드 3개를 잃음(피할 수 있다)
+            {"flame", "🔥", "ATTACK", "KeyZ", "30", "60"},      // 공격: 화염구. 확정 타겟팅 3발, 키워드 3개를 잃음(피할 수 없다)
+            {"absorb", "🧲", "ATTACK", "KeyC", "30", "65"},     // 공격: 흡수. 사거리 안 모든 원에게서 3개씩 빼앗음(가장 강하다)
     };
+
+    /** 시더가 정한 스킬의 기본 쿨타임(초). 관리자 화면의 "기본값으로" 버튼이 쓴다. 모르는 코드면 30 */
+    public static double defaultCooldown(String code) {
+        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Double.parseDouble(r[4]);
+        return 30;
+    }
+
+    /** 시더가 정한 스킬의 기본 해금 레벨. 관리자 화면의 "기본값으로" 버튼이 쓴다. 모르는 코드면 1 */
+    public static int defaultRequiredLevel(String code) {
+        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Integer.parseInt(r[5]);
+        return 1;
+    }
 
     private int seedSkills() {
         int added = 0;

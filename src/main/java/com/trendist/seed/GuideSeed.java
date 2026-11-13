@@ -76,11 +76,12 @@ final class GuideSeed {
 
                             > 키워드를 잃으면 3초 동안 무적이에요(원 위에 🛡가 보이고, 다른 원을 그냥 통과해요). 처음 들어오거나 리스폰할 때는 가운데 세이프존에서 시작해서 안전해요."""),
                     new Article("연속 빼앗기와 불꽃", """
-                            부딪혀서 키워드를 **연속으로** 빼앗으면 콤보가 쌓여요. 화면 위에 **⚔️ 3 Combo**처럼 보여요.
+                            상대에게 **공격을 맞힐 때마다** 콤보가 +1씩 쌓여요. 몸싸움에서 이겨 키워드를 빼앗는 것도, 공격 스킬을 맞히는 것도 모두 **히트 한 번에 +1**이에요. 화면 위에 **⚔️ 3 Combo**처럼 보여요.
 
                             - **5 Combo**가 되면 내 원 둘레가 **🔥 불꽃**으로 타올라요. 다른 사람에게도 그대로 보여요.
                             - 봇을 이겨 키워드를 얻은 것도, **보스를 치는 것**도 콤보에 들어가요.
-                            - 한 번이라도 싸움에서 키워드를 **잃으면** 콤보가 0이 되고 불꽃도 꺼져요. 불타는 사람을 이기면 불꽃을 끌 수 있어요!
+                            - **스킬은 공격 스킬만** 콤보가 쌓여요(CC·방어·유틸 스킬은 안 쌓여요). 갈고리는 맞히면 +1, 🔥 화염구는 3발이 한 발씩 맞을 때마다 +1(최대 +3), 💥 충격파는 맞은 원마다 +1, 🧲 흡수는 키워드를 빼앗는 순간마다 +1(세 명에게서 끝까지 빼앗으면 +9), ☠️ 독은 키워드를 잃게 할 때마다 +1이에요.
+                            - 한 번이라도 싸움이나 공격 스킬에 키워드를 **잃으면** 콤보가 0이 되고 불꽃도 꺼져요. 불타는 사람을 이기면 불꽃을 끌 수 있어요!
                             - 마지막으로 콤보가 오른 뒤 **5분** 동안 새 콤보가 없으면 콤보와 불꽃이 저절로 사라져요. 콤보가 오를 때마다 5분이 다시 시작돼요. 콤보 카드(오른쪽 위 리더보드 아래)에 남은 시간이 보여요.
                             - 새로고침하거나 나갔다가 다시 들어오면 콤보는 **0부터** 다시 시작해요.
                             - 봇도 콤보를 쌓고 불꽃이 붙어요.
@@ -280,6 +281,25 @@ final class GuideSeed {
     record Fix(String categoryCode, String title, String oldBody) {}
 
     static final List<Fix> FIXES = List.of(
+            new Fix("score-and-size", "연속 빼앗기와 불꽃", """
+                            부딪혀서 키워드를 **연속으로** 빼앗으면 콤보가 쌓여요. 화면 위에 **⚔️ 3 Combo**처럼 보여요.
+
+                            - **5 Combo**가 되면 내 원 둘레가 **🔥 불꽃**으로 타올라요. 다른 사람에게도 그대로 보여요.
+                            - 봇을 이겨 키워드를 얻은 것도, **보스를 치는 것**도 콤보에 들어가요.
+                            - 한 번이라도 싸움에서 키워드를 **잃으면** 콤보가 0이 되고 불꽃도 꺼져요. 불타는 사람을 이기면 불꽃을 끌 수 있어요!
+                            - 마지막으로 콤보가 오른 뒤 **5분** 동안 새 콤보가 없으면 콤보와 불꽃이 저절로 사라져요. 콤보가 오를 때마다 5분이 다시 시작돼요. 콤보 카드(오른쪽 위 리더보드 아래)에 남은 시간이 보여요.
+                            - 새로고침하거나 나갔다가 다시 들어오면 콤보는 **0부터** 다시 시작해요.
+                            - 봇도 콤보를 쌓고 불꽃이 붙어요.
+
+                            ## 🔥 불꽃의 힘
+
+                            - **불꽃인 사람이 불꽃 없는 사람과 부딪히면**: 유행도(점수)와 상관없이 불꽃 쪽이 이기고, 상대는 가진 키워드의 **절반**을 잃어요. 불꽃 쪽은 콤보가 1 올라가요. 체력 피해도 **공격력 5배**로 들어가요.
+                            - **둘 다 불꽃이면**: 평소처럼 유행도가 높은 쪽이 이겨요. 진 쪽은 콤보와 불꽃이 사라지고 키워드 하나를 빼앗겨요.
+                            - **봇**과 부딪힐 때도 같은 규칙이에요. 불꽃인 내가 불꽃 없는 봇과 부딪히면 봇의 키워드 절반을 날리고, 불꽃인 봇이 불꽃 없는 나와 부딪히면 내가 키워드의 절반을 잃어요.
+                            - 불꽃이 붙은 쪽은 부딪혀도 **제자리**에 있고, 불꽃 없는 상대만 튕겨 나가요.
+                            - 키워드를 잃으면 3초 동안 무적이에요. 그리고 잃은 키워드 중 **🔥활성 키워드 개수의 절반**(올림, 활성이 하나라도 있었다면 최소 1개)만큼 **빨간 ! 구슬**이 그 자리 둘레에 떨어져요. 누구나 주워 갈 수 있어요.
+
+                            > 불꽃은 자랑거리이자 무기예요. 크기에는 영향이 없지만, 한 번 지면 꺼지니 조심하세요."""),
             new Fix("score-and-size", "현재 유행도와 원의 크기", """
                             내 원의 크기는 **현재 유행도**로 정해져요. 내가 가진 🔥활성 키워드의 점수를 모두 더하고 **내 레벨**(1레벨당 1점)을 더한 값이에요. **경험치(EXP)는 크기에 영향이 없어요.**
 
@@ -511,8 +531,9 @@ final class GuideSeed {
                     - 아직 레벨이 모자란 스킬은 버튼에 **🔒와 필요한 레벨**이 보여요. 레벨이 되면 "스킬을 쓸 수 있어요!" 안내가 떠요.
                     - 스킬마다 **쿨타임**이 있어요. 쓰면 버튼에 남은 초가 보이고, 새로고침해도 쿨타임은 이어져요.
                     - PC는 버튼에 마우스를 올리면 설명과 쿨타임, 지금 쓸 수 있는지가 카드로 보여요.
-                    - 공격 스킬인 **갈고리·충격파·독·암흑은 세이프존 안에서는 쓸 수 없어요.** 정화는 쓸 수 있어요.
-                    - 갈고리·충격파·독·암흑의 **사거리는 모두 내 원 가장자리에서 화면에 보이는 길이**가 기준이라, 원이 작아도 커도 화면에서 비슷한 길이로 나가요.
+                    - 스킬은 **네 종류**예요. **공격**(갈고리·독·화염구·충격파·흡수: 직접 키워드를 빼앗거나 잃게 해요. **맞힐 때마다 콤보가 +1**이에요), **방어**(방패·반발: 막거나 밀어내요), **CC**(암흑·스턴·슬로우: 시야나 움직임을 방해해요), **유틸**(대시·은신·회복·정화)이에요. 스킬창과 스킬 버튼의 색깔로도 구분돼요.
+                    - **갈고리·반발·충격파·슬로우·스턴·화염구·흡수·독·암흑은 세이프존 안에서는 쓸 수 없어요.** 방패·은신·대시·정화·회복은 쓸 수 있어요.
+                    - 갈고리·반발·충격파·슬로우·스턴·화염구·흡수·독·암흑의 **사거리는 모두 내 원 가장자리에서 화면에 보이는 길이**가 기준이라, 원이 작아도 커도 화면에서 비슷한 길이로 나가요.
 
                     > 레벨은 현재 유행도에 **1레벨당 1점**씩만 더해져요(원 크기에는 거의 영향이 없어요). 스킬을 쓸 수 있게 하는 열쇠예요. 각 스킬이 내 화면과 상대 화면에서 어떻게 보이는지는 아래 글마다 움직이는 그림으로 볼 수 있어요.""",
                     "Skills at a glance", """
@@ -525,8 +546,9 @@ final class GuideSeed {
                     - Skills you haven't unlocked yet show a **🔒 and the level you need** on the button. When you reach it, a "You can now use a skill!" notice appears.
                     - Each skill has a **cooldown**. After using one, the button shows the seconds left, and it carries over even if you refresh.
                     - On PC, hover a button to see its description, cooldown and whether it is ready.
-                    - The attack skills, **Hook, Shockwave, Poison and Darkness, can't be used inside safe zones.** Cleanse can be used.
-                    - The **range of Hook, Shockwave, Poison and Darkness is measured as a length on your screen from your circle's edge**, so it looks about the same whether your circle is small or large.
+                    - Skills come in **four types**: **Attack** (Hook, Poison, Fireball, Shockwave, Absorb: they directly take or make you lose keywords; **each hit gives +1 combo**), **Defense** (Shield, Repel: block or push away), **CC** (Darkness, Stun, Slow: they disrupt sight or movement) and **Utility** (Dash, Stealth, Heal, Cleanse). The colors of the skill window and buttons tell them apart.
+                    - **Hook, Repel, Shockwave, Slow, Stun, Fireball, Absorb, Poison and Darkness can't be used inside safe zones.** Shield, Stealth, Dash, Cleanse and Heal can be used.
+                    - The **range of Hook, Repel, Shockwave, Slow, Stun, Fireball, Absorb, Poison and Darkness is measured as a length on your screen from your circle's edge**, so it looks about the same whether your circle is small or large.
 
                     > Your level adds just **1 point per level** to your trend score (barely changing circle size). It is the key that unlocks skills. Each article below shows, with a moving picture, how the skill looks on your screen and on the other player's screen."""),
             new Added("skills", "스킬 장착하기", """
@@ -601,28 +623,48 @@ final class GuideSeed {
                     - **Your screen**: The hook line shoots out, catches the circle and pulls it in. The pulled circle collides with you right away and is settled by the normal rules.
                     - **The other player's screen**: You see a red dotted line and the rope flying at you. If hit you **lose one keyword**, and while being pulled you can't move, use skills, or touch other circles. Move sideways to dodge.
                     - After being pulled you always collide with the user. The lower-scoring side can lose one more keyword, so be careful against higher-scoring players."""),
-            new Added("skills", "💥 충격파", """
-                    내 원 둘레로 **충격파를 퍼뜨려 닿은 원을 바깥으로 밀어내요.** 키워드는 잃지 않아요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+            new Added("skills", "🌀 반발", """
+                    내 원 둘레로 **방어막 파문을 퍼뜨려 닿은 원을 바깥으로 밀어내요.** 키워드는 잃지 않아요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
 
-                    [[스킬 충격파]]
+                    [[스킬 반발]]
 
-                    - **언제 쓸까요**: 여러 원에게 둘러싸였을 때 거리를 벌리거나, 가까이 붙은 상대를 떼어 낼 때 좋아요.
-                    - **내 화면**: 내 원에서 고리가 퍼져 나가요. 고리의 바깥 점선이 닿는 범위예요. 닿은 원은 바깥으로 밀려나요.
-                    - **상대 화면**: 퍼지는 빨간 고리에 닿으면 바깥으로 밀려나요. 키워드를 잃지는 않아요. 고리가 닿기 전에 범위 밖으로 움직이면 피할 수 있어요.
-                    - **모양과 범위**: 고리는 일정한 간격으로 지그재그인 물결 모양으로 퍼져요. 퍼지는 거리는 내 원 가장자리에서 화면 기준 약 300px(설정값)라서 가장 작은 원도 충분히 멀리 닿아요.
+                    - **언제 쓸까요**: 여러 원에게 둘러싸였을 때 거리를 벌리거나, 가까이 붙은 상대를 떼어 낼 때 좋아요. 방어하는 스킬이에요.
+                    - **내 화면**: 내 원에서 청록빛 보호막 파문이 퍼져 나가요. 바깥의 점선이 닿는 범위예요. 닿은 원은 바깥으로 밀려나요.
+                    - **상대 화면**: 퍼지는 청록 파문에 닿으면 바깥으로 밀려나요. 키워드를 잃지는 않아요. 파문이 닿기 전에 범위 밖으로 움직이면 피할 수 있어요.
+                    - **범위**: 퍼지는 거리는 내 원 가장자리에서 화면 기준 약 300px(설정값)라서 가장 작은 원도 충분히 멀리 닿아요.
                     - 세이프존 안의 원이나 방패·무적 중인 원은 밀리지 않아요.""",
-                    "💥 Shockwave", """
-                    **Send a shockwave out around your circle that pushes touched circles outward.** They do not lose keywords. See the table above for the unlock level. **It can't be used inside safe zones.**
+                    "🌀 Repel", """
+                    **Spread a protective ripple around your circle that pushes touched circles outward.** They do not lose keywords. See the table above for the unlock level. **It can't be used inside safe zones.**
 
-                    [[skill shockwave]]
+                    [[skill repel]]
 
-                    - **When to use it**: Open some distance when surrounded by several circles, or shake off someone stuck to you.
-                    - **Your screen**: A ring spreads out from your circle. The dotted outer line shows the reach. Circles it touches are pushed outward.
-                    - **The other player's screen**: If the red spreading ring touches you, you are pushed outward. You don't lose keywords. Move out of its range before it reaches you to dodge.
-                    - **Shape and range**: The ring spreads out as a zigzag wave at even intervals. It reaches about 300 px on screen from your circle's edge (a setting), so even the smallest circle reaches far enough.
+                    - **When to use it**: Open some distance when surrounded by several circles, or shake off someone stuck to you. It is a defensive skill.
+                    - **Your screen**: A teal shield ripple spreads out from your circle. The dotted outer line shows the reach. Circles it touches are pushed outward.
+                    - **The other player's screen**: If the spreading teal ripple touches you, you are pushed outward. You don't lose keywords. Move out of its range before it reaches you to dodge.
+                    - **Range**: It reaches about 300 px on screen from your circle's edge (a setting), so even the smallest circle reaches far enough.
                     - Circles in safe zones, or shielded or invulnerable circles, are not pushed."""),
+            new Added("skills", "💥 충격파", """
+                    내 원 둘레로 **충격파를 퍼뜨려 닿은 원이 키워드 3개를 잃게 해요.** 잃은 키워드는 **아무도 가져가지 않아요.** 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 충격파 키워드]]
+
+                    - **언제 쓸까요**: 여러 원이 모여 있을 때 한꺼번에 키워드를 잃게 하고 싶을 때 좋아요.
+                    - **내 화면**: 내 원에서 붉은 물결 고리가 균열과 함께 퍼져 나가요. 바깥 점선이 닿는 범위예요. 닿은 원은 키워드를 잃어요(밀려나지는 않아요).
+                    - **상대 화면**: 퍼지는 빨간 고리에 닿으면 **키워드가 무작위로 3개** 사라져요. 고리가 닿기 전에 범위 밖으로 움직이면 피할 수 있어요. 키워드를 잃으면 콤보와 불꽃이 끊겨요.
+                    - **한 번만**: 한 충격파에 같은 원은 한 번만 맞아요. 맞은 원이 생길 때마다 **콤보가 +1**이에요.
+                    - 세이프존 안의 원이나 방패·무적 중인 원은 맞지 않아요. **🌀 반발**과 달리 밀어내지 않고 키워드만 잃게 해요.""",
+                    "💥 Shockwave", """
+                    **Spread a shockwave around your circle that makes touched circles lose 3 keywords.** Lost keywords are **taken by no one.** See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill quake]]
+
+                    - **When to use it**: When several circles are bunched up and you want them all to lose keywords at once.
+                    - **Your screen**: A red wave ring spreads out from your circle with cracks. The dotted outer line shows the reach. Circles it touches lose keywords (they are not pushed).
+                    - **The other player's screen**: If the spreading red ring touches you, **3 random keywords** disappear. Move out of its range before it reaches you to dodge. Losing keywords breaks your combo and flame.
+                    - **Only once**: The same circle is hit only once per shockwave. You get **+1 combo** for each circle it hits.
+                    - Circles in safe zones, or shielded or invulnerable circles, are not hit. Unlike **🌀 Repel**, it doesn't push; it only makes you lose keywords."""),
             new Added("skills", "👻 은신", """
-                    **잠깐 다른 사람 눈에 배경처럼 안 보여요.** 해금 레벨은 위 표를 보세요. 공격 스킬(갈고리, 충격파, 독, 암흑)을 쓰면 풀려요.
+                    **잠깐 다른 사람 눈에 배경처럼 안 보여요.** 해금 레벨은 위 표를 보세요. 공격 스킬(갈고리, 반발, 충격파, 슬로우, 스턴, 화염구, 흡수, 독, 암흑)을 쓰면 풀려요.
 
                     [[스킬 은신]]
 
@@ -631,7 +673,7 @@ final class GuideSeed {
                     - **상대 화면**: 은신한 원은 서서히 사라져 이름, 테두리, 효과까지 배경과 똑같아 보여요(미니맵에서도 빠져요). 대신 **가까이 오면 내 원 위에 빨간 !**가 떠서 조심하라고 알려 줘요.
                     - 눈에 안 보일 뿐 몸은 그대로라서, 부딪히면 평소처럼 밀리고 키워드를 잃을 수 있어요. 세이프존 안에서는 ! 경고가 뜨지 않아요.""",
                     "👻 Stealth", """
-                    **Briefly blend into the background for other players.** See the table above for the unlock level. Using an attack skill (Hook, Shockwave, Poison, Darkness) ends it.
+                    **Briefly blend into the background for other players.** See the table above for the unlock level. Using an attack skill (Hook, Repel, Shockwave, Slow, Stun, Fireball, Absorb, Poison, Darkness) ends it.
 
                     [[skill stealth]]
 
@@ -670,6 +712,7 @@ final class GuideSeed {
                     - **스택**: 독이 끝나기 전에 또 맞으면 **스택이 올라가고(최대 10)** 9초를 처음부터 다시 세요. 1스택은 틱마다 키워드 1개, 2스택은 틱마다 2개를 잃어요.
                     - **내 화면**: 맞으면 상대 머리 위에 ☠ ×스택과 남은 초가 떠요. 독으로 잃은 키워드는 **빼앗지 못해요**(아무도 가져가지 않아요).
                     - **상대 화면(맞은 사람)**: 3초마다 키워드를 잃어요. 잃는 키워드는 **무작위**예요. 한 번에 여러 개를 잃으면 결과 카드에 **"키워드 N개"로 개수만** 알려 주고, 어떤 키워드인지는 보여 주지 않아요. 독으로 잃으면 콤보와 불꽃이 끊겨요.
+                    - **콤보**: 독이 키워드를 잃게 할 때마다(틱마다) **콤보가 +1**이에요.
                     - **✨ 정화**로 풀 수 있어요. 세이프존 안이거나 방패·무적 중이면 투사체가 통과하고, 키워드를 잃은 뒤 무적은 독을 막지 않아요.""",
                     "☠️ Poison", """
                     **Throw a poison bolt** toward your aim. The circle it hits **loses a keyword every 3 seconds for 9 seconds** (3 times in total). See the table above for the unlock level. **It can't be used inside safe zones.**
@@ -680,9 +723,86 @@ final class GuideSeed {
                     - **Stacks**: If you are hit again before the poison ends, the **stacks rise (up to 10)** and the 9 seconds start over. 1 stack loses 1 keyword per tick, 2 stacks lose 2 per tick.
                     - **Your screen**: When it hits, ☠ ×stacks and the seconds left appear above the target. Keywords lost to poison **can't be stolen** (nobody takes them).
                     - **The other player's screen (the one hit)**: You lose keywords every 3 seconds, and which ones is **random**. If you lose several at once, the result card only tells you **"N keywords"**, not which ones. Losing keywords to poison breaks your combo and flame.
+                    - **Combo**: Each time the poison makes the target lose keywords (every tick) you get **+1 combo**.
                     - **✨ Cleanse** removes it. The bolt passes through circles in safe zones and shielded or invulnerable circles, and the invulnerability after losing a keyword does not block poison.""")
+            ,new Added("skills", "🧊 슬로우", """
+                    겨눈 방향으로 **얼음 투사체를 던져요.** 맞은 원은 **3초 동안 이동 속도가 50% 느려져요.** 다시 맞으면 겹쳐서 더 느려져요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 슬로우]]
+
+                    - **겨누는 법**: 암흑·독과 같은 투사체예요(속도와 사거리도 같아요).
+                    - **겹침**: 슬로우가 풀리기 전에 또 맞으면 **한 겹 더 쌓여요(최대 3겹)**. 한 겹마다 속도가 절반이라 2겹은 25%, 3겹은 약 12%까지 느려지고, 남은 시간은 다시 3초로 돌아가요.
+                    - **내 화면**: 맞으면 상대 머리 위에 🧊 ×겹 수와 남은 초가 떠요.
+                    - **상대 화면(맞은 사람)**: 이동 속도가 느려져요(대시와 겹치면 둘이 곱해져요). 스킬은 쓸 수 있어요.
+                    - **✨ 정화**로 풀 수 있어요. 세이프존 안이거나 방패·무적 중이면 투사체가 통과해요.""",
+                    "🧊 Slow", """
+                    **Throw an ice bolt** toward your aim. The circle it hits **moves 50% slower for 3 seconds.** Hits stack, slowing it even more. See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill slow]]
+
+                    - **Aiming**: The same bolt as Darkness and Poison (same speed and range).
+                    - **Stacks**: If you are hit again before it wears off, it **stacks one more layer (up to 3)**. Each layer halves the speed, so 2 layers is 25% and 3 layers about 12%, and the time goes back to 3 seconds.
+                    - **Your screen**: When it hits, 🧊 ×layers and the seconds left appear above the target.
+                    - **The other player's screen (the one hit)**: Your movement speed drops (it multiplies with Dash). You can still use skills.
+                    - **✨ Cleanse** removes it. The bolt passes through circles in safe zones and shielded or invulnerable circles.""")
+            ,new Added("skills", "💫 스턴", """
+                    겨눈 방향으로 **번개 투사체를 던져요.** 맞은 원은 **1초 동안 움직이지도 스킬을 쓰지도 못해요.** 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 스턴]]
+
+                    - **겨누는 법**: 암흑·독과 같은 투사체예요(속도와 사거리도 같아요).
+                    - **내 화면**: 맞으면 상대 머리 위에 별이 빙글 돌아요.
+                    - **상대 화면(맞은 사람)**: 1초 동안 제자리에 멈춰요. 입력은 받지만 움직이지 않고, 정화 말고는 스킬도 쓸 수 없어요. 다른 원과 부딪히면 평소처럼 처리돼요.
+                    - **✨ 정화**로 바로 풀 수 있어요. 세이프존 안이거나 방패·무적 중이면 투사체가 통과해요.""",
+                    "💫 Stun", """
+                    **Throw a lightning bolt** toward your aim. The circle it hits **can neither move nor use skills for 1 second.** See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill stun]]
+
+                    - **Aiming**: The same bolt as Darkness and Poison (same speed and range).
+                    - **Your screen**: When it hits, stars spin above the target.
+                    - **The other player's screen (the one hit)**: You stop in place for 1 second. Your input is received but you don't move, and you can't use skills except Cleanse. Collisions with other circles are settled as usual.
+                    - **✨ Cleanse** frees you at once. The bolt passes through circles in safe zones and shielded or invulnerable circles.""")
+            ,new Added("skills", "🔥 화염구", """
+                    겨눈 곳에서 **가장 가까운 상대를 노려 화염구 3발을 던져요.** 화염구는 **반드시 맞고**, 한 발에 키워드 1개씩 **총 3개를 잃어요.** 잃은 키워드는 **아무도 가져가지 않아요.** 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 불꽃]]
+
+                    - **겨누는 법**: PC는 마우스 근처, 모바일은 조이스틱 방향 근처의 상대를 골라요. 내 원 가장자리에서 화면 기준 약 600px(설정값) 안에 상대가 없으면 쓰이지 않고 쿨타임도 쓰지 않아요.
+                    - **내 화면**: 0.15초 간격으로 화염구 3발이 상대를 따라가며 날아가요. 한 발이 맞을 때마다 **콤보가 +1**이라 3발이 모두 맞으면 +3이에요.
+                    - **상대 화면(맞은 사람)**: 화염구는 피할 수 없어요. 한 발마다 **무작위 키워드 1개**를 잃어요. 키워드를 잃으면 콤보와 불꽃이 끊겨요.
+                    - 날아오는 동안 상대가 세이프존에 들어가거나 방패·무적이 되면 화염구가 꺼져요. **✨ 정화**로는 이미 잃은 키워드를 되돌릴 수 없어요.""",
+                    "🔥 Fireball", """
+                    **Throw 3 fireballs at the nearest opponent to your aim.** The fireballs **always hit**, and each takes **one keyword, 3 in total.** Lost keywords are **taken by no one.** See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill flame]]
+
+                    - **Aiming**: On PC it picks the opponent near the mouse; on mobile near the joystick direction. If no one is within about 600 px on screen from your circle's edge (a setting), it isn't used and the cooldown isn't spent.
+                    - **Your screen**: 3 fireballs fly out 0.15 seconds apart, following the target. Each hit gives you **+1 combo**, so all 3 hitting gives +3.
+                    - **The other player's screen (the one hit)**: You can't dodge the fireballs. Each one takes **one random keyword**. Losing keywords breaks your combo and flame.
+                    - If the target enters a safe zone or becomes shielded or invulnerable while a fireball is in flight, it goes out. **✨ Cleanse** can't bring back keywords already lost.""")
+            ,new Added("skills", "🧲 흡수", """
+                    사거리 안에 있는 **모든 원과 선을 이어요.** 이은 순간 **키워드 1개를 빼앗고, 1초 뒤 1개, 또 1초 뒤 1개를 더 빼앗아** 원마다 모두 3개예요. 사거리를 벗어난 원과는 선이 끊겨요. 해금 레벨은 위 표를 보세요. **세이프존 안에서는 쓸 수 없어요.**
+
+                    [[스킬 흡수]]
+
+                    - **쓰는 법**: 겨누지 않아요. 내 원 가장자리에서 화면 기준 약 600px(설정값) 안에 세이프존 밖의 원이 하나도 없으면 쓰이지 않고 쿨타임도 쓰지 않아요.
+                    - **내 화면**: 사거리 안의 원마다 보랏빛 선이 이어지고, 키워드를 빼앗는 순간(이은 순간, 1초 뒤, 2초 뒤) 번쩍여요. 빼앗은 키워드는 내 보관함에 들어와요.
+                    - **상대 화면(맞은 사람)**: 선이 이어진 순간 키워드를 빼앗기고, 1초마다 또 빼앗겨요. **사거리 밖으로 벗어나면 그 선이 끊겨요.** 선이 이어진 동안에는 잃은 뒤 무적이 생기지 않아요.
+                    - **콤보**: 빼앗는 순간마다 **콤보가 +1**이에요. 세 명에게서 끝까지 빼앗으면 +9예요.
+                    - **끊기는 때**: 사거리를 벗어날 때, 상대가 세이프존에 들어가거나 쓰러질 때, 내가 갈고리에 끌려올 때, 상대가 **✨ 정화**를 쓸 때예요. 다시 쓰면 이전 선은 끊기고 새로 이어져요.""",
+                    "🧲 Absorb", """
+                    **Link a line to every circle within range.** You **steal 1 keyword the moment it connects, 1 more a second later and 1 more a second after that**: 3 from each circle. The line to a circle breaks if it gets out of range. See the table above for the unlock level. **It can't be used inside safe zones.**
+
+                    [[skill absorb]]
+
+                    - **Using it**: You don't aim. If no circle outside safe zones is within about 600 px on screen from your circle's edge (a setting), it isn't used and the cooldown isn't spent.
+                    - **Your screen**: A purple line connects to each circle in range and flashes each time a keyword is stolen (when it connects, 1 second later, 2 seconds later). Stolen keywords go into your collection.
+                    - **The other player's screen (the one hit)**: You lose a keyword the moment the line connects, then another every second. **If you get out of range, that line breaks.** You get no invulnerability after losing a keyword while the line holds.
+                    - **Combo**: Each steal gives **+1 combo**. Stealing from three circles to the end gives +9.
+                    - **When it breaks**: When the target leaves the range, enters a safe zone or is defeated, when you are pulled by a hook, or when the target uses **✨ Cleanse**. Using it again breaks the old lines and links new ones.""")
             ,new Added("skills", "✨ 정화", """
-                    **걸려 있는 방해를 한꺼번에 풀어요.** 갈고리에 끌려오는 중이든, ☠️ 독이든, 🕶️ 암흑이든 모두 사라져요. 해금 레벨은 위 표를 보세요. 다른 공격 스킬과 달리 **세이프존 안에서도 쓸 수 있어요.**
+                    **걸려 있는 방해를 한꺼번에 풀어요.** 갈고리에 끌려오는 중이든, ☠️ 독, 🕶️ 암흑, 🧊 슬로우, 💫 스턴, 🧲 흡수 선이든 모두 사라져요. 해금 레벨은 위 표를 보세요. 다른 공격 스킬과 달리 **세이프존 안에서도 쓸 수 있어요.**
 
                     [[스킬 정화]]
 
@@ -691,7 +811,7 @@ final class GuideSeed {
                     - **상대 화면**: 같은 연출이 보여서 걸어 둔 방해가 풀렸다는 걸 알 수 있어요. 정화 뒤에 면역은 없어서 바로 다시 걸 수 있어요(기본값).
                     - 정화는 상대를 건드리지 않아요. 키워드를 빼앗거나 잃게 하지 않고, 나를 지키는 데만 써요.""",
                     "✨ Cleanse", """
-                    **Remove every effect on you at once.** Being pulled by a hook, ☠️ poison or 🕶️ darkness, all of it disappears. See the table above for the unlock level. Unlike the other attack skills, **it can be used inside safe zones.**
+                    **Remove every effect on you at once.** Being pulled by a hook, ☠️ poison, 🕶️ darkness, 🧊 slow, 💫 stun or a 🧲 absorb line, all of it disappears. See the table above for the unlock level. Unlike the other attack skills, **it can be used inside safe zones.**
 
                     [[skill cleanse]]
 

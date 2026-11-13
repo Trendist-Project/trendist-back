@@ -182,10 +182,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.EAT_MIN_REACH));
     }
 
-    /** 독·암흑·정화의 쿨타임(DB skills). 테스트 중에는 0이다. */
+    /** 독·암흑·정화·회복·슬로우·스턴·불꽃·충격파·흡수의 쿨타임(DB skills). 테스트 중에는 0이다. */
     private java.util.Map<String, Double> extraSkillCooldowns() {
         return java.util.Map.of("poison", skillCatalog.cooldownSeconds("poison", 0), "darkness", skillCatalog.cooldownSeconds("darkness", 0), "cleanse", skillCatalog.cooldownSeconds("cleanse", 0),
-                "heal", skillCatalog.cooldownSeconds("heal", 0), "heal_percent", settings.getDouble(SettingKeys.SKILL_HEAL_PERCENT)); // heal_percent는 쿨타임이 아니라 회복 스킬의 회복량(%)이다
+                "heal", skillCatalog.cooldownSeconds("heal", 0), "heal_percent", settings.getDouble(SettingKeys.SKILL_HEAL_PERCENT),
+                "slow", skillCatalog.cooldownSeconds("slow", 0), "stun", skillCatalog.cooldownSeconds("stun", 0), "flame", skillCatalog.cooldownSeconds("flame", 0),
+                "quake", skillCatalog.cooldownSeconds("quake", 0), "absorb", skillCatalog.cooldownSeconds("absorb", 0)); // heal_percent는 쿨타임이 아니라 회복 스킬의 회복량(%)이다
     }
 
     /** 대시 설정(4.27). */
@@ -450,6 +452,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     @Override
     public void requestPoisonLose(Room room, Room.Member victim, Room.Member owner, int count) {
+        requestSkillLose(room, victim, owner, count, "poison");
+    }
+
+    @Override
+    public void requestSkillLose(Room room, Room.Member victim, Room.Member owner, int count, String cause) {
         long victimId = victim.playerId;
         String by = owner != null ? owner.nickname : "☠";
         db(() -> {
@@ -469,7 +476,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                     Room.Member m = r.byPlayer(victimId);
                     if (m != null) {
                         r.poisonLost(m, owner);
-                        sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "poison", true, "count", texts.size()));
+                        sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "poison", true, "cause", cause, "count", texts.size()));
                     }
                 });
             } catch (RuntimeException e) {

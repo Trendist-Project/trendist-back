@@ -47,6 +47,8 @@ public class Room {
         void requestLose(Room room, Member loser, Member winner);
         /** 독(4.33)으로 키워드를 count개 잃는다(빼앗는 사람 없음). owner는 독을 건 사람(알림용). 틱 밖에서 무작위로 잃고 당한 사람에게 알린다. */
         default void requestPoisonLose(Room room, Member victim, Member owner, int count) {}
+        /** 독 말고 스킬(충격파 "quake"·불꽃 "flame")로 키워드를 count개 잃는다. cause는 알림에 실어 보내 잃은 원인을 보여 주는 데 쓴다. 기본은 독과 같다. */
+        default void requestSkillLose(Room room, Member victim, Member owner, int count, String cause) { requestPoisonLose(room, victim, owner, count); }
         /** 장착 스킬 4칸이 바뀌었다(4.33). slots는 쉼표로 이은 코드(빈 칸은 빈 문자열)이고 틱 밖에서 저장한다. */
         default void saveSkillSlots(Room room, Member member, List<String> slots) {}
         /** ? 구슬을 먹었다. 보상(무작위 🔥 키워드)은 틱 밖에서 정하고 먹은 사람에게 알린다(4.20). */
@@ -147,7 +149,7 @@ public class Room {
     /** 스킬 코드(4.33). 클라이언트는 이 코드로 쓴다 */
     /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
     public static final int DEFAULT_SKILL_SLOTS = 4;
-    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse", "heal");
+    public static final List<String> SKILLS = List.of("shockwave", "hook", "shield", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "flame", "quake", "absorb");
 
     /** 투사체 스킬(독·암흑, 4.33): 화면에서 보이는 속도는 갈고리가 뻗는 속도(hookReachPx ÷ hookSeconds)와 같고, 사거리는 SkillTuning.boltReachPx다(둘 다 reachWorld로 월드 길이로 바꾼다) */
     /** 투사체 반지름 = 쓴 원 반지름 × BOLT_RADIUS_RATIO(최소 BOLT_MIN_RADIUS px). 판정과 화면 그림이 같은 값을 쓴다 */
@@ -161,9 +163,31 @@ public class Room {
     static final double DARK_SIGHT_RATIO = 1.5;
     /** 정화를 쓴 뒤 새 CC(갈고리·독·암흑·충격파)에 걸리지 않는 시간(초). 0이면 면역 없음 */
     static final double CLEANSE_IMMUNE_SECONDS = 0;
+    /** 슬로우: 맞으면 SLOW_SECONDS 동안 이동 속도가 SLOW_MULT배가 된다. 다시 맞으면 겹쳐서(SLOW_MULT^겹 수, 최대 SLOW_MAX_STACKS겹) 시간은 처음부터 다시 센다 */
+    static final double SLOW_SECONDS = 3, SLOW_MULT = 0.5;
+    static final int SLOW_MAX_STACKS = 3;
+    /** 스턴: 맞으면 STUN_SECONDS 동안 움직이지도 스킬을 쓰지도 못한다 */
+    static final double STUN_SECONDS = 1;
+    /** 불꽃: 조준점에 가장 가까운 상대를 노려 FLAME_COUNT발을 FLAME_INTERVAL초 간격으로 던진다. 반드시 맞고(FLAME_MAX_FLIGHT초 안에) 한 발에 키워드 1개를 잃는다 */
+    static final int FLAME_COUNT = 3;
+    static final double FLAME_INTERVAL = 0.15, FLAME_MAX_FLIGHT = 3;
+    /** 충격파(키워드 잃게 하기): 닿은 원이 잃는 키워드 수. 잃은 키워드는 아무도 가져가지 않는다 */
+    static final int QUAKE_DROP = 3;
+    /** 흡수: 사거리(boltReachPx) 안의 모든 원과 선을 잇고, 쓰는 순간 1개, 이후 ABSORB_TICK_SECONDS마다 1개씩 ABSORB_SECONDS 동안 뺏는다(원마다 3개). 사거리를 벗어나면 그 원의 선만 끊긴다 */
+    static final double ABSORB_SECONDS = 3, ABSORB_TICK_SECONDS = 1;
 
     /** 퍼지고 있는 충격파: 쓴 자리(x, y)에서 반지름 r0로 시작해 speed(px/s)로 rMax까지 퍼진다. hit은 이미 맞은 원 */
-    private record Shock(Member owner, double x, double y, double r0, double rMax, double speed, double startedAt, Set<Member> hit) {}
+    private record Shock(Member owner, double x, double y, double r0, double rMax, double speed, double startedAt, Set<Member> hit, boolean drop) {}
+    /** 날아가는 불꽃 한 발(조준한 상대를 끝까지 따라간다). launchAt 전에는 아직 던지지 않았다 */
+    private static final class Flame {
+        final int id; final Member owner, target; final double launchAt; boolean launched; double x, y, flown;
+        Flame(int id, Member owner, Member target, double launchAt) { this.id = id; this.owner = owner; this.target = target; this.launchAt = launchAt; }
+    }
+    /** 흡수 선: owner가 target과 이어져 있다. nextAt은 다음에 빼앗는 시각, left는 남은 횟수, until은 선이 끝나는 시각 */
+    private static final class Tether {
+        final Member owner, target; final double range, until; double nextAt; int left;
+        Tether(Member owner, Member target, double range, double nextAt, int left, double until) { this.owner = owner; this.target = target; this.range = range; this.nextAt = nextAt; this.left = left; this.until = until; }
+    }
     /** 날아가는 갈고리: 쓴 사람 중심에서 (dirX, dirY) 방향으로 seconds에 걸쳐 range까지 뻗는다 */
     private record Hook(Member owner, double dirX, double dirY, double range, double startedAt, double seconds) {}
 
@@ -218,6 +242,9 @@ public class Room {
         Member poisonOwner;
         /** 암흑이 끝나는 시각(방 시계 초), 정화 뒤 CC 면역이 끝나는 시각 */
         public double darkUntil, ccImmuneUntil;
+        /** 슬로우(4.33): 겹 수와 끝나는 시각. 스턴이 끝나는 시각 */
+        public int slowStacks;
+        public double slowUntil, stunUntil;
         public double radius, displayRadius;
         public double dirX, dirY;          // 방향키 입력(-1~1)
         public Double targetX, targetY;    // 클릭 목표(새로 찍으면 바로 바뀐다)
@@ -291,6 +318,9 @@ public class Room {
     private volatile List<Map<String, Object>> monsterView = List.of();
     private final List<Shock> shocks = new ArrayList<>();
     private final List<Hook> hooks = new ArrayList<>();
+    private final List<Flame> flames = new ArrayList<>();
+    private final List<Tether> tethers = new ArrayList<>();
+    private int nextFlameId = 1;
     /**
      * 지금의 활동 영역 한 변(0이면 아직 정하지 않음). 목표(접속 인원에 따른 값)보다 클 때는 areaShrinkSpeed(px/s)로만 줄어들어서
      * 사람이 한꺼번에 나가거나 서버를 다시 켜도 원이 가장자리로 한꺼번에 밀려나지 않는다. 목표가 더 크면 바로 커진다. 틱 스레드에서만 바꾼다.
@@ -783,7 +813,10 @@ public class Room {
         updateShocks(tu);
         updateHooks(tu);
         updateBolts(dt);
+        updateFlames(dt);
+        updateAbsorbs();
         updatePoison();
+        updateStatus();
         collide(tu);
         tickMonsters(dt);
         finishHooks(tu);
@@ -910,8 +943,9 @@ public class Room {
      * 클라이언트 예측과 같은 곳에 멈춘다(틱 경계로 반올림하면 최대 50ms만큼 더 가거나 덜 가서, 멈춘 뒤 화면이 보정된다).
      */
     private void move(Member m, double dt, Tuning tu, double half) {
-        if (m.hookedBy != null) {
-            // 갈고리에 끌려오는 중(4.33): 조작은 받아 두되 움직이지 않는다. 위치는 pullHooked가 정한다
+        if (m.hookedBy != null || stunned(m)) {
+            // 갈고리에 끌려오는 중이거나 스턴(4.33): 조작은 받아 두되 움직이지 않는다. 끌려올 때 위치는 pullHooked가 정한다
+            if (stunned(m)) { m.vx = 0; m.vy = 0; }
             for (Control c : m.controls) {
                 if (c.targetX() != null) setTarget(m, c.targetX(), c.targetY());
                 else setInput(m, c.dx(), c.dy());
@@ -946,7 +980,7 @@ public class Room {
      */
     private void advance(Member m, double h, Tuning tu) {
         if (h <= 0) return;
-        double speed = tu.maxSpeed() * (clockSeconds < m.dashUntil ? dashTuning.multiplier() : 1); // 크기와 관계없이 모두 같다. 대시 중이면 배수
+        double speed = tu.maxSpeed() * (clockSeconds < m.dashUntil ? dashTuning.multiplier() : 1) * slowMult(m); // 크기와 관계없이 모두 같다. 대시 중이면 배수, 슬로우면 감속
         double wantX = 0, wantY = 0;
         if (m.dirX != 0 || m.dirY != 0) {
             wantX = m.dirX * speed; wantY = m.dirY * speed;
@@ -1470,7 +1504,7 @@ public class Room {
      * 클라이언트 예측이 같은 속도로 가게 하고, 모두에게 {dashFx: 원 번호, 지속 ms}를 보내 그 원에 강조 효과를 그리게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
      */
     public void dash(Member m) {
-        if (m.bot || members.get(m.entityNo) != m || m.hookedBy != null || disabledSkills.contains("dash")) return; // 끌려오는 동안은 스킬을 쓸 수 없다(4.33)
+        if (m.bot || members.get(m.entityNo) != m || m.hookedBy != null || stunned(m) || disabledSkills.contains("dash")) return; // 끌려오는 동안은 스킬을 쓸 수 없다(4.33)
         DashTuning d = dashTuning;
         if (clockSeconds < m.dashReadyAt) return;
         if (!unlocked(m, "dash")) return;
@@ -1491,14 +1525,17 @@ public class Room {
      */
     public void skill(Member m, String id, double ax, double ay) {
         int idx = SKILLS.indexOf(id);
-        if (idx < 0 || m.bot || m.dead || m.offline || members.get(m.entityNo) != m || (m.hookedBy != null && !"cleanse".equals(id)) || disabledSkills.contains(id)) return; // 끌려오는 중에도 정화는 쓴다
+        if (idx < 0 || m.bot || m.dead || m.offline || members.get(m.entityNo) != m || ((m.hookedBy != null || stunned(m)) && !"cleanse".equals(id)) || disabledSkills.contains(id)) return; // 끌려오거나 스턴인 중에도 정화는 쓴다
         if (clockSeconds < m.skillReadyAt[idx]) return;
         if (!unlocked(m, id)) return; // 해금 레벨이 안 되면 쓰지 못한다(서버가 판정)
         if (!equippedSkills(m).contains(id)) { outbox.sendText(m, Map.of("type", "skillFail", "id", id, "reason", "unequipped")); return; } // 장착해야만 쓴다(4.33)
         SkillTuning s = skillTuning;
         double cooldown;
         switch (id) {
-            case "shockwave" -> { if (!attackAllowed(m, id)) return; castShockwave(m, s); cooldown = s.shockCooldown(); }
+            case "shockwave" -> { if (!attackAllowed(m, id)) return; castShockwave(m, s, false); cooldown = s.shockCooldown(); }
+            case "quake" -> { if (!attackAllowed(m, id)) return; castShockwave(m, s, true); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
+            case "flame" -> { if (!attackAllowed(m, id) || !castFlame(m, ax, ay)) return; cooldown = skillCooldowns.getOrDefault(id, 0.0); }
+            case "absorb" -> { if (!attackAllowed(m, id) || !castAbsorb(m)) return; cooldown = skillCooldowns.getOrDefault(id, 0.0); }
             case "hook" -> { if (!attackAllowed(m, id)) return; castHook(m, s, ax, ay); cooldown = s.hookCooldown(); }
             case "shield" -> {
                 // 키워드를 잃은 뒤 무적과 같다: 다른 원과 충돌하지 않고 통과한다(4.3). 보호막은 같은 연출을 쓴다
@@ -1511,7 +1548,7 @@ public class Room {
                 broadcast(Map.of("type", "skillFx", "id", "stealth", "e", m.entityNo, "ms", Math.round(s.stealthSeconds() * 1000)));
                 cooldown = s.stealthCooldown();
             }
-            case "poison", "darkness" -> { if (!attackAllowed(m, id)) return; castBolt(m, id, ax, ay); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
+            case "poison", "darkness", "slow", "stun" -> { if (!attackAllowed(m, id)) return; castBolt(m, id, ax, ay); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
             case "cleanse" -> { cleanse(m); cooldown = skillCooldowns.getOrDefault(id, 0.0); }
             case "heal" -> { // 회복: 최대 체력의 일정 %를 바로 채운다(세이프존 밖에서도 쓴다). 체력이 이미 가득이거나 체력 방식이 꺼져 있으면 쿨타임을 쓰지 않는다
                 if (!hpTuning.enabled() || m.hp >= hpTuning.max()) { outbox.sendText(m, Map.of("type", "skillFail", "id", id, "reason", "hpFull")); return; }
@@ -1661,7 +1698,12 @@ public class Room {
                 Map<String, Object> end = new HashMap<>();
                 end.put("type", "skillFx"); end.put("id", "boltEnd"); end.put("bid", b.id); end.put("hit", best.entityNo); end.put("x", hx); end.put("y", hy);
                 broadcast(end);
-                if ("poison".equals(b.kind)) applyPoison(best, o); else applyDarkness(best);
+                switch (b.kind) {
+                    case "poison" -> applyPoison(best, o);
+                    case "slow" -> applySlow(best);
+                    case "stun" -> applyStun(best);
+                    default -> applyDarkness(best);
+                }
                 continue;
             }
             b.x = nx; b.y = ny; b.left -= step;
@@ -1691,6 +1733,7 @@ public class Room {
             } else {
                 outbox.requestPoisonLose(this, m, m.poisonOwner, count);
             }
+            skillHitCombo(m.poisonOwner, m); // 독이 키워드를 잃게 할 때마다(틱마다) 히트 한 번
             m.poisonTicksLeft--;
             m.poisonNextAt += POISON_TICK_SECONDS;
             if (m.poisonTicksLeft <= 0) clearPoison(m);
@@ -1728,9 +1771,214 @@ public class Room {
             if (!m.bot) outbox.sendText(m, Map.of("type", "pullEnd"));
         }
         clearPoison(m);
+        clearSlow(m); clearStun(m);
+        endAbsorbsOn(m);
         if (m.darkUntil > clockSeconds) { m.darkUntil = 0; if (!m.bot) outbox.sendText(m, Map.of("type", "darkEnd")); }
         m.ccImmuneUntil = clockSeconds + CLEANSE_IMMUNE_SECONDS;
         broadcast(Map.of("type", "skillFx", "id", "cleanse", "e", m.entityNo));
+    }
+
+
+    // ---- 슬로우·스턴·불꽃·흡수(4.33)
+
+    private boolean stunned(Member m) { return clockSeconds < m.stunUntil; }
+
+    /** 지금 이동 속도 배수: 슬로우 겹 수만큼 SLOW_MULT를 거듭 곱한다(없으면 1) */
+    private double slowMult(Member m) { return clockSeconds < m.slowUntil && m.slowStacks > 0 ? Math.pow(SLOW_MULT, m.slowStacks) : 1; }
+
+    /** 키워드를 떨군다(아무도 가져가지 않는다): 사람은 DB에서 무작위로 count개, 봇은 메모리 목록에서. 콤보·불꽃이 끊긴다(독과 같다). */
+    private void dropKeywords(Member v, Member owner, int count, String cause) {
+        if (v.bot) {
+            for (int i = 0; i < count && !v.botKeywords.isEmpty(); i++) botLose(v, tuning);
+            comboLose(v, owner);
+        } else {
+            outbox.requestSkillLose(this, v, owner, count, cause);
+        }
+        skillHitCombo(owner, v); // 화염구 한 발·충격파에 닿은 원 하나가 히트 한 번이다
+    }
+
+    /**
+     * 공격 스킬이 한 번 맞았다(히트 판정 하나): 쓴 사람은 콤보 +1(상대 콤보는 키워드를 잃는 쪽에서 끊긴다). CC·방어·유틸 스킬은 콤보에 들어가지 않는다.
+     * 몸싸움·갈고리·흡수는 키워드를 빼앗는 경로(fightResult)에서 이미 +1이고, 이 메서드는 아무도 가져가지 않는 공격(독·화염구·충격파)에서 쓴다.
+     */
+    private void skillHitCombo(Member owner, Member victim) {
+        if (owner == null || owner.bot || owner.dead || members.get(owner.entityNo) != owner) return;
+        comboWin(owner, victim != null && victim.bot);
+    }
+
+    /** 슬로우에 걸린다: 이미 걸려 있으면 겹이 오르고(최대 SLOW_MAX_STACKS) 시간은 처음부터 다시 센다. */
+    private void applySlow(Member t) {
+        t.slowStacks = clockSeconds < t.slowUntil && t.slowStacks > 0 ? Math.min(SLOW_MAX_STACKS, t.slowStacks + 1) : 1;
+        t.slowUntil = clockSeconds + SLOW_SECONDS;
+        long ms = Math.round(SLOW_SECONDS * 1000);
+        if (!t.bot) outbox.sendText(t, Map.of("type", "slow", "ms", ms, "mult", slowMult(t)));
+        broadcast(Map.of("type", "skillFx", "id", "slow", "t", t.entityNo, "stacks", t.slowStacks, "ms", ms));
+    }
+
+    private void clearSlow(Member m) {
+        if (m.slowStacks <= 0) return;
+        m.slowStacks = 0; m.slowUntil = 0;
+        if (!m.bot) outbox.sendText(m, Map.of("type", "slowEnd"));
+        broadcast(Map.of("type", "skillFx", "id", "slowEnd", "t", m.entityNo));
+    }
+
+    /** 스턴에 걸린다: STUN_SECONDS 동안 멈춘다. 이미 스턴이면 시간을 늘리지 않고 더 긴 쪽을 쓴다. */
+    private void applyStun(Member t) {
+        t.stunUntil = Math.max(t.stunUntil, clockSeconds + STUN_SECONDS);
+        t.vx = 0; t.vy = 0; t.targetX = null; t.targetY = null;
+        long ms = Math.round(STUN_SECONDS * 1000);
+        if (!t.bot) outbox.sendText(t, Map.of("type", "stun", "ms", ms));
+        broadcast(Map.of("type", "skillFx", "id", "stun", "t", t.entityNo, "ms", ms));
+    }
+
+    private void clearStun(Member m) {
+        if (m.stunUntil <= clockSeconds) return;
+        m.stunUntil = 0;
+        if (!m.bot) outbox.sendText(m, Map.of("type", "stunEnd"));
+        broadcast(Map.of("type", "skillFx", "id", "stunEnd", "t", m.entityNo));
+    }
+
+    /** 슬로우·스턴이 시간이 다 돼서 끝났으면 걷어 낸다(정화는 직접 clearSlow·clearStun을 부른다). */
+    private void updateStatus() {
+        for (Member m : members.values()) {
+            if (m.slowStacks > 0 && clockSeconds >= m.slowUntil) clearSlow(m);
+            if (m.stunUntil > 0 && clockSeconds >= m.stunUntil) clearStun(m);
+        }
+    }
+
+    /**
+     * 조준점(ax, ay)에 가장 가까운 상대를 고른다(불꽃·흡수의 확정 타겟팅). 내 원 가장자리에서 그 원 가장자리까지가 사거리(boltReachPx, 화면 기준) 안이고
+     * 세이프존·무적·정화 직후 면역이 아닌 원만 고른다. 없으면 null.
+     */
+    private Member pickTarget(Member m, double ax, double ay) {
+        double reach = reachWorld(skillTuning.boltReachPx(), m.displayRadius);
+        if (!Double.isFinite(ax) || !Double.isFinite(ay)) { ax = m.x + m.vx; ay = m.y + m.vy; }
+        Member best = null; double bestD = Double.MAX_VALUE;
+        for (Member t : targetsInReach(m, reach)) {
+            double d = Math.hypot(t.x - ax, t.y - ay);
+            if (d < bestD) { best = t; bestD = d; }
+        }
+        return best;
+    }
+
+    /** 내 원 가장자리에서 그 원 가장자리까지가 reach 안이고 세이프존·무적·정화 직후 면역이 아닌 원 모두 */
+    private List<Member> targetsInReach(Member m, double reach) {
+        List<Member> out = new ArrayList<>();
+        for (Member t : members.values()) {
+            if (t == m || t.dead || t.offline || t.safe || t.protectUntil > clockSeconds || t.ccImmuneUntil > clockSeconds) continue;
+            if (Math.hypot(t.x - m.x, t.y - m.y) - m.displayRadius - t.displayRadius > reach) continue;
+            out.add(t);
+        }
+        return out;
+    }
+
+    /** 불꽃: 조준점에 가장 가까운 상대에게 FLAME_COUNT발을 FLAME_INTERVAL 간격으로 던진다. 대상이 없으면 쓰지 않는다(쿨타임도 쓰지 않는다). */
+    private boolean castFlame(Member m, double ax, double ay) {
+        Member t = pickTarget(m, ax, ay);
+        if (t == null) { outbox.sendText(m, Map.of("type", "skillFail", "id", "flame", "reason", "noTarget")); return false; }
+        for (int i = 0; i < FLAME_COUNT; i++) flames.add(new Flame(nextFlameId++, m, t, clockSeconds + i * FLAME_INTERVAL));
+        breakStealth(m);
+        return true;
+    }
+
+    /** 던진 불꽃을 상대 쪽으로 나아가게 한다. 닿으면 키워드 1개를 떨군다. 상대·쓴 사람이 사라지거나 너무 오래 날면 거둔다. 닿는 순간 상대가 세이프존이거나 무적이면 꺼진다. */
+    private void updateFlames(double dt) {
+        for (Iterator<Flame> it = flames.iterator(); it.hasNext(); ) {
+            Flame f = it.next();
+            Member o = f.owner, t = f.target;
+            boolean gone = members.get(o.entityNo) != o || o.dead || members.get(t.entityNo) != t || t.dead;
+            if (gone) { it.remove(); if (f.launched) broadcast(Map.of("type", "skillFx", "id", "flameEnd", "fid", f.id, "hit", false)); continue; }
+            if (clockSeconds < f.launchAt) continue;
+            double speed = reachWorld(skillTuning.hookReachPx() / Math.max(0.05, skillTuning.hookSeconds()), o.displayRadius);
+            if (!f.launched) {
+                double dx = t.x - o.x, dy = t.y - o.y, d = Math.hypot(dx, dy);
+                f.x = o.x + (d < 1e-6 ? 0 : dx / d) * o.displayRadius; f.y = o.y + (d < 1e-6 ? -1 : dy / d) * o.displayRadius;
+                f.launched = true;
+                Map<String, Object> fx = new HashMap<>();
+                fx.put("type", "skillFx"); fx.put("id", "flame"); fx.put("fid", f.id); fx.put("e", o.entityNo); fx.put("t", t.entityNo);
+                fx.put("x", f.x); fx.put("y", f.y); fx.put("speed", speed);
+                broadcast(fx);
+            }
+            double dx = t.x - f.x, dy = t.y - f.y, d = Math.hypot(dx, dy), step = speed * dt;
+            if (d <= step + t.displayRadius * 0.6) {
+                it.remove();
+                boolean ok = !t.safe && t.protectUntil <= clockSeconds && t.ccImmuneUntil <= clockSeconds;
+                Map<String, Object> end = new HashMap<>();
+                end.put("type", "skillFx"); end.put("id", "flameEnd"); end.put("fid", f.id); end.put("hit", ok); end.put("t", t.entityNo); end.put("x", t.x); end.put("y", t.y);
+                broadcast(end);
+                if (ok) dropKeywords(t, o, 1, "flame");
+                continue;
+            }
+            f.x += dx / d * step; f.y += dy / d * step; f.flown += dt;
+            if (f.flown >= FLAME_MAX_FLIGHT) { it.remove(); broadcast(Map.of("type", "skillFx", "id", "flameEnd", "fid", f.id, "hit", false)); }
+        }
+    }
+
+    /** 흡수: 사거리 안의 모든 원과 선을 잇고 그 자리에서 첫 키워드를 빼앗는다. 이미 이은 선이 있으면 끊고 새로 잇는다. 사거리 안에 아무도 없으면 쓰지 않는다. */
+    private boolean castAbsorb(Member m) {
+        double range = reachWorld(skillTuning.boltReachPx(), m.displayRadius);
+        List<Member> targets = targetsInReach(m, range);
+        if (targets.isEmpty()) { outbox.sendText(m, Map.of("type", "skillFail", "id", "absorb", "reason", "noTarget")); return false; }
+        endAbsorbs(m, null);
+        breakStealth(m);
+        int steals = Math.max(1, (int) Math.round(ABSORB_SECONDS / ABSORB_TICK_SECONDS));
+        for (Member t : targets) {
+            Tether b = new Tether(m, t, range, clockSeconds, steals, clockSeconds + ABSORB_SECONDS);
+            tethers.add(b);
+            broadcast(Map.of("type", "skillFx", "id", "absorb", "e", m.entityNo, "t", t.entityNo, "ms", Math.round(ABSORB_SECONDS * 1000), "range", range));
+            absorbTick(b); // 0초에 1개
+        }
+        return true;
+    }
+
+    /** 키워드 1개를 빼앗고 다음 시각을 정한다 */
+    private void absorbTick(Tether b) {
+        stealKeyword(b.owner, b.target);
+        broadcast(Map.of("type", "skillFx", "id", "absorbTick", "e", b.owner.entityNo, "t", b.target.entityNo));
+        b.left--; b.nextAt += ABSORB_TICK_SECONDS;
+    }
+
+    /** 흡수 선을 한 틱 본다: 쓴 사람이나 상대가 사라지거나 죽거나 세이프존에 들어가거나, 사거리를 벗어나거나, 쓴 사람이 끌려오면 그 선이 끊긴다. 때가 되면 키워드 1개를 빼앗고, 시간이 다 되면 끝난다. */
+    private void updateAbsorbs() {
+        for (Iterator<Tether> it = tethers.iterator(); it.hasNext(); ) {
+            Tether b = it.next();
+            Member o = b.owner, t = b.target;
+            boolean broken = members.get(o.entityNo) != o || o.dead || members.get(t.entityNo) != t || t.dead || t.safe || o.hookedBy != null
+                    || Math.hypot(t.x - o.x, t.y - o.y) - o.displayRadius - t.displayRadius > b.range;
+            if (broken || clockSeconds + 1e-9 >= b.until) { it.remove(); broadcast(Map.of("type", "skillFx", "id", "absorbEnd", "e", o.entityNo, "t", t.entityNo)); continue; }
+            if (b.left > 0 && clockSeconds + 1e-9 >= b.nextAt) absorbTick(b);
+        }
+    }
+
+    /** 키워드 1개를 빼앗는다(갈고리와 같다: 사람은 requestLose, 봇은 메모리 키워드). 잃은 뒤 무적은 주지 않아 선이 계속 이어진다. */
+    private void stealKeyword(Member o, Member v) {
+        if (v.bot && !v.botKeywords.isEmpty()) {
+            BotKw lost = botLose(v, tuning);
+            comboLose(v, o);
+            outbox.requestBotWin(this, o, v, lost.id());
+        } else if (!v.bot && !v.keywords.isEmpty()) {
+            outbox.requestLose(this, v, o);
+        }
+    }
+
+    /** owner가 이은 선을 모두 끊는다(except는 남긴다) */
+    private void endAbsorbs(Member owner, Tether except) {
+        for (Iterator<Tether> it = tethers.iterator(); it.hasNext(); ) {
+            Tether b = it.next();
+            if (b.owner != owner || b == except) continue;
+            it.remove();
+            broadcast(Map.of("type", "skillFx", "id", "absorbEnd", "e", owner.entityNo, "t", b.target.entityNo));
+        }
+    }
+
+    /** 정화: 나(target)를 향한 흡수 선을 끊는다 */
+    private void endAbsorbsOn(Member target) {
+        for (Iterator<Tether> it = tethers.iterator(); it.hasNext(); ) {
+            Tether b = it.next();
+            if (b.target != target) continue;
+            it.remove();
+            broadcast(Map.of("type", "skillFx", "id", "absorbEnd", "e", b.owner.entityNo, "t", target.entityNo));
+        }
     }
 
     /** 공격 스킬을 쓰면 은신이 풀린다 */
@@ -1741,11 +1989,11 @@ public class Room {
     }
 
     /** 충격파: 쓴 자리에서 쓴 순간의 내 원 크기로 시작해 speed로 퍼진다. 화면에는 skillFx로 그리고, 맞는 것은 updateShocks가 본다. */
-    private void castShockwave(Member m, SkillTuning s) {
+    private void castShockwave(Member m, SkillTuning s, boolean drop) {
         double r0 = m.displayRadius, rMax = r0 + reachWorld(Math.max(1, s.shockReachPx()), r0), speed = reachWorld(tuning.maxSpeed() * s.shockSpeedMult(), r0); // 범위·속도 모두 화면 기준(줌의 역수)
-        shocks.add(new Shock(m, m.x, m.y, r0, rMax, speed, clockSeconds, new HashSet<>()));
+        shocks.add(new Shock(m, m.x, m.y, r0, rMax, speed, clockSeconds, new HashSet<>(), drop));
         breakStealth(m);
-        broadcast(Map.of("type", "skillFx", "id", "shockwave", "e", m.entityNo, "x", m.x, "y", m.y, "r0", r0, "rMax", rMax, "speed", speed));
+        broadcast(Map.of("type", "skillFx", "id", drop ? "quake" : "shockwave", "e", m.entityNo, "x", m.x, "y", m.y, "r0", r0, "rMax", rMax, "speed", speed));
     }
 
     /** 퍼지는 충격파의 앞쪽 가장자리가 닿은 원을 중심에서 바깥으로 민다. 세이프존·무적·끌려오는 원은 맞지 않고, 한 충격파에 한 번만 맞는다. */
@@ -1758,6 +2006,11 @@ public class Room {
                 double dx = t.x - sh.x(), dy = t.y - sh.y(), d = Math.hypot(dx, dy);
                 if (d - t.displayRadius > radius) continue;
                 sh.hit().add(t);
+                if (sh.drop()) { // 충격파: 밀지 않고 키워드만 잃게 한다. 맞은 원 위에 표시하도록 모두에게 알린다
+                    dropKeywords(t, sh.owner(), QUAKE_DROP, "quake");
+                    broadcast(Map.of("type", "skillFx", "id", "quakeHit", "t", t.entityNo, "n", QUAKE_DROP));
+                    continue;
+                }
                 knock(t, d < 0.001 ? 1 : dx / d, d < 0.001 ? 0 : dy / d, skillTuning.shockKnockback(), tu);
                 t.targetX = null;
             }

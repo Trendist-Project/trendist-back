@@ -23,7 +23,7 @@ public class AdminSkillController {
     private final com.trendist.skill.service.SkillConfigService config;
 
     public record Item(String code, String icon, String category, String defaultKey, double cooldownSeconds, int requiredLevel,
-                       boolean enabled, double defaultCooldown, java.time.Instant updatedAt) {}
+                       boolean enabled, double defaultCooldown, int defaultRequiredLevel, java.time.Instant updatedAt) {}
 
     /** 값은 null이면 바꾸지 않는다. cooldownSeconds: 0~3600(0이면 쿨타임 없음, 소수 둘째 자리까지), requiredLevel: 1~100 */
     public record UpdateRequest(Double cooldownSeconds, Integer requiredLevel, Boolean enabled) {}
@@ -41,6 +41,6 @@ public class AdminSkillController {
 
     private static Item toItem(Skill s) {
         return new Item(s.getCode(), s.getIcon(), s.getCategory(), s.getDefaultKey(), s.getCooldownSeconds().doubleValue(), s.getRequiredLevel(),
-                s.isEnabled(), 30.0, s.getUpdatedAt());
+                s.isEnabled(), com.trendist.seed.DataSeeder.defaultCooldown(s.getCode()), com.trendist.seed.DataSeeder.defaultRequiredLevel(s.getCode()), s.getUpdatedAt());
     }
 }
