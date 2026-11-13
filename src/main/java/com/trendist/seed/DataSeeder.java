@@ -207,7 +207,64 @@ public class DataSeeder implements ApplicationRunner {
         added += insertAddedGuideCategories();
         added += insertAddedGuideArticles();
         added += applyGuideFixes();
+        added += syncGuideVersions();
         return added;
+    }
+
+    /** 시드 본문(한·영)의 해시. 줄바꿈·앞뒤 공백 차이는 같게 본다 */
+    static String seedHash(String body, String bodyEn) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest((norm(body) + "\u0000" + norm(bodyEn)).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d);
+        } catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+    }
+
+    /** 시드 글 하나: 카테고리 코드·제목·한영 본문 */
+    record SeedArticle(String categoryCode, String title, String body, String bodyEn) {}
+
+    static List<SeedArticle> seedArticles() {
+        List<SeedArticle> out = new java.util.ArrayList<>();
+        for (int ci = 0; ci < GuideSeed.CATEGORIES.size(); ci++) {
+            GuideSeed.Category c = GuideSeed.CATEGORIES.get(ci);
+            for (int ai = 0; ai < c.articles().size(); ai++)
+                out.add(new SeedArticle(c.code(), c.articles().get(ai).title(), c.articles().get(ai).body(), EnglishSeed.GUIDE.get(ci).articles().get(ai).bodyEn()));
+        }
+        for (GuideSeed.Added a : GuideSeed.ADDED) out.add(new SeedArticle(a.categoryCode(), a.title(), a.body(), a.bodyEn()));
+        return out;
+    }
+
+    /**
+     * 시드 글을 판 번호(GuideSeed.VERSIONS)로 맞춘다(4.17).
+     * - 판 번호가 아직 없는 행(이 방식 이전): 본문이 지금 시드와 같으면 그 판·해시를 적고, 다르면(관리자가 고친 글) 판만 적고 해시는 비워 앞으로 건드리지 않는다.
+     * - 판 번호가 코드보다 낮은 행: 본문 해시가 시더가 마지막으로 넣은 해시와 같을 때만 새 본문으로 바꾸고, 어느 쪽이든 판을 올린다.
+     * 지운 글도 판만 맞춘다(되살리지 않는다).
+     */
+    int syncGuideVersions() {
+        int n = 0;
+        java.util.Map<String, Long> categoryIds = new java.util.HashMap<>();
+        for (SeedArticle a : seedArticles()) {
+            Long cid = categoryIds.computeIfAbsent(a.categoryCode(), code -> guideCategories.findByCodeAndEnabledTrue(code).map(GuideCategory::getId).orElse(-1L));
+            if (cid < 0) continue;
+            int version = GuideSeed.version(a.categoryCode(), a.title());
+            String fresh = seedHash(a.body(), a.bodyEn());
+            for (Guide g : guides.findByGuideCategoryId(cid)) {
+                if (!g.getTitle().equals(a.title())) continue;
+                String now = seedHash(g.getBody(), g.getBodyEn());
+                if (g.getSeedVersion() == null) {
+                    g.markSeed(version, now.equals(fresh) ? fresh : null);
+                } else if (g.getSeedVersion() < version) {
+                    if (now.equals(g.getSeedHash()) && g.getDeletedAt() == null) {
+                        g.changeBody(a.body());
+                        g.changeEnglish(g.getTitleEn(), a.bodyEn());
+                        g.markSeed(version, fresh);
+                        n++;
+                    } else {
+                        g.markSeed(version, g.getSeedHash());
+                    }
+                }
+            }
+        }
+        return n;
     }
 
     /** 나중에 더한 카테고리(GuideSeed.ADDED_CATEGORIES): 같은 코드가 없을 때만, afterCode 카테고리 바로 뒤에 끼워 넣는다(뒤 카테고리는 순서를 하나씩 민다) */
@@ -305,7 +362,7 @@ public class DataSeeder implements ApplicationRunner {
             if (category == null) continue; // 관리자가 지우거나 끈 카테고리
             int order = 1;
             for (GuideSeed.Article a : c.articles()) {
-                guides.save(new Guide(category, author, a.title(), a.body(), order++));
+                guides.save(new Guide(category, author, a.title(), a.body(), order++)); // 영어는 EnglishBackfill, 판 번호는 syncGuideVersions가 채운다
                 added++;
             }
         }
@@ -408,14 +465,14 @@ public class DataSeeder implements ApplicationRunner {
             {"hook", "🪝", "ATTACK", "Digit2", "30", "10"},     // 공격: 첫 빼앗기 수단
             {"slow", "🧊", "CC", "Digit9", "30", "15"},         // CC: 가장 약한 CC. 이동 속도 50%↓ 3초, 겹침(최대 3겹)
             {"stealth", "👻", "UTILITY", "Digit4", "30", "20"}, // 유틸: 여기까지 4칸이 방어·공격·CC·유틸로 완성된다
-            {"shockwave", "🌀", "DEFENSE", "Digit3", "30", "25"}, // 방어: 반발(밀어내기)
+            {"repel", "🌀", "DEFENSE", "Digit3", "30", "25"}, // 방어: 반발(밀어내기)
             {"cleanse", "✨", "UTILITY", "Digit6", "30", "30"}, // 유틸: 뒤에 나오는 CC·독의 카운터를 먼저 준다
             {"darkness", "🕶️", "CC", "Digit5", "30", "35"},     // CC: 시야만 가린다
             {"heal", "➕", "UTILITY", "Digit8", "60", "40"},    // 유틸: 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
             {"poison", "☠️", "ATTACK", "Digit7", "30", "45"},   // 공격: 지속 피해(정화로 해제)
             {"stun", "💫", "CC", "Digit0", "30", "50"},         // CC: 1초 동안 움직이지도 스킬을 쓰지도 못함(가장 강한 CC)
             {"quake", "💥", "ATTACK", "KeyX", "30", "55"},      // 공격: 충격파. 범위 안 원이 키워드 3개를 잃음(피할 수 있다)
-            {"flame", "🔥", "ATTACK", "KeyZ", "30", "60"},      // 공격: 화염구. 확정 타겟팅 3발, 키워드 3개를 잃음(피할 수 없다)
+            {"fireball", "🔥", "ATTACK", "KeyZ", "30", "60"},      // 공격: 화염구. 확정 타겟팅 3발, 키워드 3개를 잃음(피할 수 없다)
             {"absorb", "🧲", "ATTACK", "KeyC", "30", "65"},     // 공격: 흡수. 사거리 안 모든 원에게서 3개씩 빼앗음(가장 강하다)
     };
 

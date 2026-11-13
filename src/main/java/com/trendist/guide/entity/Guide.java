@@ -23,6 +23,9 @@ public class Guide extends BaseTimeEntity {
     @Column(name = "body_en", columnDefinition = "MEDIUMTEXT") private String bodyEn;
     @Column(name = "sort_order", nullable = false) private long sortOrder;
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)") private Instant deletedAt;
+    /** 시드 글(4.17): 이 행이 따르는 시드 판 번호(GuideSeed.VERSIONS)와, 시더가 마지막으로 넣은 본문(한·영)의 해시. 관리자가 만든 글은 둘 다 NULL */
+    @Column(name = "seed_version") private Integer seedVersion;
+    @Column(name = "seed_hash", length = 64) private String seedHash;
 
     /** 지운 글(소프트 삭제). 목록에서 빠진다 */
     public void delete(Instant now) { this.deletedAt = now; }
@@ -39,6 +42,8 @@ public class Guide extends BaseTimeEntity {
     /** 영어판 채우기(EnglishBackfill) */
     public void changeEnglish(String titleEn, String bodyEn) { this.titleEn = titleEn; this.bodyEn = bodyEn; }
     public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
+    /** 시더가 이 글을 seedVersion판으로 봤다. hash는 그때 시드 본문의 해시(관리자가 고친 글이면 예전 해시를 그대로 둔다) */
+    public void markSeed(Integer seedVersion, String hash) { this.seedVersion = seedVersion; this.seedHash = hash; }
 
     public Guide(GuideCategory category, User author, String title, String body, int sortOrder) {
         this.guideCategory = category; this.user = author; this.title = title; this.body = body; this.sortOrder = sortOrder;

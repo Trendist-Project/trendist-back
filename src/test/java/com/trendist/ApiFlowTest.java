@@ -1342,7 +1342,7 @@ class ApiFlowTest {
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("dash", "shield", "hook", "slow", "stealth", "shockwave", "cleanse", "darkness", "heal", "poison", "stun", "quake", "flame", "absorb");
+                .containsExactly("dash", "shield", "hook", "slow", "stealth", "repel", "cleanse", "darkness", "heal", "poison", "stun", "quake", "fireball", "absorb");
         try {
             var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);

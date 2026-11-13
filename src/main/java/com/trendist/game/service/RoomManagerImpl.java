@@ -1,6 +1,8 @@
 package com.trendist.game.service;
 
 import com.trendist.game.event.GameEvents;
+import com.trendist.game.room.KeywordLoss;
+import com.trendist.game.room.LossMessages;
 import com.trendist.game.room.Room;
 import com.trendist.keyword.dto.KeywordDtos;
 import com.trendist.keyword.service.KeywordService;
@@ -78,16 +80,14 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 Room.ComboTuning c = comboTuning();
                 Room.DashTuning dash = dashTuning();
                 Room.HpTuning hp = hpTuning();
-                Room.SkillTuning skill = skillTuning();
-                java.util.Map<String, Double> extra = extraSkillCooldowns();
+                com.trendist.game.room.SkillConfig skill = skillConfig();
                 java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
                 java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
                 java.util.Map<String, java.util.Map<String, Double>> monsterParams = new java.util.HashMap<>();
                 monsterCatalog.all().forEach((code, e) -> monsterParams.put(code, e.params())); // 몬스터 설정값(4.35)
                 rooms.values().forEach(r -> {
                     r.setMonsterParams(monsterParams);
-                    if (!skill.equals(r.skillTuning())) r.setSkillTuning(skill);
-                    r.setSkillCooldowns(extra);
+                    if (!skill.equals(r.skillConfig())) r.setSkillConfig(skill);
                     r.setDisabledSkills(disabledSkills);
                     r.setRequiredLevels(requiredLevels);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
@@ -126,8 +126,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             r.setComboTuning(comboTuning());
             r.setHpTuning(hpTuning());
             r.setDashTuning(dashTuning());
-            r.setSkillTuning(skillTuning());
-            r.setSkillCooldowns(extraSkillCooldowns());
+            r.setSkillConfig(skillConfig());
             r.setSkillSlotCount(skillLoadouts.slotCount()); // 장착 칸 수는 actions의 SKILL_SLOT 동작 수(4.33)
             r.setDisabledSkills(skillCatalog.disabledCodes());
             r.setRequiredLevels(skillCatalog.requiredLevels());
@@ -182,30 +181,22 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getDouble(SettingKeys.EAT_MIN_REACH));
     }
 
-    /** 독·암흑·정화·회복·슬로우·스턴·불꽃·충격파·흡수의 쿨타임(DB skills). 테스트 중에는 0이다. */
-    private java.util.Map<String, Double> extraSkillCooldowns() {
-        return java.util.Map.of("poison", skillCatalog.cooldownSeconds("poison", 0), "darkness", skillCatalog.cooldownSeconds("darkness", 0), "cleanse", skillCatalog.cooldownSeconds("cleanse", 0),
-                "heal", skillCatalog.cooldownSeconds("heal", 0), "heal_percent", settings.getDouble(SettingKeys.SKILL_HEAL_PERCENT),
-                "slow", skillCatalog.cooldownSeconds("slow", 0), "stun", skillCatalog.cooldownSeconds("stun", 0), "flame", skillCatalog.cooldownSeconds("flame", 0),
-                "quake", skillCatalog.cooldownSeconds("quake", 0), "absorb", skillCatalog.cooldownSeconds("absorb", 0)); // heal_percent는 쿨타임이 아니라 회복 스킬의 회복량(%)이다
-    }
-
     /** 대시 설정(4.27). */
     private Room.DashTuning dashTuning() {
         return new Room.DashTuning(settings.getDouble(SettingKeys.DASH_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.DASH_SECONDS),
                 skillCatalog.cooldownSeconds("dash", 30));
     }
 
-    /** 스킬 설정(4.33). */
-    private Room.SkillTuning skillTuning() {
-        return new Room.SkillTuning(
-                settings.getDouble(SettingKeys.SHOCKWAVE_SPEED_MULTIPLIER), settings.getDouble(SettingKeys.SHOCKWAVE_REACH_PX),
-                settings.getDouble(SettingKeys.SHOCKWAVE_KNOCKBACK), skillCatalog.cooldownSeconds("shockwave", 30),
-                settings.getDouble(SettingKeys.HOOK_REACH_PX), settings.getDouble(SettingKeys.HOOK_SECONDS),
-                settings.getDouble(SettingKeys.HOOK_PULL_SECONDS), skillCatalog.cooldownSeconds("hook", 30),
-                settings.getDouble(SettingKeys.SKILL_SHIELD_SECONDS), skillCatalog.cooldownSeconds("shield", 30),
-                settings.getDouble(SettingKeys.STEALTH_SECONDS), skillCatalog.cooldownSeconds("stealth", 30),
-                settings.getDouble(SettingKeys.BOLT_REACH_PX));
+    /**
+     * 스킬 설정(4.33): 모든 스킬의 쿨타임(DB skills, 없으면 SkillConfig 기본)과 수치(settings, SkillConfig.paramNames의 이름 그대로)를 한 묶음으로 만든다.
+     * 방에는 이 하나만 넘긴다(1초마다 새로 만들어 바뀌었으면 넣는다).
+     */
+    private com.trendist.game.room.SkillConfig skillConfig() {
+        java.util.Map<String, Double> cooldowns = new java.util.HashMap<>();
+        for (String code : Room.SKILLS) cooldowns.put(code, skillCatalog.cooldownSeconds(code, com.trendist.game.room.SkillConfig.DEFAULT.cooldown(code)));
+        java.util.Map<String, Double> params = new java.util.HashMap<>();
+        for (String name : com.trendist.game.room.SkillConfig.paramNames()) params.put(name, settings.getDouble(name));
+        return new com.trendist.game.room.SkillConfig(cooldowns, params);
     }
 
     /** 연속 빼앗기 콤보 설정(4.25). */
@@ -348,35 +339,128 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
 
     // ------------------------------------------------------------ Room.Outbox
 
+    /**
+     * 키워드 잃기 한 건(KeywordLoss): 원인(cause)이 정한 방식으로 DB에서 잃게 하고, 당한 사람·이긴 사람에게 같은 모양의 알림(LossMessages)을 보낸다.
+     * 몸싸움·불꽃처럼 결과가 DB에서 정해지는 원인(cause.serviceCombo)은 끝난 뒤 방 큐에 싸움 결과(콤보, 4.25)를 넣는다. 스킬 히트·죽음은 방이 이미 처리했다.
+     */
     @Override
-    public void requestLose(Room room, Room.Member loser, Room.Member winner) {
+    public void requestLoss(Room room, KeywordLoss loss) {
+        if (loss.victim().bot) { takeFromBot(room, loss); return; }
+        switch (loss.way()) {
+            case STEAL -> { if (loss.by() == null) drop(room, loss); else steal(room, loss); }
+            case DROP -> drop(room, loss);
+            case PERCENT -> losePercent(room, loss);
+        }
+    }
+
+    private static String nameOf(Room.Member m) { return m != null ? m.nickname : "☠"; } // 건 사람이 사라진 독 등
+
+    /** STEAL: 하나를 잃고, 이긴 쪽이 사람이면 그 키워드를 빼앗고 봇이면 봇의 메모리로 간다(4.3, 4.21) */
+    private void steal(Room room, KeywordLoss loss) {
+        Room.Member loser = loss.victim(), winner = loss.by();
+        KeywordLoss.Cause cause = loss.cause();
         long loserId = loser.playerId;
-        String winnerName = winner.nickname, loserName = loser.nickname; // 봇(이름 Bot)에게 져도 키워드를 잃는다(4.21)
+        String winnerName = winner.nickname, loserName = loser.nickname;
         Long winnerId = winner.bot ? null : winner.playerId;
         db(() -> {
             try {
                 if (winnerId == null) {
-                    // 봇에게 지면 잃기만 한다(봇은 실제 키워드를 갖지 않는다, 4.21)
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
                         r.botTakes(winner, lost.keywordId()); // 이긴 봇이 사람이 잃은 그 키워드를 메모리에 가진다(4.21)
-                        r.fightResult(winner, r.byPlayer(loserId), false); // 진 사람 콤보·불꽃은 사라지고, 이긴 봇의 콤보는 +1(4.25)
+                        if (cause.serviceCombo) r.fightResult(winner, r.byPlayer(loserId), false);
                         Room.Member m = r.byPlayer(loserId);
-                        if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", lost.text(), "score", lost.score()));
+                        if (m != null) sendText(m, LossMessages.lost(cause, winnerName, 1, lost.score(), lost.text()));
                     }));
                     return;
                 }
-                // 사람끼리면 이긴 사람이 그 키워드를 빼앗는다. 양쪽 모두에게 어떤 키워드인지와 점수를, 이긴 사람에게는
-                // 새로 들어갔는지(ADDED)·남은 시간만 갱신됐는지(RENEWED)도 보여 준다(4.3)
                 keywordService.stealRandom(loserId, winnerId).ifPresent(st -> room.submit(r -> {
-                    r.fightResult(winnerId, loserId, false); // 연속 빼앗기 콤보(4.25)
+                    if (cause.serviceCombo) r.fightResult(winnerId, loserId, false);
                     Room.Member m = r.byPlayer(loserId);
-                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "keyword", st.text(), "score", st.score(), "stolen", true));
+                    if (m != null) sendText(m, LossMessages.lost(cause, winnerName, 1, st.score(), st.text()));
                     Room.Member w = r.byPlayer(winnerId);
-                    if (w != null) sendText(w, Map.of("type", "hit", "target", loserName, "keyword", st.text(), "score", st.score(),
-                            "stolen", st.result(), "gained", st.gained()));
+                    if (w != null) sendText(w, LossMessages.took(cause, loserName, st.text(), st.score(), st.result(), st.gained()));
                 }));
             } catch (RuntimeException e) {
-                log.warn("lose keyword failed for player {}", loserId, e);
+                log.warn("lose keyword ({}) failed for player {}", cause.code, loserId, e);
+            }
+        });
+    }
+
+    /** DROP: amount개를 무작위로 잃고 아무도 가져가지 않는다. 여러 개면 알림 하나로 모아 잃은 개수와 점수 합계를 알린다(어떤 키워드인지는 첫 하나만) */
+    private void drop(Room room, KeywordLoss loss) {
+        long victimId = loss.victim().playerId;
+        KeywordLoss.Cause cause = loss.cause();
+        String by = nameOf(loss.by());
+        int count = loss.amount();
+        db(() -> {
+            try {
+                java.util.List<String> texts = new java.util.ArrayList<>();
+                long total = 0;
+                for (int i = 0; i < count; i++) {
+                    var lost = keywordService.loseRandom(victimId);
+                    if (lost.isEmpty()) break;
+                    texts.add(lost.get().text());
+                    total += lost.get().score();
+                }
+                if (texts.isEmpty()) return;
+                long score = total;
+                room.submit(r -> {
+                    Room.Member m = r.byPlayer(victimId);
+                    if (m != null) sendText(m, LossMessages.lost(cause, by, texts.size(), score, texts.get(0)));
+                });
+            } catch (RuntimeException e) {
+                log.warn("drop keywords ({}) failed for player {}", cause.code, victimId, e);
+            }
+        });
+    }
+
+    /** PERCENT: 가진 키워드의 amount%를 잃는다(4.36). 불꽃에게 부딪혔거나(FLAME) 체력이 0이 되어 죽었다(DEATH). 죽은 사람은 이미 방에서 빠졌으므로 넘겨 받은 원에 바로 알린다 */
+    private void losePercent(Room room, KeywordLoss loss) {
+        Room.Member loser = loss.victim(), winner = loss.by();
+        KeywordLoss.Cause cause = loss.cause();
+        long loserId = loser.playerId, winnerId = winner.playerId;
+        String winnerName = winner.nickname;
+        boolean winnerBot = winner.bot;
+        db(() -> {
+            try {
+                keywordService.loseFraction(loserId, loss.amount()).ifPresent(lost -> {
+                    if (cause.countsSteal && !winnerBot) playerService.recordSteal(winnerId); // 불꽃으로 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
+                    room.submit(r -> {
+                        if (cause.serviceCombo) r.fightResult(winner, r.byPlayer(loserId), false); // 죽는 경우는 die가 이미 콤보를 처리했다
+                        r.dropPrizeOrbs(loser, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
+                        sendText(loser, LossMessages.lost(cause, winnerName, lost.count(), lost.score(), null));
+                        Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
+                        if (w != null) sendText(w, LossMessages.hit(cause, loser.nickname, lost.count(), lost.score()));
+                    });
+                });
+            } catch (RuntimeException e) {
+                log.warn("lose part of keywords ({}) failed for player {}", cause.code, loserId, e);
+            }
+        });
+    }
+
+    /** 봇이 방 메모리에서 잃은 키워드(botKeywordId)를 이긴 사람에게 준다(이미 가졌으면 남은 시간 갱신, 4.21) */
+    private void takeFromBot(Room room, KeywordLoss loss) {
+        Room.Member winner = loss.by();
+        if (winner == null || winner.bot) return;
+        KeywordLoss.Cause cause = loss.cause();
+        long playerId = winner.playerId;
+        String botName = loss.victim().nickname;
+        db(() -> {
+            try {
+                KeywordDtos.OrbResult r = keywordService.gainFromBot(playerId, loss.botKeywordId());
+                boolean won = "GAINED".equals(r.status()) || "RENEWED".equals(r.status());
+                // BOT_RENEWED: 이미 가진 키워드라 남은 시간만 24시간으로 늘렸다. 🔥 키워드가 없으면 가져온 것 없이 점수 0
+                Map<String, Object> msg = won
+                        ? LossMessages.took(cause, botName, r.text(), r.trendValue() == null ? 0 : r.trendValue(), "RENEWED".equals(r.status()) ? "BOT_RENEWED" : "BOT", r.gained() == null ? 0 : r.gained())
+                        : LossMessages.took(cause, botName, null, 0, null, 0);
+                room.submit(rr -> {
+                    if (won && cause.serviceCombo) rr.fightResult(playerId, null, true); // 봇을 이겨 키워드를 얻은 것도 콤보(설정, 4.25)
+                    Room.Member m = rr.byPlayer(playerId);
+                    if (m != null) sendText(m, msg);
+                });
+            } catch (RuntimeException e) {
+                log.warn("bot win reward failed for player {}", playerId, e);
             }
         });
     }
@@ -417,121 +501,11 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     }
 
     @Override
-    public void requestMonsterLose(Room room, Room.Member victim, String by, int count) {
-        long victimId = victim.playerId;
-        db(() -> {
-            try {
-                java.util.List<String> texts = new java.util.ArrayList<>();
-                long total = 0;
-                for (int i = 0; i < count; i++) {
-                    var lost = keywordService.loseRandom(victimId);
-                    if (lost.isEmpty()) break;
-                    texts.add(lost.get().text());
-                    total += lost.get().score();
-                }
-                if (texts.isEmpty()) return;
-                long score = total;
-                room.submit(r -> {
-                    Room.Member m = r.byPlayer(victimId);
-                    if (m != null) sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "monster", true, "count", texts.size()));
-                });
-            } catch (RuntimeException e) {
-                log.warn("monster lose failed for player {}", victimId, e);
-            }
-        });
-    }
-
-    @Override
     public void saveSkillSlots(Room room, Room.Member member, java.util.List<String> slots) {
         long playerId = member.playerId;
         db(() -> {
             try { skillLoadouts.save(playerId, slots); }
             catch (RuntimeException e) { log.warn("save skill slots failed for player {}", playerId, e); }
-        });
-    }
-
-    @Override
-    public void requestPoisonLose(Room room, Room.Member victim, Room.Member owner, int count) {
-        requestSkillLose(room, victim, owner, count, "poison");
-    }
-
-    @Override
-    public void requestSkillLose(Room room, Room.Member victim, Room.Member owner, int count, String cause) {
-        long victimId = victim.playerId;
-        String by = owner != null ? owner.nickname : "☠";
-        db(() -> {
-            try {
-                // 스택으로 한 틱에 여러 개를 잃으면 알림을 하나로 모아 잃은 개수만 알린다(어떤 키워드인지는 알리지 않는다. 따로 보내면 마지막 하나만 보인다)
-                java.util.List<String> texts = new java.util.ArrayList<>();
-                long total = 0;
-                for (int i = 0; i < count; i++) {
-                    var lost = keywordService.loseRandom(victimId);
-                    if (lost.isEmpty()) break;
-                    texts.add(lost.get().text());
-                    total += lost.get().score();
-                }
-                if (texts.isEmpty()) return;
-                long score = total;
-                room.submit(r -> {
-                    Room.Member m = r.byPlayer(victimId);
-                    if (m != null) {
-                        r.poisonLost(m, owner);
-                        sendText(m, Map.of("type", "lost", "by", by, "keyword", texts.get(0), "score", score, "poison", true, "cause", cause, "count", texts.size()));
-                    }
-                });
-            } catch (RuntimeException e) {
-                log.warn("poison lose failed for player {}", victimId, e);
-            }
-        });
-    }
-
-    @Override
-    public void requestWipe(Room room, Room.Member loser, Room.Member winner) {
-        long loserId = loser.playerId, winnerId = winner.playerId;
-        String winnerName = winner.nickname;
-        db(() -> {
-            try {
-                keywordService.loseAll(loserId).ifPresent(lost -> {
-                    if (!winner.bot) playerService.recordSteal(winnerId); // 모두 잃게 해도 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
-                    room.submit(r -> {
-                    r.fightResult(winner, r.byPlayer(loserId), false); // 이긴 쪽(사람·봇) 콤보 +1, 진 쪽 콤보·불꽃 없앰(4.25)
-                    r.dropPrizeOrbs(loserId, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
-                    Room.Member m = r.byPlayer(loserId);
-                    if (m != null) sendText(m, Map.of("type", "lost", "by", winnerName, "wiped", lost.count(), "score", lost.score()));
-                    Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
-                    if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score()));
-                    });
-                });
-            } catch (RuntimeException e) {
-                log.warn("wipe keywords failed for player {}", loserId, e);
-            }
-        });
-    }
-
-    /** 키워드의 일부를 잃는다(4.36): 불꽃에게 부딪혔거나(death=false) 체력이 0이 되어 죽었다(death=true). 죽은 사람은 이미 방에서 빠졌으므로 넘겨 받은 원 기준으로 알린다 */
-    @Override
-    public void requestHalve(Room room, Room.Member loser, Room.Member winner, int percent, boolean death) {
-        long loserId = loser.playerId, winnerId = winner.playerId;
-        String winnerName = winner.nickname;
-        boolean winnerBot = winner.bot;
-        db(() -> {
-            try {
-                keywordService.loseFraction(loserId, percent).ifPresent(lost -> {
-                    if (!death && !winnerBot) playerService.recordSteal(winnerId); // 불꽃으로 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
-                    room.submit(r -> {
-                        if (!death) r.fightResult(winner, r.byPlayer(loserId), false); // 죽는 경우는 die가 이미 콤보를 처리했다
-                        r.dropPrizeOrbs(loser, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
-                        Map<String, Object> msg = new HashMap<>();
-                        msg.put("type", "lost"); msg.put("by", winnerName); msg.put("wiped", lost.count()); msg.put("score", lost.score());
-                        msg.put("partial", true); msg.put("death", death);
-                        sendText(loser, msg);
-                        Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
-                        if (w != null) sendText(w, Map.of("type", "hit", "target", loser.nickname, "wiped", lost.count(), "score", lost.score(), "partial", true));
-                    });
-                });
-            } catch (RuntimeException e) {
-                log.warn("lose part of keywords failed for player {}", loserId, e);
-            }
         });
     }
 
@@ -603,35 +577,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 playerService.recordKill(playerId);
             } catch (RuntimeException e) {
                 log.warn("record kill failed for player {}", playerId, e);
-            }
-        });
-    }
-
-    @Override
-    public void requestBotWin(Room room, Room.Member winner, Room.Member bot, long keywordId) {
-        long playerId = winner.playerId;
-        String botName = bot.nickname;
-        db(() -> {
-            try {
-                KeywordDtos.OrbResult r = keywordService.gainFromBot(playerId, keywordId); // 봇이 잃은 그 키워드를 얻는다(4.21)
-                Map<String, Object> msg = new HashMap<>();
-                msg.put("type", "hit");
-                msg.put("target", botName);
-                if ("GAINED".equals(r.status()) || "RENEWED".equals(r.status())) {
-                    // BOT_RENEWED: 이미 가진 키워드라 남은 시간만 24시간으로 늘렸다
-                    msg.put("keyword", r.text()); msg.put("score", r.trendValue()); msg.put("gained", r.gained());
-                    msg.put("stolen", "RENEWED".equals(r.status()) ? "BOT_RENEWED" : "BOT");
-                } else {
-                    msg.put("score", 0); // 🔥 키워드가 없다
-                }
-                boolean won = "GAINED".equals(r.status()) || "RENEWED".equals(r.status());
-                room.submit(rr -> {
-                    if (won) rr.fightResult(playerId, null, true); // 봇을 이겨 키워드를 얻은 것도 콤보(설정, 4.25)
-                    Room.Member m = rr.byPlayer(playerId);
-                    if (m != null) sendText(m, msg);
-                });
-            } catch (RuntimeException e) {
-                log.warn("bot win reward failed for player {}", playerId, e);
             }
         });
     }

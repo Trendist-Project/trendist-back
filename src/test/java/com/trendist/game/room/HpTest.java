@@ -209,7 +209,7 @@ class HpTest {
         assertThat(bot.dead).isTrue();
         assertThat(bot.botKeywords).hasSize(2); // 4개 중 절반(2개)을 잃었다
         assertThat(r.prizeOrbCount()).isEqualTo(1); // 잃은 활성 키워드 2개 → 절반인 구슬 1개
-        assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(2).equals(m.get("wiped")) && Boolean.TRUE.equals(m.get("partial")));
+        assertThat(out.texts).anyMatch(m -> "hit".equals(m.get("type")) && Integer.valueOf(2).equals(m.get("count")) && "death".equals(m.get("cause")));
         assertThat(out.kills).containsExactly(human.playerId);
         Room.Member again = null;
         for (int i = 0; i < 60 && again == null; i++) {

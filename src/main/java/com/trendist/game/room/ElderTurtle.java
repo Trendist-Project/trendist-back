@@ -2,7 +2,6 @@ package com.trendist.game.room;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 장로 거북이(4.35): 첫 번째 보스몹. 몸이 아주 크고 느리게 가장 가까운 사람을 따라다니며 돌진·충격고리를 쓴다.
@@ -30,7 +29,7 @@ final class ElderTurtle extends SkillBoss {
         hp = Math.max(d(p, "hp_min"), Math.min(d(p, "hp_max"), hp));
         long maxHp = Math.round(hp);
         double now = room.clock(), half = room.half(), radius = d(p, "radius");
-        double reach = Math.max(0, half - radius), ang = ThreadLocalRandom.current().nextDouble(Math.PI * 2);
+        double reach = Math.max(0, half - radius), ang = room.random().nextDouble(Math.PI * 2);
         double sx = Math.cos(ang) * reach * 0.6, sy = Math.sin(ang) * reach * 0.6; // 가운데(세이프존)에서 떨어진 곳에서 나온다
         return new ElderTurtle(id, spec, radius, new Start(maxHp, humans, Math.round(avg), Math.round(top)), now, d(p, "duration_seconds"), sx, sy, d(p, "opening_delay_seconds"));
     }

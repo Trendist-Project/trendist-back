@@ -139,7 +139,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
             }
             case "dash" -> room.submit(r -> r.dash(member)); // 대시(4.27). 쿨타임·움직이는 중인지는 방이 본다
             case "skill" -> { // 스킬(4.33): 코드와 겨눈 세계 좌표(갈고리). 쿨타임·상태는 방이 본다
-                String id = node.path("id").asString("");
+                String id = Room.skillCode(node.path("id").asString("")); // 옛 코드(shockwave·flame)도 받는다
                 double ax = node.path("x").asDouble(Double.NaN), ay = node.path("y").asDouble(Double.NaN);
                 if (Room.SKILLS.contains(id)) room.submit(r -> r.skill(member, id, ax, ay));
             }

@@ -17,10 +17,8 @@ class MonsterTest {
     static class MOut extends RoomTest.Out {
         final List<Monster.Start> starts = new ArrayList<>();
         final List<Monster.Result> ends = new ArrayList<>();
-        final List<long[]> monsterLoses = new ArrayList<>(); // {당한 사람, 잃은 개수}
         @Override public void monsterStarted(Room room, Monster.Spec spec, Monster.Start start) { starts.add(start); }
         @Override public void monsterEnded(Room room, Monster.Result result) { ends.add(result); }
-        @Override public void requestMonsterLose(Room room, Room.Member victim, String by, int count) { monsterLoses.add(new long[]{victim.playerId, count}); }
     }
 
     private static Map<String, Double> defaults() {
@@ -85,7 +83,7 @@ class MonsterTest {
         touch(b, a);
         r.tick();
         assertThat(hp0 - b.hp).isEqualTo(120);                 // 내 유행도만큼 보스가 피해를 입는다
-        assertThat(out.monsterLoses).isEmpty();                // 키워드를 잃지 않는다
+        assertThat(out.losses).isEmpty();                // 키워드를 잃지 않는다
         assertThat(a.protectUntil).isLessThanOrEqualTo(r.clock()); // 무적이 되지 않는다
         assertThat(a.hp).isCloseTo(hpMe - 5, org.assertj.core.api.Assertions.within(0.01)); // 부딪히면 내 체력이 5% 닳는다
         assertThat(a.kbTime).isGreaterThan(0);                 // 나만 튕겨 난다
@@ -116,7 +114,7 @@ class MonsterTest {
         touch(b, a);
         r.tick();
         assertThat(hp0 - b.hp).isEqualTo(500);
-        assertThat(out.monsterLoses).isEmpty();      // 불꽃이면 키워드를 잃지 않는다
+        assertThat(out.losses).isEmpty();      // 불꽃이면 키워드를 잃지 않는다
         assertThat(a.combo).isEqualTo(6);            // 콤보는 이어진다
         assertThat(a.protectUntil).isLessThanOrEqualTo(r.clock()); // 무적이 되지 않는다
     }
@@ -137,7 +135,7 @@ class MonsterTest {
         r.tick();
         assertThat(cold.dead).isTrue();                                // 불꽃 없이 덤비면 즉사하지만
         assertThat(hp0 - b.hp).isEqualTo(100);                         // 피해는 똑같이 준다
-        assertThat(out.monsterLoses).isEmpty();                        // 키워드는 잃지 않는다
+        assertThat(out.losses).isEmpty();                        // 키워드는 잃지 않는다
         assertThat(out.defeats).containsExactly(1L);
         assertThat(out.texts).anyMatch(m -> "died".equals(m.get("type")) && "장로 거북이".equals(m.get("by")));
         long hp1 = b.hp;
@@ -145,7 +143,7 @@ class MonsterTest {
         r.tick();
         assertThat(hot.dead).isFalse();                                // 불꽃이면 즉사하지 않고
         assertThat(hot.combo).isEqualTo(6);                            // 불꽃도 그대로
-        assertThat(out.monsterLoses).isEmpty();
+        assertThat(out.losses).isEmpty();
         assertThat(hp1 - b.hp).isEqualTo(100);                         // 불꽃 없는 피해량(×5가 아니다)
     }
 
@@ -198,7 +196,7 @@ class MonsterTest {
         assertThat(shielded.hp).isEqualTo(100.0);                      // 무적 중이면 맞지 않는다
         assertThat(hot.hp).isLessThan(100.0);                          // 불꽃이어도 맞는다
         assertThat(weak.dead).isTrue();                                // 체력이 모자라면 죽는다
-        assertThat(out.monsterLoses).isEmpty();                        // 키워드는 잃지 않는다
+        assertThat(out.losses).isEmpty();                        // 키워드는 잃지 않는다
         assertThat(near.protectUntil).isLessThanOrEqualTo(r.clock());  // 무적도 되지 않는다
     }
 

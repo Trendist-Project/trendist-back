@@ -84,4 +84,84 @@ class GuideSeedTest {
         });
         assertThat(hook.oldBody()).contains("반지름의 5배쯤"); // 예전 본문은 옛 사거리 설명을 담고 있다
     }
+
+    @Test
+    void newerSeedVersionReplacesUneditedBodyButKeepsAdminEdits() {
+        // 판 번호 방식(GuideSeed.VERSIONS): 행의 판이 낮고 본문이 시더가 넣은 그대로(해시 일치)면 새 본문, 관리자가 고친 글은 그대로
+        var skills = categories.findByCodeAndEnabledTrue("skills").orElseThrow();
+        tx.executeWithoutResult(st -> {
+            for (Guide g : guides.findByGuideCategoryId(skills.getId())) {
+                if (g.getTitle().equals("☠️ 독")) { g.changeBody("예전 시드 본문"); g.markSeed(0, DataSeeder.seedHash("예전 시드 본문", g.getBodyEn())); }
+                if (g.getTitle().equals("🕶️ 암흑")) { String h = DataSeeder.seedHash("예전 시드 본문", g.getBodyEn()); g.changeBody("관리자가 고친 본문"); g.markSeed(0, h); }
+            }
+        });
+        tx.executeWithoutResult(st -> seeder.run(new DefaultApplicationArguments()));
+        tx.executeWithoutResult(st -> {
+            GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(a -> a.title().equals("☠️ 독")).findFirst().orElseThrow();
+            for (Guide g : guides.findByGuideCategoryId(skills.getId())) {
+                if (g.getTitle().equals("☠️ 독")) {
+                    assertThat(g.getBody()).isEqualTo(poison.body());
+                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "☠️ 독"));
+                    assertThat(g.getSeedHash()).isEqualTo(DataSeeder.seedHash(poison.body(), poison.bodyEn()));
+                }
+                if (g.getTitle().equals("🕶️ 암흑")) {
+                    assertThat(g.getBody()).isEqualTo("관리자가 고친 본문");
+                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "🕶️ 암흑")); // 판은 올라가서 다시 묻지 않는다
+                }
+            }
+        });
+    }
+
+    @Test
+    void everySeededArticleGetsAVersionAndTheVersionTableNamesRealArticles() {
+        var keys = new HashSet<String>();
+        for (DataSeeder.SeedArticle a : DataSeeder.seedArticles()) keys.add(a.categoryCode() + "/" + a.title());
+        assertThat(keys).containsAll(GuideSeed.VERSIONS.keySet()); // 오타로 판 번호가 엉뚱한 글을 가리키지 않게
+        tx.executeWithoutResult(st -> {
+            for (var c : categories.findAll()) for (Guide g : guides.findByGuideCategoryId(c.getId()))
+                if (keys.contains(c.getCode() + "/" + g.getTitle())) assertThat(g.getSeedVersion()).as(g.getTitle()).isNotNull();
+        });
+    }
+
+    @Test
+    void everySettingSlotInSeedArticlesRendersWithTheDefaults() {
+        // 시드 글의 {{설정이름}}은 모두 코드에 있는 설정이어야 한다(틀리면 글에 {{…}}가 그대로 보인다)
+        for (DataSeeder.SeedArticle a : DataSeeder.seedArticles()) {
+            for (String body : new String[]{a.body(), a.bodyEn()}) {
+                String out = com.trendist.guide.support.GuideValues.render(body, n -> {
+                    if (!com.trendist.setting.support.SettingKeys.isKnown(n)) throw new IllegalArgumentException(n);
+                    return com.trendist.setting.support.SettingKeys.defaultOf(n);
+                });
+                assertThat(out).as(a.title()).doesNotContain("{{");
+            }
+        }
+        GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(x -> x.title().equals("☠️ 독")).findFirst().orElseThrow();
+        assertThat(poison.body()).contains("{{poison_tick_seconds}}");
+    }
+
+    @Autowired com.trendist.guide.service.GuideService guideService;
+
+    @Test
+    void publicGuideShowsTheCurrentSettingValues() {
+        // 공개 가이드는 설정값 자리를 지금 값으로 바꿔 보여 준다(기본값: 독 9초 동안 3초마다)
+        var poison = guideService.articles("skills", com.trendist.common.support.Lang.KO).stream().filter(x -> x.title().equals("☠️ 독")).findFirst().orElseThrow();
+        assertThat(poison.body()).contains("9초 동안 3초마다").doesNotContain("{{");
+    }
+
+    @Test
+    void preVersionRowWithTheOldNumericBodyGetsTheSettingSlots() {
+        // V62 이전 DB(판 번호 없음)의 독 글이 222판 직전 본문 그대로면 설정값 자리가 든 새 본문으로 바뀌고 판이 올라간다
+        var skills = categories.findByCodeAndEnabledTrue("skills").orElseThrow();
+        GuideSeed.Fix before = GuideSeedOld.FIXES.stream().filter(f -> f.title().equals("☠️ 독") && f.oldBody().contains("9초 동안 3초마다")).findFirst().orElseThrow();
+        tx.executeWithoutResult(st -> {
+            for (Guide g : guides.findByGuideCategoryId(skills.getId()))
+                if (g.getTitle().equals("☠️ 독")) { g.changeBody(before.oldBody()); g.markSeed(null, null); }
+        });
+        tx.executeWithoutResult(st -> seeder.run(new DefaultApplicationArguments()));
+        tx.executeWithoutResult(st -> {
+            Guide g = guides.findByGuideCategoryId(skills.getId()).stream().filter(x -> x.getTitle().equals("☠️ 독")).findFirst().orElseThrow();
+            assertThat(g.getBody()).contains("{{poison_tick_seconds}}");
+            assertThat(g.getSeedVersion()).isEqualTo(2);
+        });
+    }
 }

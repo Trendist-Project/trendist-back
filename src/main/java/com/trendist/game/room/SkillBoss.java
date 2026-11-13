@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 패턴을 쓰는 보스의 공통 틀(4.35). 새 보스는 이것을 이어받아 체력 계산(spawn)과 패턴 목록(BossSkill)만 정하면 된다.
@@ -188,7 +187,7 @@ abstract class SkillBoss extends Monster {
         if (ready.size() > 1) ready.removeIf(s -> s.id.equals(lastSkill)); // 직전과 같은 패턴은 피한다(다른 쓸 수 있는 패턴이 있을 때)
         if (ready.isEmpty()) return;
         double total = 0; for (BossSkill s : ready) total += p(room, s.id + "_weight");
-        double roll = ThreadLocalRandom.current().nextDouble(total);
+        double roll = room.random().nextDouble(total);
         BossSkill pick = ready.get(ready.size() - 1);
         for (BossSkill s : ready) { roll -= p(room, s.id + "_weight"); if (roll < 0) { pick = s; break; } }
         current = pick; lastSkill = pick.id;

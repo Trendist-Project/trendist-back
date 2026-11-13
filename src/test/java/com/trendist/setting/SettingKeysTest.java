@@ -40,6 +40,17 @@ class SettingKeysTest {
     }
 
     @Test
+    void everySkillParamIsASettingWithTheSameDefault() {
+        // 방의 스킬 수치(4.33)는 settings에서 이름 그대로 읽는다: 이름이 없거나 기본값이 다르면 관리자 화면과 테스트 기본이 어긋난다
+        for (var e : com.trendist.game.room.SkillConfig.DEFAULT_PARAMS.entrySet()) {
+            var def = SettingKeys.DEFAULTS.stream().filter(d -> d.name().equals(e.getKey())).findFirst();
+            assertThat(def).as("설정에 없는 스킬 수치: " + e.getKey()).isPresent();
+            assertThat(Double.parseDouble(def.get().value())).as(e.getKey()).isEqualTo(e.getValue());
+            assertThat(SettingKeys.groupOf(e.getKey())).as(e.getKey()).isEqualTo("스킬");
+        }
+    }
+
+    @Test
     void unknownSettingGoesToOther() {
         assertThat(SettingKeys.groupOf("no_such_setting")).isEqualTo("기타");
     }

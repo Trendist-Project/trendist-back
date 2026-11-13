@@ -44,4 +44,6 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 방의 난수(봇 움직임·구슬 자리 등)를 고정해 테스트가 매번 같은 결과를 내게 한다(Room.SEED_PROPERTY)
+    systemProperty("trendist.room.seed", "20261113")
 }

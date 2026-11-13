@@ -22,6 +22,20 @@ Trendist(트렌디스트)의 기획·설계 문서다. 이 백엔드 저장소�
 
 ## 변경 이력
 
+### 222판 (2026-11-14)
+
+- **공격 스킬의 히트 처리를 한 곳으로**(4.25, 4.33): 갈고리·독·화염구·충격파·흡수가 키워드를 잃게 하는 길이 하나(`Room.skillHit`)가 되어 콤보·키워드·알림 규칙이 스킬마다 같다. **맞은 사람에게 잃을 키워드가 없어도 히트 하나마다 쓴 사람의 콤보가 +1**이고 맞은 사람의 콤보·불꽃은 끊긴다(전에는 갈고리·흡수만 실제로 빼앗았을 때 올랐다). 충격파·화염구가 독 경로를 빌려 쓰던 것도 없어져 잃은 원인이 바르게 보인다.
+- **스킬 코드 이름 변경**(4.33, V63): 반발 `shockwave` → `repel`, 화염구 `flame` → `fireball`(충격파 `quake`는 그대로). 마이그레이션 V63이 `skills.code`, 설정 이름(`shockwave_*` → `repel_*`)과 설명, 설정 변경 이력의 대상 이름을 바꾼다. 장착(`player_skill_slots`)은 스킬 번호를 가리키므로 그대로다. 새로고침하지 않은 화면이 옛 코드로 보내도 서버가 새 코드로 받는다(`Room.LEGACY_SKILL_CODES`). 프론트의 번역 키·아이콘·가이드 그림·메시지 id(`skillFx repel`·`fireball`·`fireballEnd`, `lost.cause fireball`)도 맞췄다. **배포는 백엔드를 먼저** 한다.
+- **스킬 수치 14개를 설정으로**(4.33, 13.3): 독(`poison_ticks`·`poison_tick_seconds`·`poison_max_stacks`), 암흑(`darkness_seconds`), 정화 면역(`cleanse_immune_seconds`), 슬로우(`slow_seconds`·`slow_percent`·`slow_max_stacks`), 스턴(`stun_seconds`), 화염구(`fireball_count`·`fireball_interval_seconds`), 충격파(`quake_drop_keywords`), 흡수(`absorb_seconds`·`absorb_tick_seconds`)가 코드 상수에서 관리자 [설정]의 "스킬" 그룹으로 옮겼다(기본값은 예전 상수와 같다, 시더가 만든다).
+- **스킬 서버 구조 정리**(9.2, 동작 변화 없음): 스킬마다 클래스 하나(`PlayerSkill`, 등록표 `PlayerSkills`), 상태 효과 공통 구조(`StatusEffects`, `Member.effects`), 대상 조건 하나(`Room.targetable`), 스킬 메시지 만들기 한 곳(`SkillFx`), 쿨타임·수치 전달 통로 하나(`SkillConfig`, 예전 `SkillTuning`과 쿨타임 맵을 없앴다. 회복량이 쿨타임 맵에 섞여 있던 것도 정리됐다). `Room.java`가 2,696줄에서 2,258줄이 됐다.
+- **테스트 난수 고정**(9.2): 방의 모든 무작위가 `Room.random()`을 쓰고, 테스트는 시스템 속성 `trendist.room.seed`로 씨앗을 고정한다(봇 움직임 때문에 가끔 실패하던 테스트). 운영은 그대로다.
+- **가이드 시드 판 번호**(4.17, V62): 시드 글을 고치면 `GuideSeed.VERSIONS`의 그 글 번호만 올린다. `guides.seed_version`·`seed_hash`로 관리자가 고치지 않은 글만 새 본문으로 바꾸고, 예전 본문을 코드에 쌓지 않는다.
+- **키워드 잃기 경로를 하나로**(4.3, 4.25, 4.33, 4.36, 9.2): 몸싸움·불꽃·체력 0·공격 스킬로 잃는 것과 봇에게서 빼앗은 키워드를 주는 것이 모두 `KeywordLoss` 한 건(원인·잃는 방식)으로 `Outbox.requestLoss` 하나를 지난다(예전 `requestLose`·`requestSkillSteal`·`requestPoisonLose`·`requestSkillLose`·`requestWipe`·`requestHalve`·`requestBotWin`·`requestSkillBotWin`, 쓰이지 않던 `requestMonsterLose`를 없앴다). 알림은 `LossMessages` 한 곳에서 만들고 **`lost`·`hit` 메시지 모양이 바뀌었다**: 원인 `cause`(fight·hook·absorb·poison·quake·fireball·flame·death)와 개수 `count`를 늘 보내고, 충격파·화염구에도 붙던 `poison: true`와 `monster`·`wiped`·`partial`은 없앴다. 프론트도 함께 바꿨으므로 **백엔드와 프론트를 같이 배포**한다.
+- **가이드 숫자를 설정값에서**(4.17): 가이드 본문에 `{{설정이름}}` 자리를 쓰면 공개 가이드가 지금 설정값으로 바꿔 보여 준다(`GuideValues`). 스킬 글 8개(충격파·암흑·독·슬로우·스턴·화염구·흡수·회복)의 숫자를 이 자리로 바꾸고 판 번호를 2로 올렸다(관리자가 고친 글은 그대로, V62 이전 DB는 `GuideSeedOld`의 직전 본문으로 알아본다).
+- **방 메시지 만들기를 한 곳으로**(9.2): `Room`이 `Map.of("type", …)`로 직접 만들던 메시지 36곳을 `RoomMessages`로 옮겼다(필드 이름은 그대로).
+- **프론트 스킬 정의·상태 효과 정리**(8): 스킬 코드·기본값·가이드 그림 이름·그림의 잃는 개수를 `game/skills.ts` 한 곳에 두고 기본 목록(`useSkills`)·가이드 그림(`RichText`)·스킬 그림(`SkillDemo`)·아이콘 표(`SkillIcon`, 코드 타입으로 빠뜨림을 잡는다)이 여기서 읽는다. 남의 원의 상태 표시(`skillfx/statuses.ts`)는 그리기 함수 넷을 한 루프 + 종류별 모양 표로, 내 원의 상태(`selfStatus.ts`)는 종류마다 따로 두던 필드를 종류 → 남은 시간 표 하나로 합쳤다. 체력바·피해 숫자를 `game/arena/hp.ts`로, 입력을 `ui/gameInput.ts`로 더 나눴다(`Arena.ts` 1,433줄, `GameScreen.tsx` 622줄).
+- **프론트 구조 정리**(8, 동작 변화 없음): 스킬 연출을 효과별 파일(`game/skillfx/`)로, 아레나의 구슬·세이프존을 `game/arena/`로, 게임 화면의 서버 메시지 처리를 `ui/gameMessages.ts`로, 브라우저에 기억하는 선택을 `ui/gamePrefs.ts`로 나눴다(`Arena.ts` 1,701 → 1,509줄, `GameScreen.tsx` 1,164 → 924줄, 위 항목에서 더 줄였다). 개발 서버의 "Fast Refresh 안 됨"(`pingQuality` 내보내기) 경고도 없어진다.
+
 ### 221판 (2026-11-13)
 
 - **스킬 해금 순서 재설계와 관리자 "기본값으로"**(4.33, 13.3): 해금 레벨의 기본값(시더 `SKILL_ROWS`)을 방패 5, 갈고리 10, 슬로우 15, 은신 20, 반발 25, 정화 30, 암흑 35, 회복 40, 독 45, 스턴 50, 충격파 55, 화염구 60, 흡수 65로 바꿨다(대시는 기본 지급). 시더는 이미 있는 행의 레벨·쿨타임을 덮어쓰지 않으므로 기존 DB는 관리자 화면에서 맞춘다. 스킬 설정 화면에 스킬마다 **"기본 N레벨로"**(해금 레벨)·**"기본 N초로"**(쿨타임, 스킬마다 시더 기본값 — 이전에는 30초로 고정이었다) 버튼과 상단 **[전체 기본값으로]**를 더했다. 누르면 모든 스킬의 입력칸을 기본값으로 채우되 바로 저장하지 않고, 현재 값과 다른 스킬만 "바뀐 칸"(저장하지 않은 변경)으로 표시되어 관리자가 확인한 뒤 [모두 저장]하거나 [모두 되돌리기]로 취소한다(사용 여부는 그대로). `GET /api/admin/skills`에 `defaultRequiredLevel`이 추가됐다.

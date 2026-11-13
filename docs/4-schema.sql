@@ -57,7 +57,7 @@ CREATE TABLE player_popularity_votes (
 
 CREATE TABLE skills (
   id               BIGINT NOT NULL AUTO_INCREMENT COMMENT '스킬 ID',
-  code             VARCHAR(30) NOT NULL COMMENT '스킬 코드(유일). 동작은 코드(Room.SKILLS)가, 이름·설명(번역)은 프론트엔드 번역 파일(skills.<코드>_name·_desc)이 이 코드로 찾는다: dash, shockwave, hook, shield, stealth …',
+  code             VARCHAR(30) NOT NULL COMMENT '스킬 코드(유일). 동작은 코드(Room.SKILLS)가, 이름·설명(번역)은 프론트엔드 번역 파일(skills.<코드>_name·_desc)이 이 코드로 찾는다: dash, repel, hook, shield, stealth, fireball, quake …',
   icon             VARCHAR(20) NULL COMMENT '버튼에 보이는 아이콘(이모지)',
   category         VARCHAR(20) NOT NULL COMMENT '종류(MOVE 이동, ATTACK 공격, DEFENSE 방어, STEALTH 은신). 툴팁 색과 이름에 쓴다',
   default_key      VARCHAR(30) NOT NULL COMMENT '기본 단축키(KeyboardEvent.code: Space, Digit1, KeyQ …). 사용자가 바꾼 키는 클라이언트가 덧씌운다',
@@ -522,6 +522,8 @@ CREATE TABLE guides (
   body_en           MEDIUMTEXT NULL COMMENT '본문(영어). NULL이면 한글로 대체',
   sort_order        BIGINT NOT NULL DEFAULT 0 COMMENT '카테고리 안 표시 순서',
   deleted_at        DATETIME(6) NULL COMMENT '삭제 시각(NULL이면 게시 중)',
+  seed_version      INT NULL COMMENT '시드 글의 판 번호(코드 GuideSeed.VERSIONS). 관리자가 만든 글은 NULL',
+  seed_hash         VARCHAR(64) NULL COMMENT '시더가 마지막으로 넣은 본문(한·영)의 SHA-256. 지금 본문과 다르면 관리자가 고친 글이라 시더가 바꾸지 않는다',
   created_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
   updated_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정 시각',
   PRIMARY KEY (id),
