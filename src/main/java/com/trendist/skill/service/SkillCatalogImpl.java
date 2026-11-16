@@ -34,7 +34,7 @@ public class SkillCatalogImpl implements SkillCatalog {
     @Override
     public List<SkillDtos.Item> list() {
         return rows().stream().filter(Skill::isEnabled)
-                .map(s -> new SkillDtos.Item(s.getCode(), s.getIcon(), s.getCategory(), s.getDefaultKey(), s.getCooldownSeconds().doubleValue(), s.getRequiredLevel()))
+                .map(s -> new SkillDtos.Item(s.getCode(), s.getCategory(), s.getDefaultKey(), s.getCooldownSeconds().doubleValue(), s.getRequiredLevel()))
                 .toList();
     }
 
@@ -46,6 +46,11 @@ public class SkillCatalogImpl implements SkillCatalog {
     @Override
     public java.util.Map<String, Integer> requiredLevels() {
         return rows().stream().filter(s -> s.getRequiredLevel() > 1).collect(Collectors.toMap(Skill::getCode, Skill::getRequiredLevel));
+    }
+
+    @Override
+    public Set<String> allCodes() {
+        return rows().stream().map(Skill::getCode).collect(Collectors.toSet());
     }
 
     @Override

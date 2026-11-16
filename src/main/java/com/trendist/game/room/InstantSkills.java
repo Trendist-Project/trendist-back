@@ -1,16 +1,16 @@
 package com.trendist.game.room;
 
-/** 바로 끝나는 스킬(4.33): 방패·은신·정화·회복 */
+/** 바로 끝나는 스킬(4.33): 무적·은신·정화·회복 */
 final class InstantSkills {
     private InstantSkills() {}
 
-    /** 방패: 키워드를 잃은 뒤 무적과 같다. 다른 원과 충돌하지 않고 통과하며(4.3) 보호막은 같은 연출을 쓴다 */
-    record Shield(Room room) implements PlayerSkill {
-        public String code() { return "shield"; }
+    /** 무적: 키워드를 잃은 뒤 무적과 같다. 다른 원과 충돌하지 않고 통과하며(4.3) 보호막은 같은 연출을 쓴다 */
+    record Invincibility(Room room) implements PlayerSkill {
+        public String code() { return "invincibility"; }
         public boolean cast(Room.Member m, double ax, double ay) {
-            double seconds = room.skillConfig().param("skill_shield_seconds");
+            double seconds = room.skillConfig().param("invincibility_seconds");
             m.protectUntil = Math.max(m.protectUntil, room.now() + seconds);
-            room.broadcast(SkillFx.shield(m.entityNo, SkillFx.ms(seconds)));
+            room.broadcast(SkillFx.invincibility(m.entityNo, SkillFx.ms(seconds)));
             return true;
         }
     }

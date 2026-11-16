@@ -83,6 +83,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 com.trendist.game.room.SkillConfig skill = skillConfig();
                 java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
                 java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
+                java.util.Set<String> knownSkills = skillCatalog.allCodes();
                 java.util.Map<String, java.util.Map<String, Double>> monsterParams = new java.util.HashMap<>();
                 monsterCatalog.all().forEach((code, e) -> monsterParams.put(code, e.params())); // 몬스터 설정값(4.35)
                 rooms.values().forEach(r -> {
@@ -90,6 +91,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                     if (!skill.equals(r.skillConfig())) r.setSkillConfig(skill);
                     r.setDisabledSkills(disabledSkills);
                     r.setRequiredLevels(requiredLevels);
+                    r.setKnownSkills(knownSkills);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
                     if (!hp.equals(r.hpTuning())) r.setHpTuning(hp);
                     if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);
@@ -130,6 +132,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
             r.setSkillSlotCount(skillLoadouts.slotCount()); // 장착 칸 수는 actions의 SKILL_SLOT 동작 수(4.33)
             r.setDisabledSkills(skillCatalog.disabledCodes());
             r.setRequiredLevels(skillCatalog.requiredLevels());
+            r.setKnownSkills(skillCatalog.allCodes());
             r.setMonsterParams(monsterParamsNow());
             r.setAreaGrowSpeed(settings.getDouble(SettingKeys.AREA_GROW_SPEED));
             r.setAreaShrinkSpeed(settings.getDouble(SettingKeys.AREA_SHRINK_SPEED));

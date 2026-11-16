@@ -368,6 +368,15 @@ class ApiFlowTest {
     }
 
     @Test
+    void newPlayerAtLevelOneStartsWithTrendScoreOne() throws Exception {
+        // 유행도 = EXP 몫 + 레벨 + 키워드 점수 합이라, 키워드가 없는 1레벨 새 플레이어도 처음부터 1이다(0이 아니다)
+        String t = player("처음유행도");
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + t))
+                .andExpect(jsonPath("$.player.level").value(1))
+                .andExpect(jsonPath("$.player.currentScore").value(1));
+    }
+
+    @Test
     void firstPlusGrantsTitleAndOnlyOwnedTitleCanBeActivated() throws Exception {
         // 처음 추가하면 "트렌드 워처"를 자동으로 받는다(4.10). 자동 활성화는 하지 않는다
         String t = player("칭호시험");
@@ -1226,22 +1235,22 @@ class ApiFlowTest {
         skillCatalog.invalidate();
         mvc.perform(get("/api/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(14))
-                .andExpect(jsonPath("$[1].code").value("shield"))      // 대시 다음은 해금 레벨 순서
+                .andExpect(jsonPath("$.length()").value(21))
+                .andExpect(jsonPath("$[1].code").value("invincibility"))      // 대시 다음은 해금 레벨 순서
                 .andExpect(jsonPath("$[1].defaultKey").value("Digit1"))
                 .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
                 .andExpect(jsonPath("$[1].category").value("DEFENSE"))
-                .andExpect(jsonPath("$[1].icon").value("🛡"))
-                .andExpect(jsonPath("$[1].requiredLevel").value(5))   // 방패 5레벨
+                .andExpect(jsonPath("$[1].icon").doesNotExist()) // 아이콘은 프론트의 SVG라 서버가 주지 않는다
+                .andExpect(jsonPath("$[1].requiredLevel").value(4))   // 무적(방패) 4레벨
                 .andExpect(jsonPath("$[2].code").value("hook"))
                 .andExpect(jsonPath("$[2].defaultKey").value("Digit2"))
-                .andExpect(jsonPath("$[2].requiredLevel").value(10))   // 갈고리 10레벨
+                .andExpect(jsonPath("$[2].requiredLevel").value(7))   // 갈고리 7레벨
                 .andExpect(jsonPath("$[3].code").value("slow"))
-                .andExpect(jsonPath("$[3].defaultKey").value("Digit9"))
-                .andExpect(jsonPath("$[3].requiredLevel").value(15))   // 슬로우 15레벨
+                .andExpect(jsonPath("$[3].defaultKey").value("Digit3"))
+                .andExpect(jsonPath("$[3].requiredLevel").value(10))   // 슬로우 10레벨
                 .andExpect(jsonPath("$[4].code").value("stealth"))
                 .andExpect(jsonPath("$[4].defaultKey").value("Digit4"))
-                .andExpect(jsonPath("$[4].requiredLevel").value(20))   // 은신 20레벨
+                .andExpect(jsonPath("$[4].requiredLevel").value(13))   // 은신 13레벨
                 .andExpect(jsonPath("$[0].name").doesNotExist())
                 .andExpect(jsonPath("$[0].code").value("dash")) // 대시는 목록의 맨 앞
                 .andExpect(jsonPath("$[0].defaultKey").value("Space"))
@@ -1255,7 +1264,7 @@ class ApiFlowTest {
             skillRepository.saveAndFlush(hook);
             skillCatalog.invalidate();
             assertThat(skillCatalog.disabledCodes()).contains("hook");
-            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(13));
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(20));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
             skillRepository.saveAndFlush(hook);
@@ -1331,9 +1340,9 @@ class ApiFlowTest {
         var heal = list.stream().filter(i -> i.code().equals("heal")).findFirst().orElseThrow();
         var hook = list.stream().filter(i -> i.code().equals("hook")).findFirst().orElseThrow();
         assertThat(heal.defaultCooldown()).isEqualTo(60.0);
-        assertThat(heal.defaultRequiredLevel()).isEqualTo(40);
+        assertThat(heal.defaultRequiredLevel()).isEqualTo(31);
         assertThat(hook.defaultCooldown()).isEqualTo(30.0);
-        assertThat(hook.defaultRequiredLevel()).isEqualTo(10);
+        assertThat(hook.defaultRequiredLevel()).isEqualTo(7);
     }
 
     @Test
@@ -1342,12 +1351,12 @@ class ApiFlowTest {
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("dash", "shield", "hook", "slow", "stealth", "repel", "cleanse", "darkness", "heal", "poison", "stun", "quake", "fireball", "absorb");
+                .containsExactly("dash", "invincibility", "hook", "slow", "stealth", "repel", "fortify", "cleanse", "darkness", "root", "heal", "poison", "barrier", "stun", "silence", "quake", "confuse", "fireball", "amplify", "absorb", "berserk");
         try {
             var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);
             assertThat(r.requiredLevel()).isEqualTo(16);
-            assertThat(adminSkills.list().stream().filter(x -> x.code().equals("shield")).findFirst().orElseThrow().cooldownSeconds()).isEqualTo(30.0); // 다른 스킬은 그대로
+            assertThat(adminSkills.list().stream().filter(x -> x.code().equals("invincibility")).findFirst().orElseThrow().cooldownSeconds()).isEqualTo(30.0); // 다른 스킬은 그대로
             mvc.perform(get("/api/skills")).andExpect(jsonPath("$[?(@.code=='hook')].cooldownSeconds").value(12.5))
                     .andExpect(jsonPath("$[?(@.code=='hook')].requiredLevel").value(16));
             assertThatThrownBy(() -> adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(-1.0, null, null)))
@@ -1357,7 +1366,7 @@ class ApiFlowTest {
             assertThatThrownBy(() -> adminSkills.update(new com.trendist.auth.security.AuthUser(1), "nope", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(1.0, null, null)))
                     .hasMessageContaining("없는 스킬");
         } finally {
-            adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 10, true));
+            adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(30.0, 7, true));
         }
     }
 }

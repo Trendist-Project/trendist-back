@@ -15,6 +15,9 @@ public interface SkillCatalog {
     /** 스킬 코드 → 해금 레벨(1보다 큰 것만). 이 레벨이 안 되면 서버가 쓰지 못하게 한다 */
     java.util.Map<String, Integer> requiredLevels();
 
+    /** DB에 등록된 모든 스킬 코드(서버 규칙이 아직 없는 스킬도 포함). 장착 칸에 놓을 수 있는지 가릴 때 쓴다 */
+    Set<String> allCodes();
+
     /** 사용 여부가 꺼진 스킬 코드 */
     Set<String> disabledCodes();
 

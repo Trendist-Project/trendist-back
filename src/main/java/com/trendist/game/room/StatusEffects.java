@@ -8,7 +8,7 @@ package com.trendist.game.room;
  */
 final class StatusEffects {
     /** 효과 종류. POISON은 남은 틱 수로 끝나고, 나머지는 until(방 시계 초)에 끝난다 */
-    enum Kind { POISON, DARK, SLOW, STUN }
+    enum Kind { POISON, DARK, SLOW, STUN, ROOT, SILENCE, CONFUSE }
 
     /** 원에 붙은 효과 하나: 겹 수, 끝나는 시각, (독) 다음 틱 시각·남은 틱 수, 건 사람 */
     static final class Effect {
@@ -43,9 +43,41 @@ final class StatusEffects {
         return n > 0 ? Math.pow(room.skillConfig().param("slow_percent") / 100.0, n) : 1;
     }
 
-    /** 투사체가 맞힌 효과를 건다(kind: 스킬 코드 poison·darkness·slow·stun) */
+    boolean rooted(Room.Member m) { return has(m, Kind.ROOT); }
+    boolean silenced(Room.Member m) { return has(m, Kind.SILENCE); }
+    boolean confused(Room.Member m) { return has(m, Kind.CONFUSE); }
+
+    /** 이동 속도에 곱하는 모든 배수: 속박이면 0, 슬로우, 광폭화(잃은 체력 비율만큼 빨라진다). 대시 배수와 곱해서 쓴다 */
+    double speedMult(Room.Member m) {
+        if (rooted(m)) return 0;
+        return slowMult(m) * (m.berserk ? 1 + room.lostFraction(m) : 1);
+    }
+
+    /**
+     * 속도 배수가 달라졌으면 본인에게 알린다(클라이언트 예측이 서버와 같은 속도로 가게). 속박·광폭화·슬로우가 섞여도 합친 배수를 한 번에 보낸다.
+     * 광폭화는 체력에 따라 계속 바뀌고 클라이언트의 효과가 끝나지 않게 1초마다 다시 보낸다. 배수가 1로 돌아오면 slowEnd.
+     */
+    void syncSpeed(Room.Member m) {
+        if (m.bot || m.offline) return;
+        double mult = Math.round(speedMult(m) * 100) / 100.0, now = room.now();
+        boolean refresh = m.berserk && now - m.speedSentAt >= 1.0;
+        if (Math.abs(mult - m.lastSpeedMult) < 0.005 && !refresh) return;
+        if (mult == 1) { if (m.lastSpeedMult != 1) room.tell(m, SkillFx.slowEnd()); }
+        else {
+            double left = 0;
+            for (Kind k : new Kind[]{Kind.ROOT, Kind.SLOW}) if (has(m, k)) left = Math.max(left, m.effects.get(k).until - now);
+            if (m.berserk) left = Math.max(left, 2.0);
+            room.tell(m, SkillFx.slowQuiet(SkillFx.ms(left) + 100, mult));
+        }
+        m.lastSpeedMult = mult; m.speedSentAt = now;
+    }
+
+    /** 투사체가 맞힌 효과를 건다(kind: 스킬 코드 poison·darkness·slow·stun·root·silence·confuse) */
     void applyBolt(String kind, Room.Member t, Room.Member owner) {
         switch (kind) {
+            case "root" -> root(t, owner);
+            case "silence" -> silence(t, owner);
+            case "confuse" -> confuse(t, owner);
             case "poison" -> poison(t, owner);
             case "slow" -> slow(t, owner);
             case "stun" -> stun(t, owner);
@@ -82,8 +114,37 @@ final class StatusEffects {
         e.stacks = on ? Math.min(c.intParam("slow_max_stacks"), e.stacks + 1) : 1;
         double seconds = c.param("slow_seconds");
         e.until = room.now() + seconds;
-        room.tell(t, SkillFx.slow(SkillFx.ms(seconds), slowMult(t)));
+        t.lastSpeedMult = speedMult(t); t.speedSentAt = room.now();
+        room.tell(t, SkillFx.slow(SkillFx.ms(seconds), t.lastSpeedMult)); // 속박·광폭화와 합친 배수
         room.broadcast(SkillFx.status("slow", t.entityNo, e.stacks, SkillFx.ms(seconds)));
+    }
+
+    /** 속박: root_seconds 동안 움직이지 못한다(스킬은 쓸 수 있다). 이미 걸려 있으면 더 긴 쪽을 쓴다. 속도 배수 0은 syncSpeed가 본인에게 알린다 */
+    void root(Room.Member t, Room.Member owner) {
+        double seconds = room.skillConfig().param("root_seconds");
+        Effect e = effect(t, Kind.ROOT, owner);
+        e.until = Math.max(e.until, room.now() + seconds);
+        t.vx = 0; t.vy = 0; t.targetX = null; t.targetY = null;
+        room.tell(t, SkillFx.slowQuiet(SkillFx.ms(seconds) + 100, 0));
+        t.lastSpeedMult = 0; t.speedSentAt = room.now();
+        room.broadcast(SkillFx.status("root", t.entityNo, SkillFx.ms(seconds)));
+    }
+
+    /** 침묵: silence_seconds 동안 스킬을 쓰지 못한다(이동·대시·정화는 된다, Room.skill이 막는다). 더 긴 쪽을 쓴다 */
+    void silence(Room.Member t, Room.Member owner) {
+        double seconds = room.skillConfig().param("silence_seconds");
+        Effect e = effect(t, Kind.SILENCE, owner);
+        e.until = Math.max(e.until, room.now() + seconds);
+        room.broadcast(SkillFx.status("silence", t.entityNo, SkillFx.ms(seconds)));
+    }
+
+    /** 혼란: confuse_seconds 동안 조작 방향이 반대다(Room.advance가 원하는 속도를 뒤집는다). 더 긴 쪽을 쓴다 */
+    void confuse(Room.Member t, Room.Member owner) {
+        double seconds = room.skillConfig().param("confuse_seconds");
+        Effect e = effect(t, Kind.CONFUSE, owner);
+        e.until = Math.max(e.until, room.now() + seconds);
+        room.tell(t, SkillFx.confuse(SkillFx.ms(seconds)));
+        room.broadcast(SkillFx.status("confuse", t.entityNo, SkillFx.ms(seconds)));
     }
 
     /** 스턴: stun_seconds 동안 움직이지도 스킬을 쓰지도 못한다. 이미 스턴이면 시간을 더하지 않고 더 긴 쪽을 쓴다 */
@@ -113,6 +174,9 @@ final class StatusEffects {
             case DARK -> room.tell(m, SkillFx.darkEnd()); // 다른 사람 화면의 표시는 정화 연출(cleanse)이 지운다
             case SLOW -> { room.tell(m, SkillFx.slowEnd()); room.broadcast(SkillFx.statusEnd("slowEnd", m.entityNo)); }
             case STUN -> { room.tell(m, SkillFx.stunEnd()); room.broadcast(SkillFx.statusEnd("stunEnd", m.entityNo)); }
+            case ROOT -> room.broadcast(SkillFx.statusEnd("rootEnd", m.entityNo)); // 속도 배수는 다음 틱 syncSpeed가 되돌린다
+            case SILENCE -> room.broadcast(SkillFx.statusEnd("silenceEnd", m.entityNo));
+            case CONFUSE -> { room.tell(m, SkillFx.confuseEnd()); room.broadcast(SkillFx.statusEnd("confuseEnd", m.entityNo)); }
         }
     }
 
@@ -126,6 +190,7 @@ final class StatusEffects {
     void tick() {
         SkillConfig c = room.skillConfig();
         for (Room.Member m : room.all()) {
+            syncSpeed(m);
             if (m.effects.isEmpty()) continue;
             Effect p = m.effects.get(Kind.POISON);
             if (p != null && p.stacks > 0) {
@@ -137,11 +202,11 @@ final class StatusEffects {
                     if (p.ticksLeft <= 0) clear(m, Kind.POISON);
                 }
             }
-            for (Kind k : new Kind[]{Kind.SLOW, Kind.STUN}) {
+            for (Kind k : new Kind[]{Kind.SLOW, Kind.STUN, Kind.ROOT, Kind.SILENCE, Kind.CONFUSE}) { // 속박·침묵·혼란은 클라이언트가 시간으로 스스로 끝낸다(알림 없음)
                 Effect e = m.effects.get(k);
                 if (e == null || room.now() < e.until) continue;
                 m.effects.remove(k);
-                if (k == Kind.SLOW) { room.tell(m, SkillFx.slowEnd()); room.broadcast(SkillFx.statusEnd("slowEnd", m.entityNo)); }
+                if (k == Kind.SLOW) { room.tell(m, SkillFx.slowEnd()); room.broadcast(SkillFx.statusEnd("slowEnd", m.entityNo)); m.lastSpeedMult = 1; }
                 // 스턴은 시간이 다 되면 클라이언트가 스스로 푼다(stunEnd는 정화로 일찍 풀릴 때만 보낸다)
             }
         }

@@ -22,7 +22,7 @@ public record SkillConfig(Map<String, Double> cooldowns, Map<String, Double> par
         p.put("hook_reach_px", 300.0); p.put("hook_seconds", 0.15); p.put("hook_pull_seconds", 0.3);
         // 투사체(독·암흑·슬로우·스턴)·화염구·흡수의 사거리(화면 기준 px)
         p.put("bolt_reach_px", 600.0);
-        p.put("skill_shield_seconds", 3.0); p.put("stealth_seconds", 5.0); p.put("skill_heal_percent", 50.0);
+        p.put("invincibility_seconds", 3.0); p.put("stealth_seconds", 5.0); p.put("skill_heal_percent", 50.0);
         // 독: poison_ticks번, poison_tick_seconds마다 겹 수만큼 키워드를 잃는다. 겹 상한
         p.put("poison_ticks", 3.0); p.put("poison_tick_seconds", 3.0); p.put("poison_max_stacks", 10.0);
         p.put("darkness_seconds", 3.0);
@@ -37,11 +37,19 @@ public record SkillConfig(Map<String, Double> cooldowns, Map<String, Double> par
         p.put("quake_drop_keywords", 3.0);
         // 흡수: 선이 이어지는 시간과 빼앗는 간격
         p.put("absorb_seconds", 3.0); p.put("absorb_tick_seconds", 1.0);
+        // 속박·침묵·혼란: 걸리는 시간(초)
+        p.put("root_seconds", 2.0); p.put("silence_seconds", 3.0); p.put("confuse_seconds", 3.0);
+        // 공격 증폭(내가 주는 체력 피해 배수)·피해 감소(받는 체력 피해의 %): 유지 시간(초)
+        p.put("amplify_seconds", 10.0); p.put("amplify_multiplier", 2.0); p.put("fortify_seconds", 10.0); p.put("fortify_percent", 50.0);
+        // 보호막: 유지 시간(초)과 쉴드량(최대 체력의 절대 %)
+        p.put("barrier_seconds", 10.0); p.put("barrier_hp_percent", 50.0);
+        // 광폭화: 켜 둔 동안 1초마다 잃는 최대 체력의 %, 이 % 아래로는 더 깎이지 않고 자동으로 꺼진다
+        p.put("berserk_drain_percent", 1.0); p.put("berserk_min_hp_percent", 1.0);
         DEFAULT_PARAMS = Map.copyOf(p);
     }
 
     /** DB에 쿨타임이 없을 때의 기본(초). 처음 네 스킬은 30초, 나중에 더한 스킬은 0(없음)이다 */
-    public static final Map<String, Double> DEFAULT_COOLDOWNS = Map.of("repel", 30.0, "hook", 30.0, "shield", 30.0, "stealth", 30.0);
+    public static final Map<String, Double> DEFAULT_COOLDOWNS = Map.of("repel", 30.0, "hook", 30.0, "invincibility", 30.0, "stealth", 30.0);
 
     public static final SkillConfig DEFAULT = new SkillConfig(DEFAULT_COOLDOWNS, DEFAULT_PARAMS);
 

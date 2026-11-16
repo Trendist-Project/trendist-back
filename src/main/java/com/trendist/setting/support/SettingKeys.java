@@ -64,7 +64,7 @@ public final class SettingKeys {
     public static final String BOLT_REACH_PX = "bolt_reach_px";
     public static final String HOOK_SECONDS = "hook_seconds";
     public static final String HOOK_PULL_SECONDS = "hook_pull_seconds";
-    public static final String SKILL_SHIELD_SECONDS = "skill_shield_seconds";
+    public static final String INVINCIBILITY_SECONDS = "invincibility_seconds";
     public static final String SKILL_HEAL_PERCENT = "skill_heal_percent";
     // 스킬 수치(4.33). 방은 이름 그대로 SkillConfig로 받는다(기본값은 SkillConfig.DEFAULT_PARAMS와 같아야 한다)
     public static final String POISON_TICKS = "poison_ticks";
@@ -76,6 +76,17 @@ public final class SettingKeys {
     public static final String SLOW_PERCENT = "slow_percent";
     public static final String SLOW_MAX_STACKS = "slow_max_stacks";
     public static final String STUN_SECONDS = "stun_seconds";
+    public static final String ROOT_SECONDS = "root_seconds";
+    public static final String SILENCE_SECONDS = "silence_seconds";
+    public static final String CONFUSE_SECONDS = "confuse_seconds";
+    public static final String AMPLIFY_SECONDS = "amplify_seconds";
+    public static final String AMPLIFY_MULTIPLIER = "amplify_multiplier";
+    public static final String FORTIFY_SECONDS = "fortify_seconds";
+    public static final String FORTIFY_PERCENT = "fortify_percent";
+    public static final String BARRIER_SECONDS = "barrier_seconds";
+    public static final String BARRIER_HP_PERCENT = "barrier_hp_percent";
+    public static final String BERSERK_DRAIN_PERCENT = "berserk_drain_percent";
+    public static final String BERSERK_MIN_HP_PERCENT = "berserk_min_hp_percent";
     public static final String FIREBALL_COUNT = "fireball_count";
     public static final String FIREBALL_INTERVAL_SECONDS = "fireball_interval_seconds";
     public static final String QUAKE_DROP_KEYWORDS = "quake_drop_keywords";
@@ -173,25 +184,36 @@ public final class SettingKeys {
             new Def(AI_COMMENT_GROUNDING, "0", 0, 1, "AI 한 줄 설명에 구글 검색 확인(그라운딩)을 쓸지(1이면 사용). 무료 등급은 검색 한도가 없어 429로 막히므로 결제를 연결한 뒤에 켠다. 끄면 최신 이슈는 모른다고 답할 수 있다"),
             new Def(DASH_SPEED_MULTIPLIER, "2", 1, 5, "대시 속도: 대시 중 최대 속도가 평소의 몇 배인지(1이면 대시가 효과 없음). 서버와 클라이언트 예측이 같은 값을 쓴다"),
             new Def(DASH_SECONDS, "3", 0.5, 30, "대시가 유지되는 시간"),
-            // 스킬(반발·충격파·갈고리·방패·은신 등): 테스트하며 조절할 값이라 모두 설정으로 둔다. 쓰는 키는 클라이언트(GameScreen)가 정한다
+            // 스킬(반발·충격파·쇠창살·무적·은신 등): 테스트하며 조절할 값이라 모두 설정으로 둔다. 쓰는 키는 클라이언트(GameScreen)가 정한다
             new Def(REPEL_SPEED_MULTIPLIER, "4", 0.1, 20, "반발·충격파가 퍼지는 속도: 최대 속도의 몇 배인지(기본 4 = 대시 속도(기본 최대 속도의 2배)의 2배)"),
-            new Def(REPEL_REACH_PX, "300", 50, 3000, "반발·충격파 범위: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 퍼지는지(시작은 내 원 크기, 중심은 쓴 자리). 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다. 갈고리 사거리와 같은 방식이다"),
+            new Def(REPEL_REACH_PX, "300", 50, 3000, "반발·충격파 범위: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 퍼지는지(시작은 내 원 크기, 중심은 쓴 자리). 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다. 쇠창살 사거리와 같은 방식이다"),
             new Def(REPEL_KNOCKBACK, "1.5", 0, 10, "반발에 맞은 원이 밀려나는 세기(튕김 세기와 같은 단위. 1이면 같은 크기끼리 부딪힐 때만큼)"),
-            new Def(HOOK_REACH_PX, "300", 50, 3000, "갈고리 사거리: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 뻗는지. 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다(기준 화면 기준, 작은 화면에서는 조금 달라질 수 있다)"),
-            new Def(BOLT_REACH_PX, "600", 50, 5000, "독·암흑 투사체 사거리: 내 원 가장자리에서 화면에 보이는 길이(px). 갈고리 사거리와 같은 방식이라 크기와 상관없이 갈고리와의 길이 비율이 일정하다"),
-            new Def(HOOK_SECONDS, "0.15", 0.05, 5, "갈고리가 끝까지 날아가는 데 걸리는 시간(빗나가면 같은 시간에 걸쳐 돌아온다. 상대가 피할 수 있을 만큼은 걸리게)"),
-            new Def(HOOK_PULL_SECONDS, "0.3", 0.05, 5, "갈고리에 맞은 원이 내게 끌려오는 시간(끌려오는 동안 스킬 사용·이동 불가, 다른 원과의 충돌 무효)"),
-            new Def(SKILL_SHIELD_SECONDS, "3", 0.5, 60, "방패 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
+            new Def(HOOK_REACH_PX, "300", 50, 3000, "쇠창살 사거리: 내 원 가장자리에서 화면에 보이는 길이(px)로 얼마나 뻗는지. 원 크기에 따른 줌을 반영해 서버가 월드 길이로 바꾸므로 원이 작아도 커도 화면에서 같은 길이로 보인다(기준 화면 기준, 작은 화면에서는 조금 달라질 수 있다)"),
+            new Def(BOLT_REACH_PX, "600", 50, 5000, "독·암흑 투사체 사거리: 내 원 가장자리에서 화면에 보이는 길이(px). 쇠창살 사거리와 같은 방식이라 크기와 상관없이 쇠창살과의 길이 비율이 일정하다"),
+            new Def(HOOK_SECONDS, "0.15", 0.05, 5, "쇠창살이 끝까지 날아가는 데 걸리는 시간(빗나가면 같은 시간에 걸쳐 돌아온다. 상대가 피할 수 있을 만큼은 걸리게)"),
+            new Def(HOOK_PULL_SECONDS, "0.3", 0.05, 5, "쇠창살에 맞은 원이 내게 끌려오는 시간(끌려오는 동안 스킬 사용·이동 불가, 다른 원과의 충돌 무효)"),
+            new Def(INVINCIBILITY_SECONDS, "3", 0.5, 60, "무적 스킬이 유지되는 시간(키워드를 잃은 뒤 무적과 같이 다른 원과 충돌하지 않는다)"),
             new Def(SKILL_HEAL_PERCENT, "50", 1, 100, "회복 스킬이 한 번에 채우는 체력(최대 체력의 %). 체력(HP)이 켜져 있을 때만 쓸 수 있고 가득이면 쿨타임을 쓰지 않는다"),
             new Def(POISON_TICKS, "3", 1, 30, "독에 맞으면 키워드를 잃는 횟수(독 틱 간격마다 한 번, 겹 수만큼 잃는다). 다시 맞으면 처음부터 센다"),
             new Def(POISON_TICK_SECONDS, "3", 0.5, 30, "독이 키워드를 잃게 하는 간격(전체 지속 시간 = 횟수 × 간격, 기본 9초)"),
             new Def(POISON_MAX_STACKS, "10", 1, 50, "독이 겹칠 수 있는 최대 겹 수(한 틱에 잃는 키워드 수의 상한)"),
             new Def(DARKNESS_SECONDS, "3", 0.5, 30, "암흑에 맞으면 화면이 내 원 둘레만 보이게 어두워지는 시간(봇은 그동안 시야가 좁아진다)"),
-            new Def(CLEANSE_IMMUNE_SECONDS, "0", 0, 30, "정화를 쓴 뒤 새 CC(갈고리·투사체·충격파 등)에 걸리지 않는 시간(0이면 면역 없음)"),
+            new Def(CLEANSE_IMMUNE_SECONDS, "0", 0, 30, "정화를 쓴 뒤 새 CC(쇠창살·투사체·충격파 등)에 걸리지 않는 시간(0이면 면역 없음)"),
             new Def(SLOW_SECONDS, "3", 0.5, 30, "슬로우에 맞으면 느려지는 시간. 다시 맞으면 처음부터 센다"),
             new Def(SLOW_PERCENT, "50", 5, 100, "슬로우 한 겹의 이동 속도(평소의 %). 겹치면 거듭 곱한다(50%가 2겹이면 25%)"),
             new Def(SLOW_MAX_STACKS, "3", 1, 10, "슬로우가 겹칠 수 있는 최대 겹 수"),
             new Def(STUN_SECONDS, "1", 0.1, 10, "스턴에 맞으면 움직이지도 스킬을 쓰지도 못하는 시간(정화는 쓸 수 있다)"),
+            new Def(ROOT_SECONDS, "2", 0.2, 30, "속박에 걸리면 움직이지 못하는 시간(스킬은 쓸 수 있고 정화로 풀린다)"),
+            new Def(SILENCE_SECONDS, "3", 0.5, 30, "침묵에 걸리면 스킬을 쓰지 못하는 시간(이동·대시는 된다. 정화로 풀린다)"),
+            new Def(CONFUSE_SECONDS, "3", 0.5, 30, "혼란에 걸리면 조작 방향이 반대가 되는 시간(정화로 풀린다)"),
+            new Def(AMPLIFY_SECONDS, "10", 1, 120, "공격 증폭이 유지되는 시간(다시 쓰면 남은 시간을 새로 센다)"),
+            new Def(AMPLIFY_MULTIPLIER, "2", 1, 10, "공격 증폭 중 내가 주는 체력 피해의 배수"),
+            new Def(FORTIFY_SECONDS, "10", 1, 120, "피해 감소이 유지되는 시간(다시 쓰면 남은 시간을 새로 센다)"),
+            new Def(FORTIFY_PERCENT, "50", 1, 100, "피해 감소 중 내가 받는 체력 피해의 비율(50이면 절반)"),
+            new Def(BARRIER_SECONDS, "10", 1, 120, "보호막이 유지되는 시간(다 닳으면 그 전에 사라진다)"),
+            new Def(BARRIER_HP_PERCENT, "50", 1, 300, "보호막의 쉴드량(최대 체력의 절대 %, 체력과 별개로 위에 쌓이고 피해는 쉴드가 먼저 받는다)"),
+            new Def(BERSERK_DRAIN_PERCENT, "1", 0, 20, "광폭화를 켜 둔 동안 1초마다 잃는 체력(최대 체력의 %)"),
+            new Def(BERSERK_MIN_HP_PERCENT, "1", 1, 50, "광폭화로 체력이 이 % 아래로 내려가면 더 깎이기 전에 자동으로 꺼진다"),
             new Def(FIREBALL_COUNT, "3", 1, 10, "화염구 한 번에 던지는 발 수(한 발에 키워드 1개, 반드시 맞는다)"),
             new Def(FIREBALL_INTERVAL_SECONDS, "0.15", 0, 2, "화염구 한 발과 다음 발 사이의 간격"),
             new Def(QUAKE_DROP_KEYWORDS, "3", 1, 20, "충격파에 닿은 원이 잃는 키워드 수(아무도 가져가지 않는다)"),
@@ -264,12 +286,16 @@ public final class SettingKeys {
         group("스킬", DASH_SPEED_MULTIPLIER, DASH_SECONDS,                                  // 대시
                 REPEL_SPEED_MULTIPLIER, REPEL_REACH_PX, REPEL_KNOCKBACK,
                 HOOK_REACH_PX, BOLT_REACH_PX, HOOK_SECONDS, HOOK_PULL_SECONDS,
-                SKILL_SHIELD_SECONDS, SKILL_HEAL_PERCENT, STEALTH_SECONDS,
+                INVINCIBILITY_SECONDS, SKILL_HEAL_PERCENT, STEALTH_SECONDS,
                 POISON_TICKS, POISON_TICK_SECONDS, POISON_MAX_STACKS,                       // 독
                 DARKNESS_SECONDS, CLEANSE_IMMUNE_SECONDS,                                   // 암흑·정화
                 SLOW_SECONDS, SLOW_PERCENT, SLOW_MAX_STACKS, STUN_SECONDS,                  // 슬로우·스턴
                 FIREBALL_COUNT, FIREBALL_INTERVAL_SECONDS, QUAKE_DROP_KEYWORDS,                   // 화염구·충격파
-                ABSORB_SECONDS, ABSORB_TICK_SECONDS);                                       // 흡수
+                ABSORB_SECONDS, ABSORB_TICK_SECONDS,                                        // 흡수
+                ROOT_SECONDS, SILENCE_SECONDS, CONFUSE_SECONDS,                             // 속박·침묵·혼란
+                AMPLIFY_SECONDS, AMPLIFY_MULTIPLIER, FORTIFY_SECONDS, FORTIFY_PERCENT,      // 공격 증폭·피해 감소
+                BARRIER_SECONDS, BARRIER_HP_PERCENT,                                        // 보호막
+                BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT);                             // 광폭화
         group("일일 제한·돌림판", DAILY_RESET_HOUR, DAILY_RESET_MINUTE, WHEEL_ENABLED, WHEEL_UNLOCK_LEVEL, WHEEL_WEIGHT_1, WHEEL_WEIGHT_2, WHEEL_WEIGHT_3, WHEEL_WEIGHT_4, WHEEL_WEIGHT_5, WHEEL_WEIGHT_6, WHEEL_WEIGHT_8, WHEEL_WEIGHT_10, WHEEL_WEIGHT_15, WHEEL_WEIGHT_20);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
         group("체력(HP)", HP_ENABLED, HP_MAX, HP_HIT_SECONDS, HP_FLAME_MULTIPLIER, HP_FLAME_COUNTER,
@@ -302,17 +328,17 @@ public final class SettingKeys {
     static {
         unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
                 ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, COMBO_MAX_SECONDS,
-                HOOK_SECONDS, HOOK_PULL_SECONDS, SKILL_SHIELD_SECONDS, STEALTH_SECONDS, HP_HIT_SECONDS,
+                HOOK_SECONDS, HOOK_PULL_SECONDS, INVINCIBILITY_SECONDS, STEALTH_SECONDS, HP_HIT_SECONDS,
                 POISON_TICK_SECONDS, DARKNESS_SECONDS, CLEANSE_IMMUNE_SECONDS, SLOW_SECONDS, STUN_SECONDS, FIREBALL_INTERVAL_SECONDS,
-                ABSORB_SECONDS, ABSORB_TICK_SECONDS);
+                ABSORB_SECONDS, ABSORB_TICK_SECONDS, ROOT_SECONDS, SILENCE_SECONDS, CONFUSE_SECONDS, AMPLIFY_SECONDS, FORTIFY_SECONDS, BARRIER_SECONDS);
         unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES, DAILY_RESET_MINUTE);
         unit("시", DAILY_RESET_HOUR);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
         unit("px", HOOK_REACH_PX, BOLT_REACH_PX, REPEL_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        unit("배", HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, REPEL_SPEED_MULTIPLIER,
+        unit("배", AMPLIFY_MULTIPLIER, HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, REPEL_SPEED_MULTIPLIER,
                 REPEL_KNOCKBACK);
-        unit("%", SKILL_HEAL_PERCENT, SLOW_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
+        unit("%", FORTIFY_PERCENT, BARRIER_HP_PERCENT, BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT, SKILL_HEAL_PERCENT, SLOW_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE, FIREBALL_COUNT, QUAKE_DROP_KEYWORDS);
         unit("겹", POISON_MAX_STACKS, SLOW_MAX_STACKS);

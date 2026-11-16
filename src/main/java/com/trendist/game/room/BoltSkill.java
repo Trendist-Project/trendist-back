@@ -8,7 +8,7 @@ import java.util.List;
  * 투사체(4.33): 독·암흑·슬로우·스턴. 내 원 가장자리에서 겨눈 방향으로 날아가고(논타겟) 처음 닿은 원 하나가 맞아 그 상태 효과(StatusEffects)에 걸린다.
  * 사거리(화면 기준 bolt_reach_px) 끝까지 빗나가면 사라진다. 화면 속도는 갈고리가 뻗는 속도(hook_reach_px ÷ hook_seconds)와 같다.
  * 반지름 = 쓴 원 반지름 × RADIUS_RATIO(최소 MIN_RADIUS px)이고 판정과 화면 그림이 같은 값을 쓴다(서버가 radius를 보낸다).
- * 세이프존·무적(방패 포함)·정화 직후 면역인 원은 지나간다.
+ * 세이프존·무적 스킬·정화 직후 면역인 원은 지나간다.
  */
 final class BoltSkill implements PlayerSkill {
     static final double RADIUS_RATIO = 0.3, MIN_RADIUS = 10;

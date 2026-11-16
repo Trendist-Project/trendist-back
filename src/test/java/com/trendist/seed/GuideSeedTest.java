@@ -43,9 +43,9 @@ class GuideSeedTest {
             assertThat(a.titleEn()).isNotBlank();
             assertThat(embeds(a.bodyEn())).as("영어 본문의 게임 그림 수: " + a.title()).isEqualTo(embeds(a.body()));
         }
-        // 스킬마다 움직이는 그림이 하나씩 있다(대시·방패·갈고리·반발·충격파·은신·암흑·독·정화·슬로우·스턴·불꽃·흡수)
+        // 스킬마다 움직이는 그림이 하나씩 있다(대시·무적·갈고리·반발·충격파·은신·암흑·독·정화·슬로우·스턴·불꽃·흡수)
         List<String> skillBodies = GuideSeed.ADDED.stream().filter(a -> a.categoryCode().equals("skills")).map(GuideSeed.Added::body).toList();
-        for (String token : List.of("[[스킬 대시]]", "[[스킬 방패]]", "[[스킬 갈고리]]", "[[스킬 반발]]", "[[스킬 충격파 키워드]]", "[[스킬 은신]]", "[[스킬 암흑]]", "[[스킬 독]]", "[[스킬 정화]]", "[[스킬 슬로우]]", "[[스킬 스턴]]", "[[스킬 불꽃]]", "[[스킬 흡수]]")) {
+        for (String token : List.of("[[스킬 대시]]", "[[스킬 무적]]", "[[스킬 쇠창살]]", "[[스킬 반발]]", "[[스킬 충격파 키워드]]", "[[스킬 은신]]", "[[스킬 암흑]]", "[[스킬 독]]", "[[스킬 정화]]", "[[스킬 슬로우]]", "[[스킬 스턴]]", "[[스킬 불꽃]]", "[[스킬 흡수]]")) {
             assertThat(skillBodies.stream().filter(b -> b.contains(token)).count()).as(token).isEqualTo(1);
         }
     }
@@ -55,8 +55,8 @@ class GuideSeedTest {
         var skills = categories.findByCodeAndEnabledTrue("skills").orElseThrow();
         List<String> titles = guides.findByGuideCategoryId(skills.getId()).stream()
                 .sorted(java.util.Comparator.comparingLong(Guide::getSortOrder)).map(Guide::getTitle).toList();
-        assertThat(titles).contains("스킬 장착하기", "🕶️ 암흑", "☠️ 독", "✨ 정화");
-        assertThat(titles.indexOf("🕶️ 암흑")).isGreaterThan(titles.indexOf("👻 은신"));
+        assertThat(titles).contains("스킬 장착하기", "암흑", "독", "정화");
+        assertThat(titles.indexOf("암흑")).isGreaterThan(titles.indexOf("은신"));
     }
 
     @Test
@@ -91,22 +91,22 @@ class GuideSeedTest {
         var skills = categories.findByCodeAndEnabledTrue("skills").orElseThrow();
         tx.executeWithoutResult(st -> {
             for (Guide g : guides.findByGuideCategoryId(skills.getId())) {
-                if (g.getTitle().equals("☠️ 독")) { g.changeBody("예전 시드 본문"); g.markSeed(0, DataSeeder.seedHash("예전 시드 본문", g.getBodyEn())); }
-                if (g.getTitle().equals("🕶️ 암흑")) { String h = DataSeeder.seedHash("예전 시드 본문", g.getBodyEn()); g.changeBody("관리자가 고친 본문"); g.markSeed(0, h); }
+                if (g.getTitle().equals("독")) { g.changeBody("예전 시드 본문"); g.markSeed(0, DataSeeder.seedHash("예전 시드 본문", g.getBodyEn())); }
+                if (g.getTitle().equals("암흑")) { String h = DataSeeder.seedHash("예전 시드 본문", g.getBodyEn()); g.changeBody("관리자가 고친 본문"); g.markSeed(0, h); }
             }
         });
         tx.executeWithoutResult(st -> seeder.run(new DefaultApplicationArguments()));
         tx.executeWithoutResult(st -> {
-            GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(a -> a.title().equals("☠️ 독")).findFirst().orElseThrow();
+            GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(a -> a.title().equals("독")).findFirst().orElseThrow();
             for (Guide g : guides.findByGuideCategoryId(skills.getId())) {
-                if (g.getTitle().equals("☠️ 독")) {
+                if (g.getTitle().equals("독")) {
                     assertThat(g.getBody()).isEqualTo(poison.body());
-                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "☠️ 독"));
+                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "독"));
                     assertThat(g.getSeedHash()).isEqualTo(DataSeeder.seedHash(poison.body(), poison.bodyEn()));
                 }
-                if (g.getTitle().equals("🕶️ 암흑")) {
+                if (g.getTitle().equals("암흑")) {
                     assertThat(g.getBody()).isEqualTo("관리자가 고친 본문");
-                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "🕶️ 암흑")); // 판은 올라가서 다시 묻지 않는다
+                    assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "암흑")); // 판은 올라가서 다시 묻지 않는다
                 }
             }
         });
@@ -135,7 +135,7 @@ class GuideSeedTest {
                 assertThat(out).as(a.title()).doesNotContain("{{");
             }
         }
-        GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(x -> x.title().equals("☠️ 독")).findFirst().orElseThrow();
+        GuideSeed.Added poison = GuideSeed.ADDED.stream().filter(x -> x.title().equals("독")).findFirst().orElseThrow();
         assertThat(poison.body()).contains("{{poison_tick_seconds}}");
     }
 
@@ -144,7 +144,7 @@ class GuideSeedTest {
     @Test
     void publicGuideShowsTheCurrentSettingValues() {
         // 공개 가이드는 설정값 자리를 지금 값으로 바꿔 보여 준다(기본값: 독 9초 동안 3초마다)
-        var poison = guideService.articles("skills", com.trendist.common.support.Lang.KO).stream().filter(x -> x.title().equals("☠️ 독")).findFirst().orElseThrow();
+        var poison = guideService.articles("skills", com.trendist.common.support.Lang.KO).stream().filter(x -> x.title().equals("독")).findFirst().orElseThrow();
         assertThat(poison.body()).contains("9초 동안 3초마다").doesNotContain("{{");
     }
 
@@ -155,13 +155,13 @@ class GuideSeedTest {
         GuideSeed.Fix before = GuideSeedOld.FIXES.stream().filter(f -> f.title().equals("☠️ 독") && f.oldBody().contains("9초 동안 3초마다")).findFirst().orElseThrow();
         tx.executeWithoutResult(st -> {
             for (Guide g : guides.findByGuideCategoryId(skills.getId()))
-                if (g.getTitle().equals("☠️ 독")) { g.changeBody(before.oldBody()); g.markSeed(null, null); }
+                if (g.getTitle().equals("독")) { g.changeBody(before.oldBody()); g.markSeed(null, null); }
         });
         tx.executeWithoutResult(st -> seeder.run(new DefaultApplicationArguments()));
         tx.executeWithoutResult(st -> {
-            Guide g = guides.findByGuideCategoryId(skills.getId()).stream().filter(x -> x.getTitle().equals("☠️ 독")).findFirst().orElseThrow();
+            Guide g = guides.findByGuideCategoryId(skills.getId()).stream().filter(x -> x.getTitle().equals("독")).findFirst().orElseThrow();
             assertThat(g.getBody()).contains("{{poison_tick_seconds}}");
-            assertThat(g.getSeedVersion()).isEqualTo(2);
+            assertThat(g.getSeedVersion()).isEqualTo(GuideSeed.version("skills", "독"));
         });
     }
 }

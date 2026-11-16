@@ -18,13 +18,17 @@ final class PlayerSkills {
         add(new WaveSkill(room, "repel", false));     // 반발
         add(new WaveSkill(room, "quake", true));      // 충격파
         add(hook);
-        for (String kind : new String[]{"poison", "darkness", "slow", "stun"}) { BoltSkill b = new BoltSkill(room, kind); bolts.put(kind, b); add(b); }
+        for (String kind : new String[]{"poison", "darkness", "slow", "stun", "root", "silence", "confuse"}) { BoltSkill b = new BoltSkill(room, kind); bolts.put(kind, b); add(b); }
         add(new FireballSkill(room));
         add(new AbsorbSkill(room));
-        add(new InstantSkills.Shield(room));
+        add(new InstantSkills.Invincibility(room));
         add(new InstantSkills.Stealth(room));
         add(new InstantSkills.Cleanse(room));
         add(new InstantSkills.Heal(room));
+        add(new BuffSkills.Amplify(room));
+        add(new BuffSkills.Fortify(room));
+        add(new BuffSkills.Barrier(room));
+        add(new BuffSkills.Berserk(room));
         if (!byCode.keySet().equals(new java.util.HashSet<>(Room.SKILLS)))
             throw new IllegalStateException("Room.SKILLS and PlayerSkills differ: " + Room.SKILLS + " vs " + byCode.keySet());
     }

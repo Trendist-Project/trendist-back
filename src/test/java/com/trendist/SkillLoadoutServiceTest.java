@@ -45,11 +45,11 @@ class SkillLoadoutServiceTest {
     void neverChosenIsNullAndSavedSlotsComeBackInSlotOrderWithEmptySlotsAsNull() throws Exception {
         long p = newPlayer("sl1");
         assertThat(loadouts.load(p)).isNull();
-        loadouts.save(p, Arrays.asList("hook", null, "shield", null));
-        assertThat(loadouts.load(p)).containsExactly("hook", null, "shield", null);
+        loadouts.save(p, Arrays.asList("hook", null, "invincibility", null));
+        assertThat(loadouts.load(p)).containsExactly("hook", null, "invincibility", null);
         // 같은 스킬을 칸끼리 옮겨도 된다
-        loadouts.save(p, Arrays.asList("shield", "hook", null, null));
-        assertThat(loadouts.load(p)).containsExactly("shield", "hook", null, null);
+        loadouts.save(p, Arrays.asList("invincibility", "hook", null, null));
+        assertThat(loadouts.load(p)).containsExactly("invincibility", "hook", null, null);
         // 전부 비워도 '고른 적 없음'과 구분된다(자동으로 다시 채워지지 않는다)
         loadouts.save(p, Arrays.asList(null, null, null, null));
         assertThat(loadouts.load(p)).containsExactly(null, null, null, null);

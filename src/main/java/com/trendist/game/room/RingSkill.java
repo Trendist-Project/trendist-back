@@ -7,7 +7,7 @@ import java.util.Set;
 
 /**
  * 충격고리: 예고 동안 몸이 붉게 맥동하다가 몸 가장자리에서 맵 전체로 퍼진다. 앞면이 닿은 사람은 보스에서 가까울수록 많이
- * (`ring_max_hp_percent`) 멀수록 적게(`ring_min_hp_percent`) 최대 체력의 %를 잃는다. 세이프존 안이거나 무적(방패 스킬 등) 상태가 아니면 불꽃이어도 맞는다.
+ * (`ring_max_hp_percent`) 멀수록 적게(`ring_min_hp_percent`) 최대 체력의 %를 잃는다. 세이프존 안이거나 무적(무적 스킬 등) 상태가 아니면 불꽃이어도 맞는다.
  */
 final class RingSkill extends BossSkill {
     private double ringR, ringMax;

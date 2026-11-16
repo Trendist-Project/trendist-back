@@ -19,7 +19,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "skills", uniqueConstraints = @UniqueConstraint(name = "uk_skills_code", columnNames = "code"))
 public class Skill extends BaseTimeEntity {
     @Column(nullable = false, length = 30) private String code;
-    @Column(length = 20) private String icon;
     @Column(nullable = false, length = 20) private String category;
     @Column(name = "default_key", nullable = false, length = 30) private String defaultKey;
     @Column(name = "cooldown_seconds", nullable = false, precision = 10, scale = 2) private BigDecimal cooldownSeconds;
@@ -34,9 +33,9 @@ public class Skill extends BaseTimeEntity {
     /** 목록 순서는 코드(시더)가 정한다 */
     public void changeSortOrder(long sortOrder) { this.sortOrder = sortOrder; }
 
-    public Skill(String code, String icon, String category, String defaultKey, double cooldownSeconds, int requiredLevel, long sortOrder) {
+    public Skill(String code, String category, String defaultKey, double cooldownSeconds, int requiredLevel, long sortOrder) {
         this.code = code; this.requiredLevel = requiredLevel;
-        this.icon = icon; this.category = category; this.defaultKey = defaultKey;
+        this.category = category; this.defaultKey = defaultKey;
         this.cooldownSeconds = BigDecimal.valueOf(cooldownSeconds); this.sortOrder = sortOrder;
     }
 }

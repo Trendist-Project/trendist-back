@@ -59,7 +59,7 @@ public class Room {
         default void requestSteal(Room room, Member attacker) {}
         /** 사람(member)이 현재 유행도가 같은 원과 부딪혔다(승패가 없는 충돌). 횟수를 올리고 칭호를 확인한다(4.3). 봇은 부르지 않는다. */
         default void requestTie(Room room, Member member) {}
-        /** 사람(loser)이 키워드가 없는 채로 져서 죽었다(패배). 패배 횟수를 올리고 칭호를 확인한다(4.31). 봇은 부르지 않는다. */
+        /** 사람(loser)이 체력이 0이 되어 죽었다(패배). 패배 횟수를 올리고 칭호를 확인한다(4.31). 봇은 부르지 않는다. */
         default void requestDefeat(Room room, Member loser) {}
         /** 사람(winner)의 연속 빼앗기 콤보가 최고 기록(이 접속에서 보낸 값)을 넘었다. 저장된 최고 콤보보다 높으면 올리고 칭호를 확인한다(4.25). 봇은 부르지 않는다. */
         default void requestCombo(Room room, Member winner, int combo) {}
@@ -125,7 +125,7 @@ public class Room {
 
     /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
     public static final int DEFAULT_SKILL_SLOTS = 4;
-    public static final List<String> SKILLS = List.of("repel", "hook", "shield", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "fireball", "quake", "absorb");
+    public static final List<String> SKILLS = List.of("repel", "hook", "invincibility", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "fireball", "quake", "absorb", "root", "silence", "confuse", "amplify", "fortify", "barrier", "berserk");
     /**
      * 바꾸기 전의 스킬 코드 → 지금 코드(V63). 반발은 shockwave, 화염구는 flame이었다(충격파 quake·콤보 불꽃과 헷갈려서 바꿨다).
      * 서버를 바꾼 뒤에도 새로고침하지 않은 화면이 옛 코드로 보내는 것을 받아 주려는 것이라, 배포 뒤 한동안 지나면 지워도 된다.
@@ -163,6 +163,15 @@ public class Room {
         /** 스킬(4.33): SKILLS 순서대로 다시 쓸 수 있는 시각(방 시계 초). 은신이 끝나는 시각 */
         public final double[] skillReadyAt = new double[SKILLS.size()];
         public double stealthUntil;
+        /** 버프(4.33): 공격 증폭·피해 감소이 끝나는 시각(방 시계 초) */
+        public double amplifyUntil, fortifyUntil;
+        /** 보호막: 남은 쉴드량(체력 점수 단위), 처음 쉴드 %(최대 체력 대비), 끝나는 시각 */
+        public double barrier, barrierMax, barrierUntil;
+        /** 광폭화가 켜져 있다, 다음 초당 체력 소모 시각 */
+        public boolean berserk;
+        public double berserkNextAt;
+        /** 마지막으로 본인에게 알린 이동 속도 배수와 그 시각(StatusEffects.syncSpeed) */
+        public double lastSpeedMult = 1, speedSentAt;
         /** 갈고리에 맞아 끌려오는 중이면 쓴 사람, 남은 끌려오는 시간(초), 맞을 때 키워드를 잃었는지(끝나면 무적을 준다). 끌려오는 동안은 이동·스킬·다른 원과의 충돌이 모두 막힌다 */
         Member hookedBy;
         double pullLeft;
@@ -190,7 +199,7 @@ public class Room {
         public boolean safe;               // 이번 틱에 세이프존 안에 있다(4.22). 부딪히지 않는다
         /** 화면에 보이는 세계 범위의 가로·세로 절반(px). 클라이언트가 알려 주며, 그 둘레(여유 포함)의 원만 스냅샷에 담는다(관심 영역 전송). 알리기 전에는 넉넉한 기본값 */
         public double viewHalfW = 5000, viewHalfH = 5000;
-        public volatile boolean dead;      // 키워드가 없는 채로 져서 죽었다(4.31). 방에서는 이미 빠졌고, 다시 들어오기(리스폰) 전까지 입력을 받지 않는다
+        public volatile boolean dead;      // 죽었다(체력 0, 4.31). 방에서는 이미 빠졌고, 다시 들어오기(리스폰) 전까지 입력을 받지 않는다
         public final Set<Long> keywords = new HashSet<>();
         /** 마지막으로 이 접속에서 메시지(ping 포함)를 받은 시각(nanoTime). 받는 스레드가 쓰고 틱이 읽는다 */
         public volatile long lastHeardNanos;
@@ -248,6 +257,8 @@ public class Room {
     private volatile Set<String> disabledSkills = Set.of();
     /** 스킬 코드 → 해금 레벨(DB skills.required_level). 없으면 처음부터 쓴다. 레벨이 모자라면 서버가 막는다(4.33) */
     private volatile Map<String, Integer> requiredLevels = Map.of();
+    /** DB에 등록된 모든 스킬 코드(서버 규칙이 아직 없는 새 스킬 포함). 장착 가능 여부에만 쓴다 */
+    private volatile Set<String> knownSkills = Set.of();
     /** 몬스터(4.35): 방 번호 → 몬스터. 설정값(종류 코드 → 이름 → 값)은 방이 1초마다 새로 받는다. monsterView는 관리자 모니터링용 복사본 */
     private final Map<Integer, Monster> monsters = new LinkedHashMap<>();
     private int nextMonster = 1;
@@ -315,6 +326,7 @@ public class Room {
     public SkillConfig skillConfig() { return skillConfig; }
     public void setDisabledSkills(Set<String> codes) { this.disabledSkills = Set.copyOf(codes); }
     public void setRequiredLevels(Map<String, Integer> levels) { this.requiredLevels = Map.copyOf(levels); }
+    public void setKnownSkills(Set<String> codes) { this.knownSkills = Set.copyOf(codes); }
 
     /** 이 레벨로 그 스킬을 쓸 수 있는지. 모자라면 본인에게 {skillFail, reason: level, level: 필요 레벨}을 알린다 */
     private boolean unlocked(Member m, String id) {
@@ -562,6 +574,7 @@ public class Room {
     public void leave(Member m) {
         if (m.dead) { spectators.remove(m); refreshSpectatorSize(); return; } // 죽은 채로 나간다(4.31): 구경 목록에서만 뺀다
         if (members.remove(m.entityNo) == null) return;
+        endBuffs(m);
         byPlayer.remove(m.playerId);
         for (Long k : m.keywords) {
             Set<Member> set = holders.get(k);
@@ -572,7 +585,7 @@ public class Room {
     }
 
     /**
-     * 죽음(4.31): 키워드가 하나도 없는 사람이 져서 보호도 없을 때. 방에서 빼고(보호·위치는 남기지 않는다) 죽은 사람에게 {died, by},
+     * 죽음(4.31): 체력이 0이 되었을 때. 방에서 빼고(보호·위치는 남기지 않는다) 죽은 사람에게 {died, by},
      * 죽인 사람에게 {kill, target}을 보낸다. 연결은 그대로 두고, 클라이언트가 {respawn}을 보내 다시 들어올 때까지 기다린다.
      * 이긴 쪽 콤보는 +1, 진 쪽 콤보는 0(4.25)이라 싸움 결과도 함께 처리한다.
      */
@@ -583,6 +596,7 @@ public class Room {
         if (loser.dead || members.get(loser.entityNo) != loser) return;
         fightResult(killer, loser, loser.bot);
         healOnKill(killer, loser); // 처치 회복(4.36)
+        endBuffs(loser);
         loser.dead = true;
         members.remove(loser.entityNo);
         if (!killer.bot) outbox.requestKill(this, killer); // 죽인 횟수(4.31): 죽은 쪽이 사람이든 봇이든 센다
@@ -753,6 +767,7 @@ public class Room {
         updateHp(dt);
         skills.update(dt);
         status.tick();
+        updateBuffs();
         collide(tu);
         tickMonsters(dt);
         skills.hook.finish();
@@ -836,8 +851,8 @@ public class Room {
     void knockFrom(Member m, double nx, double ny, double strength, Tuning tu) { knock(m, nx, ny, strength, tu); }
 
     /** 무적(보호막) 표시: 모두의 화면에 seconds초 */
-    void shieldFor(Member m, double seconds) {
-        broadcast(RoomMessages.shield(m.entityNo, SkillFx.ms(seconds)));
+    void invincibleFor(Member m, double seconds) {
+        broadcast(RoomMessages.invincibility(m.entityNo, SkillFx.ms(seconds)));
     }
 
 
@@ -847,7 +862,10 @@ public class Room {
      */
     void monsterHurt(Member m, String by, double percent) {
         if (!hpTuning.enabled() || m.bot || m.dead || percent <= 0) return;
-        double dmg = hpTuning.max() * percent / 100.0;
+        double total = modifyDamage(null, m, hpTuning.max() * percent / 100.0); // 피해 감소 → 보호막 순서
+        double dmg = absorb(m, total);
+        percent = total / hpTuning.max() * 100.0;                              // 화면에는 쉴드가 막은 몫까지 합친 전체 피해를 보인다
+        if (dmg <= 0) { broadcast(RoomMessages.hpHit(m.entityNo, -1, round2(Math.min(100.0, percent)), hpPercent(m))); return; }
         if (round2(m.hp - dmg) <= 0) { monsterKill(m, by); return; }
         m.hp = round2(m.hp - dmg);
         markHp(m); hpPublicDirty = true;
@@ -915,7 +933,7 @@ public class Room {
      */
     private void advance(Member m, double h, Tuning tu) {
         if (h <= 0) return;
-        double speed = tu.maxSpeed() * (clockSeconds < m.dashUntil ? dashTuning.multiplier() : 1) * status.slowMult(m); // 크기와 관계없이 모두 같다. 대시 중이면 배수, 슬로우면 감속
+        double speed = tu.maxSpeed() * (clockSeconds < m.dashUntil ? dashTuning.multiplier() : 1) * status.speedMult(m); // 크기와 관계없이 모두 같다. 대시 중이면 배수, 슬로우·속박이면 감속, 광폭화면 가속
         double wantX = 0, wantY = 0;
         if (m.dirX != 0 || m.dirY != 0) {
             wantX = m.dirX * speed; wantY = m.dirY * speed;
@@ -927,6 +945,7 @@ public class Room {
                 wantX = dx / d * s; wantY = dy / d * s;
             }
         }
+        if (status.confused(m)) { wantX = -wantX; wantY = -wantY; } // 혼란: 조작 방향이 반대다(클라이언트 예측도 같다)
         // 입력도 목표도 없으면 감속해 그 자리에 멈춘다(자동으로 떠다니지 않는다)
         double e = Math.exp(-ACCEL_RATE * h), moved = (1 - e) / ACCEL_RATE;
         m.x += wantX * h + (m.vx - wantX) * moved; m.y += wantY * h + (m.vy - wantY) * moved;
@@ -1252,28 +1271,30 @@ public class Room {
                         botWipe(cold, hot, tu, hpTuning.flameLosePercent()); // 봇의 (메모리) 키워드를 일부(비율은 설정, 100이면 모두) 잃는다(4.36)
                     } else if (cold.protectUntil <= clockSeconds && !cold.bot && !cold.keywords.isEmpty()) {
                         cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                        shield(cold, tu);
+                        invincible(cold, tu);
                         outbox.requestLoss(this, KeywordLoss.flame(cold, hot, hpTuning.flameLosePercent())); // 이긴 쪽이 봇이어도 잃는다(비율은 설정, 100이면 모두, 4.36)
                     } else if (cold.protectUntil <= clockSeconds) {
-                        die(cold, hot); // 이미 키워드가 없으면 죽는다(사람·봇, 4.31)
+                        cold.protectUntil = clockSeconds + tu.loseProtectSeconds(); // 키워드가 없어도 졌으니 무적이 붙는다. 죽음은 체력이 0이 될 때만 온다(4.36)
+                        invincible(cold, tu);
                     }
                 // 현재 유행도가 낮은 쪽이 키워드 하나를 잃는다(4.3). 같으면 없음. 둘 다 불꽃이어도 이 규칙이다
-                } else if (a.score != b.score) {
-                    Member loser = a.score < b.score ? a : b, winner = loser == a ? b : a;
+                } else if (effScore(a) != effScore(b)) { // 광폭화는 유행도에 잃은 체력 비율만큼 곱해 비교한다(표시값은 그대로)
+                    Member loser = effScore(a) < effScore(b) ? a : b, winner = loser == a ? b : a;
                     if (loser.protectUntil <= clockSeconds && loser.bot && !loser.botKeywords.isEmpty()) {
                         loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                         BotKw lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 실제 키워드 하나를 잃는다(4.21)
-                        shield(loser, tu);
+                        invincible(loser, tu);
                         comboLose(loser, winner); // 잃으면 봇의 콤보와 불꽃도 사라진다(4.25)
                         // 이긴 사람은 봇이 잃은 바로 그 키워드를 빼앗고, 이긴 쪽이 봇이면 그 키워드가 그 봇의 메모리 목록에 들어간다
                         if (!winner.bot) outbox.requestLoss(this, KeywordLoss.fromBot(KeywordLoss.Cause.FIGHT, loser, winner, lost.id()));
                         else { botGain(winner, lost.id()); comboWin(winner, true); }
                     } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
                         loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
-                        shield(loser, tu);
+                        invincible(loser, tu);
                         outbox.requestLoss(this, KeywordLoss.fight(loser, winner)); // 이긴 쪽이 봇이어도 잃는다
                     } else if (loser.protectUntil <= clockSeconds) {
-                        die(loser, winner); // 잃을 키워드가 없는 채로 지면 죽는다(사람·봇, 4.31)
+                        loser.protectUntil = clockSeconds + tu.loseProtectSeconds(); // 잃을 키워드가 없어도 졌으니 무적이 붙는다. 죽음은 체력이 0이 될 때만 온다(4.36): 체력이 1%라도 남으면 산다
+                        invincible(loser, tu);
                     }
                 } else {
                     tieCollision(a, b, key); // 유행도가 같으면 누구도 잃지 않는다. 사람의 "같은 유행도와 부딪힌 횟수"만 센다(4.3)
@@ -1292,7 +1313,7 @@ public class Room {
 
     /** 공격자(att)가 상대(vic)를 한 번 쳤을 때의 피해(점): 100 × 공격력 ÷ (공격력 + 상대 유행도). 공격자가 불꽃이면 공격력은 항상 유행도 × 배수다. 소수 둘째 자리까지 반올림 */
     double hpDamage(Member att, Member vic) {
-        double atk = att.score * (isFlame(att) ? hpTuning.flameMultiplier() : 1), v = vic.score;
+        double atk = effScore(att) * (isFlame(att) ? hpTuning.flameMultiplier() : 1), v = vic.score;
         double ratio = atk + v <= 0 ? 0.5 : atk / (atk + v); // 둘 다 0이면 반반
         return round2(100.0 * ratio);
     }
@@ -1387,9 +1408,9 @@ public class Room {
         if (last != null && clockSeconds - last < hp.hitSeconds()) return false;
         hpHitAt.put(pairKey, clockSeconds);
         if (hpHitAt.size() > 512) hpHitAt.values().removeIf(t -> clockSeconds - t >= hp.hitSeconds());
-        double toA = hpDamage(b, a), toB = hpDamage(a, b);
+        double toA = modifyDamage(b, a, hpDamage(b, a)), toB = modifyDamage(a, b, hpDamage(a, b)); // 공격 증폭·피해 감소 적용
         if (aFlame != bFlame && !hp.flameCounter()) { if (aFlame) toA = 0; else toB = 0; } // 불꽃은 반격 피해를 받지 않는다
-        boolean aDies = round2(a.hp - toA) <= 0, bDies = round2(b.hp - toB) <= 0;
+        boolean aDies = round2(a.hp - Math.max(0, toA - barrierPoints(a))) <= 0, bDies = round2(b.hp - Math.max(0, toB - barrierPoints(b))) <= 0; // 쉴드가 먼저 받는다
         if (aDies && bDies) {
             boolean aOut = toA > toB || (toA == toB && a.score <= b.score);
             if (aOut) bDies = false; else aDies = false;
@@ -1401,15 +1422,91 @@ public class Room {
         return aDies || bDies;
     }
 
+    // ------------------------------------------------------------ 버프·보호막·광폭화(4.33)
+
+    boolean amplified(Member m) { return m.amplifyUntil > clockSeconds; }
+    boolean fortified(Member m) { return m.fortifyUntil > clockSeconds; }
+    boolean hasBarrier(Member m) { return m.barrier > 0 && m.barrierUntil > clockSeconds; }
+    double barrierPoints(Member m) { return hasBarrier(m) ? m.barrier : 0; }
+
+    /** 잃은 체력 비율(0~1). 체력 방식이 꺼져 있으면 0 */
+    double lostFraction(Member m) {
+        if (!hpTuning.enabled()) return 0;
+        return clamp(1 - m.hp / Math.max(0.01, hpTuning.max()), 0, 1);
+    }
+    double lostPercent(Member m) { return round2(lostFraction(m) * 100); }
+
+    /** 충돌·피해 판정에 쓰는 유행도: 광폭화 중이면 잃은 체력 비율만큼 곱한다(표시값은 그대로) */
+    double effScore(Member m) { return m.berserk ? m.score * (1 + lostFraction(m)) : m.score; }
+
+    /** 체력 피해에 버프를 건다: 때린 쪽이 공격 증폭이면 amplify_multiplier배, 맞은 쪽이 피해 감소이면 fortify_percent%. att는 보스처럼 원이 아니면 null */
+    double modifyDamage(Member att, Member vic, double dmg) {
+        if (att != null && amplified(att)) dmg *= skillConfig.param("amplify_multiplier");
+        if (fortified(vic)) dmg *= skillConfig.param("fortify_percent") / 100.0;
+        return round2(dmg);
+    }
+
+    /** 보호막이 피해를 먼저 받는다. 남은 피해(체력에 들어갈 몫)를 돌려주고, 쉴드 양을 모두에게 알린다. 다 닳으면 깨진다 */
+    double absorb(Member victim, double dmg) {
+        if (!hasBarrier(victim) || dmg <= 0) return dmg;
+        double take = Math.min(victim.barrier, dmg), max = Math.max(0.01, hpTuning.max());
+        victim.barrier = round2(victim.barrier - take);
+        if (victim.barrier <= 0.0001) { victim.barrier = 0; victim.barrierUntil = 0; broadcast(SkillFx.barrierEnd(victim.entityNo, true)); }
+        else broadcast(SkillFx.barrierHit(victim.entityNo, round2(victim.barrier / max * 100)));
+        return round2(dmg - take);
+    }
+
+    void berserkOff(Member m) {
+        if (!m.berserk) return;
+        m.berserk = false;
+        broadcast(SkillFx.buffEnd("berserk", m.entityNo));
+    }
+
+    /** 원이 방에서 빠질 때(나감·죽음) 버프·보호막·광폭화 표시를 지운다 */
+    private void endBuffs(Member m) {
+        if (amplified(m)) broadcast(SkillFx.buffEnd("amplify", m.entityNo));
+        if (fortified(m)) broadcast(SkillFx.buffEnd("fortify", m.entityNo));
+        if (hasBarrier(m)) broadcast(SkillFx.barrierEnd(m.entityNo, false));
+        m.amplifyUntil = 0; m.fortifyUntil = 0; m.barrier = 0; m.barrierUntil = 0;
+        berserkOff(m);
+    }
+
+    /**
+     * 한 틱: 끝난 버프·보호막을 정리하고(끝났다고 모두에게 알림), 광폭화는 1초마다 최대 체력의 berserk_drain_percent%를 잃는다.
+     * 체력이 berserk_min_hp_percent% 아래로 내려가게 되면 깎지 않고 스스로 꺼진다(죽지 않는다). 광폭화는 쉴드를 거치지 않는 자해라 보호막과 상관없다.
+     */
+    private void updateBuffs() {
+        double now = clockSeconds;
+        for (Member m : members.values()) {
+            if (m.amplifyUntil > 0 && m.amplifyUntil <= now) { m.amplifyUntil = 0; broadcast(SkillFx.buffEnd("amplify", m.entityNo)); }
+            if (m.fortifyUntil > 0 && m.fortifyUntil <= now) { m.fortifyUntil = 0; broadcast(SkillFx.buffEnd("fortify", m.entityNo)); }
+            if (m.barrierUntil > 0 && m.barrierUntil <= now) { m.barrier = 0; m.barrierUntil = 0; broadcast(SkillFx.barrierEnd(m.entityNo, false)); }
+            if (!m.berserk) continue;
+            if (!hpTuning.enabled() || m.dead) { berserkOff(m); continue; }
+            if (now < m.berserkNextAt) continue;
+            m.berserkNextAt += 1.0;
+            double max = hpTuning.max(), drain = max * skillConfig.param("berserk_drain_percent") / 100.0, min = max * skillConfig.param("berserk_min_hp_percent") / 100.0;
+            if (m.hp - drain < min) { berserkOff(m); continue; }
+            m.hp = round2(m.hp - drain);
+            markHp(m); hpPublicDirty = true;
+            broadcast(RoomMessages.hpHit(m.entityNo, -1, round2(drain / max * 100), hpPercent(m)));
+            broadcast(SkillFx.berserk(m.entityNo, lostPercent(m)));
+        }
+    }
+
     /** victim의 체력을 dmg점 깎는다. lethal이면 0, 아니면 최소 1%는 남긴다. 맞은 것을 모두에게 알린다({hpHit}: 맞은 원, 때린 원, 깎인 %, 남은 %) */
     private void hurt(Member victim, Member by, double dmg, boolean lethal) {
         if (dmg <= 0) return;
+        double total = dmg;                      // 쉴드가 막은 몫까지 합친 피해(화면에는 이 전체를 평소처럼 한 숫자로 보인다)
+        dmg = absorb(victim, dmg);               // 보호막(쉴드)이 먼저 받고 남는 피해만 체력에 들어간다
+        double absorbed = total - dmg;
         double max = hpTuning.max(), minAlive = round2(max / 100.0);
+        if (dmg <= 0 && !lethal) { broadcast(RoomMessages.hpHit(victim.entityNo, by.entityNo, round2(Math.min(100.0, total / max * 100)), hpPercent(victim))); return; }
         double before = victim.hp;
         victim.hp = lethal ? 0 : Math.max(minAlive, round2(victim.hp - dmg));
         markHp(victim); hpPublicDirty = true;
         double lost = lethal ? dmg : Math.min(dmg, before - victim.hp); // 살아 남으면 실제로 줄어든 만큼만 알린다(1% 하한에 걸려도 -100%로 보이지 않게)
-        broadcast(RoomMessages.hpHit(victim.entityNo, by.entityNo, round2(Math.min(100.0, lost / max * 100)), hpPercent(victim)));
+        broadcast(RoomMessages.hpHit(victim.entityNo, by.entityNo, round2(Math.min(100.0, (lost + absorbed) / max * 100)), hpPercent(victim)));
     }
 
     /** 체력이 0이 되었다: 가진 키워드의 death_lose_percent%를 한 번만 잃고(이미 불꽃에게 잃었어도 이 싸움에서는 다시 잃지 않는다) 죽는다 */
@@ -1439,7 +1536,7 @@ public class Room {
      * 클라이언트 예측이 같은 속도로 가게 하고, 모두에게 {dashFx: 원 번호, 지속 ms}를 보내 그 원에 강조 효과를 그리게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
      */
     public void dash(Member m) {
-        if (m.bot || members.get(m.entityNo) != m || held(m) || disabledSkills.contains("dash")) return; // 끌려오는 동안은 스킬을 쓸 수 없다(4.33)
+        if (m.bot || members.get(m.entityNo) != m || held(m) || status.rooted(m) || disabledSkills.contains("dash")) return; // 끌려오는 동안·속박 중에는 쓸 수 없다(4.33)
         DashTuning d = dashTuning;
         if (clockSeconds < m.dashReadyAt) return;
         if (!unlocked(m, "dash")) return;
@@ -1463,6 +1560,7 @@ public class Room {
         int idx = SKILLS.indexOf(id);
         PlayerSkill s = skills.get(id);
         if (idx < 0 || s == null || m.bot || m.dead || m.offline || !inRoom(m) || (held(m) && !s.usableWhileHeld()) || disabledSkills.contains(id)) return;
+        if (status.silenced(m) && !s.usableWhileHeld()) { tell(m, SkillFx.fail(id, "silenced")); return; } // 침묵: 스킬을 쓰지 못한다(정화만 된다)
         if (clockSeconds < m.skillReadyAt[idx]) return;
         if (!unlocked(m, id)) return; // 해금 레벨이 안 되면 쓰지 못한다(서버가 판정)
         if (!equippedSkills(m).contains(id)) { tell(m, SkillFx.fail(id, "unequipped")); return; } // 장착해야만 쓴다(4.33)
@@ -1476,8 +1574,12 @@ public class Room {
 
     // ---- 스킬 장착(4.33)
 
+    /**
+     * 칸에 장착할 수 있는 스킬인가. 서버 규칙이 있는 스킬(SKILLS)뿐 아니라 DB(skills)에만 먼저 등록된 스킬(속박·증폭 등 규칙이 아직 없는 새 스킬)도 해금되고
+     * 켜져 있으면 장착된다(안 그러면 서버가 장착 요청을 거절하고 옛 장착을 되돌려 보내 "장착이 안 되는" 것처럼 보였다). 쓰는 일은 SKILLS에 있는 스킬만 한다.
+     */
     private boolean usableSkill(Member m, String id) {
-        return SKILLS.contains(id) && !disabledSkills.contains(id) && m.level >= requiredLevels.getOrDefault(id, 1);
+        return (SKILLS.contains(id) || knownSkills.contains(id)) && !disabledSkills.contains(id) && m.level >= requiredLevels.getOrDefault(id, 1);
     }
 
     /** 지금 장착해서 쓸 수 있는 스킬(해금되고 켜져 있는 것만). 고른 적 없으면 해금된 스킬이 해금 레벨 순서(같으면 SKILLS 순서)대로 SKILL_SLOTS개까지 채워진다. */
@@ -1509,7 +1611,7 @@ public class Room {
     public void restoreLoadout(Member m, List<String> saved) {
         if (saved == null) { m.loadout = null; return; }
         String[] lo = new String[skillSlots];
-        for (int i = 0; i < skillSlots && i < saved.size(); i++) lo[i] = saved.get(i) != null && SKILLS.contains(saved.get(i)) ? saved.get(i) : null;
+        for (int i = 0; i < skillSlots && i < saved.size(); i++) lo[i] = saved.get(i) != null && (SKILLS.contains(saved.get(i)) || knownSkills.contains(saved.get(i))) ? saved.get(i) : null;
         m.loadout = lo;
     }
 
@@ -1567,7 +1669,7 @@ public class Room {
     int nextBoltId() { return nextBoltId++; }
 
     /**
-     * by가 t에게 스킬을 맞힐 수 있는지: 자기 자신·죽은 원·세이프존 안·무적(방패·잃은 뒤 무적)·정화 직후 면역인 원은 맞지 않는다.
+     * by가 t에게 스킬을 맞힐 수 있는지: 자기 자신·죽은 원·세이프존 안·무적(무적 스킬·잃은 뒤 무적)·정화 직후 면역인 원은 맞지 않는다.
      * 모든 스킬 판정이 이 조건을 같이 쓰고, 스킬마다 다른 조건(끌려오는 원 제외 등)은 그 스킬이 더한다.
      */
     boolean targetable(Member by, Member t) {
@@ -1578,7 +1680,7 @@ public class Room {
     void protectAfterLoss(Member m) {
         if (m.protectUntil > clockSeconds) return;
         m.protectUntil = clockSeconds + tuning.loseProtectSeconds();
-        shield(m, tuning);
+        invincible(m, tuning);
     }
 
     /**
@@ -1661,8 +1763,8 @@ public class Room {
     boolean isFlame(Member m) { return m.combo >= comboTuning.flameAt(); }
 
     /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
-    void shield(Member m, Tuning tu) {
-        broadcast(RoomMessages.shield(m.entityNo, (long) (tu.loseProtectSeconds() * 1000)));
+    void invincible(Member m, Tuning tu) {
+        broadcast(RoomMessages.invincibility(m.entityNo, (long) (tu.loseProtectSeconds() * 1000)));
     }
 
     /**
@@ -2006,7 +2108,7 @@ public class Room {
         long score = before - botValue(cold);
         botRecompute(cold, tu);
         cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
-        shield(cold, tu);
+        invincible(cold, tu);
         fightResult(hot, cold, true);
         dropPrizeOrbs(cold, count); // 봇의 키워드는 모두 🔥로 본다
         if (!hot.bot) {

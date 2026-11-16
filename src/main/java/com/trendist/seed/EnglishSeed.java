@@ -147,7 +147,7 @@ final class EnglishSeed {
                             - **PC mouse**: **Right-click** to go there (hold to keep following). **Left-click** another orb (player or bot) to follow it automatically.
                             - **Arrow keys / WASD**: Move in the direction you press. Pressing them while following switches to manual control.
                             - **Mobile joystick**: Press and drag anywhere to move that way; drag less to go slower. Tap an orb to follow it automatically.
-                            - **⚡ Dash**: `Space` on PC, the ⚡ button at the bottom on mobile. You move twice as fast for 3 seconds, then it has a cooldown. Only usable while moving. (Details in '⚔️ Skills'.)
+                            - **[[icon dash]]**: `Space` on PC, the ⚡ button at the bottom on mobile. You move twice as fast for 3 seconds, then it has a cooldown. Only usable while moving. (Details in '⚔️ Skills'.)
                             - Let go and you glide to a stop. Your turtle always faces the way it's heading."""),
                     new Article("Getting around the screen", """
                             - **Buttons at the top right**: Turn your profile, notices, guide, minimap, leaderboard and chat on or off. A green outline means on. (On mobile: 🔍 Search · 📦 Stash · ☰ Menu.)
@@ -192,7 +192,7 @@ final class EnglishSeed {
 
                             - At **5 Combo**, a **🔥 flame** ignites around your orb. Everyone can see it.
                             - Keywords you win from bots, and **hitting a boss**, count toward the combo too.
-                            - **Only attack skills** build combo (CC, defense and utility skills don't). Hook gives +1 per hit, 🔥 Fireball +1 for each of its 3 hits (up to +3), 💥 Shockwave +1 per circle it hits, 🧲 Absorb +1 every time it steals a keyword (+9 if it steals from three circles to the end), and ☠️ Poison +1 each time it makes the target lose keywords.
+                            - **Only attack skills** build combo (CC, defense and utility skills don't). Hook gives +1 per hit, [[icon fireball]] +1 for each of its 3 hits (up to +3), [[icon quake]] +1 per circle it hits, [[icon absorb]] +1 every time it steals a keyword (+9 if it steals from three circles to the end), and [[icon poison]] +1 each time it makes the target lose keywords.
                             - If you lose a keyword in a fight or to an attack skill even once, your combo resets to 0 and the flame goes out. Beat a burning player to put out their flame!
                             - If **5 minutes** pass after your last combo gain without a new one, the combo and flame fade away. Every new combo restarts the 5 minutes. The time left shows on the combo card (under the leaderboard at the top right).
                             - If you refresh or leave and come back, your combo starts again from **0**.
@@ -361,7 +361,7 @@ final class EnglishSeed {
                     new Article("I keep getting my keywords stolen.", """
                             - Near big orbs, escape to a safe zone (blue or green squares). Nobody collides inside them.
                             - You're invincible for 3 seconds right after losing a keyword, so slip away during that time.
-                            - The 🛡 Shield skill (from level 10) lets you pass through other circles for a moment.
+                            - The [[icon invincibility]] skill (from level 4) lets you pass through other circles for a moment.
                             - If you beat a bot or an orb smaller than you, you can get keywords back."""),
                     new Article("Can I continue on another device?", """
                             If you sign in with Google under **My info → Account**, you can continue with the same progress on other devices. Your guest progress carries over to that account too.""")

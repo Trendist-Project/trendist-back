@@ -24,7 +24,7 @@ final class RoomMessages {
     static Map<String, Object> levelFx(int e, int level) { return Map.of("type", "levelFx", "e", e, "level", level); }
 
     /** 무적 보호막과 카운트다운(4.3): 원 e에 ms 동안 */
-    static Map<String, Object> shield(int e, long ms) { return Map.of("type", "shield", "e", e, "ms", ms); }
+    static Map<String, Object> invincibility(int e, long ms) { return Map.of("type", "invincibility", "e", e, "ms", ms); }
     /** 튕김(4.3): 본인 예측이 같이 밀려나게 */
     static Map<String, Object> knock(double dx, double dy, long ms) { return Map.of("type", "knock", "dx", dx, "dy", dy, "ms", ms); }
 

@@ -100,12 +100,12 @@ class ConfigChangeTest {
         mvc.perform(post("/api/admin/config-changes/" + ((Number) erow.get("id")).longValue() + "/rollback").header("Authorization", a)).andExpect(status().isOk());
         assertThat(JsonPath.<Boolean>read(json(a, get("/api/admin/monsters/types").header("Authorization", a)), "$[0].enabled")).isFalse();
         // 스킬 쿨타임
-        patchJson(a, "/api/admin/skills/shield", "{\"cooldownSeconds\":12}");
-        Map<String, Object> srow = changes(a, "shield").stream().filter(r -> "cooldown".equals(r.get("field"))).findFirst().orElseThrow();
+        patchJson(a, "/api/admin/skills/invincibility", "{\"cooldownSeconds\":12}");
+        Map<String, Object> srow = changes(a, "invincibility").stream().filter(r -> "cooldown".equals(r.get("field"))).findFirst().orElseThrow();
         assertThat(srow.get("scope")).isEqualTo("SKILL");
         assertThat(srow.get("newValue")).isEqualTo("12");
         mvc.perform(post("/api/admin/config-changes/" + ((Number) srow.get("id")).longValue() + "/rollback").header("Authorization", a)).andExpect(status().isOk());
-        assertThat(ConfigChangeTest.<Number>first(json(a, get("/api/admin/skills").header("Authorization", a)), "$[?(@.code=='shield')].cooldownSeconds").doubleValue()).isEqualTo(30.0);
+        assertThat(ConfigChangeTest.<Number>first(json(a, get("/api/admin/skills").header("Authorization", a)), "$[?(@.code=='invincibility')].cooldownSeconds").doubleValue()).isEqualTo(30.0);
     }
 
     @Test

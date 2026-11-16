@@ -68,6 +68,7 @@ public class Player extends BaseTimeEntity {
 
     public Player(User user, Country country, String nickname, Level level) {
         this.user = user; this.country = country; this.nickname = nickname; this.level = level;
+        this.currentScore = level.getLevel(); // 처음부터 레벨 값이 유행도에 1:1로 더해진다(4.8). 키워드가 없어도 1레벨이면 1이다
     }
 
     /** 레벨 숫자(1~100) */

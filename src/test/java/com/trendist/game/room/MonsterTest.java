@@ -170,7 +170,7 @@ class MonsterTest {
         Room r = room(out, p);
         Room.Member near = r.join(1, "s1", "near", 1, 100, List.of(1L, 2L));
         Room.Member far = r.join(2, "s2", "far", 1, 100, List.of(3L, 4L));
-        Room.Member shielded = r.join(3, "s3", "shield", 1, 100, List.of(5L));
+        Room.Member invincible = r.join(3, "s3", "invincible", 1, 100, List.of(5L));
         Room.Member hot = r.join(4, "s4", "hot", 1, 100, List.of(6L));
         Room.Member weak = r.join(5, "s5", "weak", 1, 100, List.of(7L));
         hot.combo = 5;
@@ -179,10 +179,10 @@ class MonsterTest {
         double edge = b.radius;
         near.x = edge + 500; near.y = 0;       // 몸 가장자리에서 500px(범위 5000의 10%)
         far.x = edge + 3500; far.y = 0;        // 멀다(범위의 70%)
-        shielded.x = edge + 300; shielded.y = 300; shielded.protectUntil = 1e9;
+        invincible.x = edge + 300; invincible.y = 300; invincible.protectUntil = 1e9;
         hot.x = edge + 400; hot.y = -300;
         weak.x = edge + 200; weak.y = 600; weak.hp = 25; // 체력이 최대 피해(33%)보다 적으면 가까이서 맞고 죽는다
-        List<Room.Member> all = List.of(near, far, shielded, hot, weak);
+        List<Room.Member> all = List.of(near, far, invincible, hot, weak);
         for (Room.Member m : all) { m.prevX = m.x; m.prevY = m.y; }
         for (int i = 0; i < 20 * 6; i++) {
             b.x = 0; b.y = 0; // 보스가 따라오지 않게 제자리에 둔다(위치를 고정한 채 패턴만 본다)
@@ -193,7 +193,7 @@ class MonsterTest {
         assertThat(near.hp).isCloseTo(100 - (33 - 28 * 0.1), org.assertj.core.api.Assertions.within(1.0)); // 가까우면 최대 33%에 가깝게
         assertThat(far.hp).isCloseTo(100 - (33 - 28 * 0.7), org.assertj.core.api.Assertions.within(1.0));  // 멀수록 덜 깎인다
         assertThat(near.hp).isLessThan(far.hp);
-        assertThat(shielded.hp).isEqualTo(100.0);                      // 무적 중이면 맞지 않는다
+        assertThat(invincible.hp).isEqualTo(100.0);                      // 무적 중이면 맞지 않는다
         assertThat(hot.hp).isLessThan(100.0);                          // 불꽃이어도 맞는다
         assertThat(weak.dead).isTrue();                                // 체력이 모자라면 죽는다
         assertThat(out.losses).isEmpty();                        // 키워드는 잃지 않는다

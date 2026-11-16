@@ -305,7 +305,7 @@ public class DataSeeder implements ApplicationRunner {
             String newBody = koCat.articles().get(ai).body();
             String newBodyEn = EnglishSeed.GUIDE.get(ci).articles().get(ai).bodyEn();
             for (com.trendist.guide.entity.Guide g : guides.findByGuideCategoryId(category.getId())) {
-                if (!g.getTitle().equals(fix.title()) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
+                if (!plainTitle(g.getTitle()).equals(plainTitle(fix.title())) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
                 g.changeBody(newBody);
                 g.changeEnglish(g.getTitleEn(), newBodyEn);
                 n++;
@@ -337,15 +337,18 @@ public class DataSeeder implements ApplicationRunner {
      * 나중에 더한 글(GuideSeed.ADDED) 고치기(GuideSeedOld.FIXES): DB의 본문이 그 글의 예전 시드 그대로일 때만 새 본문(영어 포함)으로 바꾼다.
      * 관리자가 이미 고친 글은 건드리지 않는다. 새 글은 위에서 같은 제목이 없을 때 이미 넣었다.
      */
+    /** 제목 앞의 이모지·기호·공백을 뗀 제목. 스킬 글 제목에서 이모지를 뺐으므로(V74) 예전 이모지 제목과 새 제목이 같은 글로 맞는다 */
+    static String plainTitle(String t) { return t.replaceFirst("^[^\\p{L}\\p{N}]+", ""); }
+
     private int applyAddedGuideFixes() {
         int n = 0;
         for (GuideSeed.Fix fix : GuideSeedOld.FIXES) {
             GuideSeed.Added fresh = GuideSeed.ADDED.stream()
-                    .filter(a -> a.categoryCode().equals(fix.categoryCode()) && a.title().equals(fix.title())).findFirst().orElse(null);
+                    .filter(a -> a.categoryCode().equals(fix.categoryCode()) && plainTitle(a.title()).equals(plainTitle(fix.title()))).findFirst().orElse(null);
             GuideCategory category = guideCategories.findByCodeAndEnabledTrue(fix.categoryCode()).orElse(null);
             if (fresh == null || category == null) continue;
             for (com.trendist.guide.entity.Guide g : guides.findByGuideCategoryId(category.getId())) {
-                if (!g.getTitle().equals(fix.title()) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
+                if (!plainTitle(g.getTitle()).equals(plainTitle(fix.title())) || !norm(g.getBody()).equals(norm(fix.oldBody()))) continue;
                 g.changeBody(fresh.body());
                 g.changeEnglish(g.getTitleEn(), fresh.bodyEn());
                 n++;
@@ -457,34 +460,41 @@ public class DataSeeder implements ApplicationRunner {
      * 스킬(4.33): 코드가 있는데 DB에 없는 스킬을 채우고, 이미 있는 스킬은 목록 순서만 코드(배열 순서, 대시가 맨 앞)와 맞춘다(운영에서 고친 쿨타임·기본 키는 건드리지 않는다). 스킬을 늘릴 때는 여기에 한 줄을 더하거나 DB에 행을 넣고,
      * 동작은 Room.SKILLS와 Room.skill에, 이름·설명은 프론트엔드 번역 파일(skills.<코드>_name·_desc)에 더한다. 기본 단축키는 KeyboardEvent.code(Space, Digit1, KeyQ …).
      * 종류: ATTACK(직접 키워드를 빼앗거나 잃게 함) / DEFENSE(밀어내기·보호) / CC(이동·시야를 막는 방해: 암흑·스턴·슬로우) / UTILITY(대시·은신·회복·정화).
-     * 필드: 코드, 아이콘, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬).
+     * 필드: 코드, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬). 아이콘은 프론트엔드의 직접 그린 SVG(`SkillIcon`)라 DB에 두지 않는다(V73).
      */
     private static final String[][] SKILL_ROWS = {
-            {"dash", "⚡", "UTILITY", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서, 이후는 해금 레벨 순서)
-            {"shield", "🛡", "DEFENSE", "Digit1", "30", "5"},   // 방어: 첫 생존 수단
-            {"hook", "🪝", "ATTACK", "Digit2", "30", "10"},     // 공격: 첫 빼앗기 수단
-            {"slow", "🧊", "CC", "Digit9", "30", "15"},         // CC: 가장 약한 CC. 이동 속도 50%↓ 3초, 겹침(최대 3겹)
-            {"stealth", "👻", "UTILITY", "Digit4", "30", "20"}, // 유틸: 여기까지 4칸이 방어·공격·CC·유틸로 완성된다
-            {"repel", "🌀", "DEFENSE", "Digit3", "30", "25"}, // 방어: 반발(밀어내기)
-            {"cleanse", "✨", "UTILITY", "Digit6", "30", "30"}, // 유틸: 뒤에 나오는 CC·독의 카운터를 먼저 준다
-            {"darkness", "🕶️", "CC", "Digit5", "30", "35"},     // CC: 시야만 가린다
-            {"heal", "➕", "UTILITY", "Digit8", "60", "40"},    // 유틸: 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
-            {"poison", "☠️", "ATTACK", "Digit7", "30", "45"},   // 공격: 지속 피해(정화로 해제)
-            {"stun", "💫", "CC", "Digit0", "30", "50"},         // CC: 1초 동안 움직이지도 스킬을 쓰지도 못함(가장 강한 CC)
-            {"quake", "💥", "ATTACK", "KeyX", "30", "55"},      // 공격: 충격파. 범위 안 원이 키워드 3개를 잃음(피할 수 있다)
-            {"fireball", "🔥", "ATTACK", "KeyZ", "30", "60"},      // 공격: 화염구. 확정 타겟팅 3발, 키워드 3개를 잃음(피할 수 없다)
-            {"absorb", "🧲", "ATTACK", "KeyC", "30", "65"},     // 공격: 흡수. 사거리 안 모든 원에게서 3개씩 빼앗음(가장 강하다)
+            {"dash", "UTILITY", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서, 이후는 해금 레벨 순서)
+            {"invincibility", "DEFENSE", "Digit1", "30", "4"},   // 방어: 첫 생존 수단
+            {"hook", "ATTACK", "Digit2", "30", "7"},     // 공격: 첫 빼앗기 수단
+            {"slow", "CC", "Digit3", "30", "10"},         // CC: 가장 약한 CC. 이동 속도 50%↓ 3초, 겹침(최대 3겹)
+            {"stealth", "UTILITY", "Digit4", "30", "13"}, // 유틸: 여기까지 4칸이 방어·공격·CC·유틸로 완성된다
+            {"repel", "DEFENSE", "Digit5", "30", "16"}, // 방어: 반발(밀어내기)
+            {"fortify", "DEFENSE", "Digit6", "30", "19"},  // 방어: 피해 감소. 10초 버프, 받는 체력 피해 절반(다른 스킬과 함께 쓴다)
+            {"cleanse", "UTILITY", "Digit7", "30", "22"}, // 유틸: 뒤에 나오는 CC·독의 카운터를 먼저 준다
+            {"darkness", "CC", "Digit8", "30", "25"},     // CC: 시야만 가린다
+            {"root", "CC", "Digit9", "30", "28"},          // CC: 속박. 겨눈 상대를 잠시 묶는다
+            {"heal", "UTILITY", "Digit0", "60", "31"},    // 유틸: 체력을 채우는 스킬(회복량은 설정 skill_heal_percent)
+            {"poison", "ATTACK", "", "30", "34"},   // 공격: 지속 피해(정화로 해제)
+            {"barrier", "DEFENSE", "", "30", "37"},  // 방어: 보호막. 10초, 최대 체력의 50%를 체력 위에 쌓는다(피해는 보호막부터)
+            {"stun", "CC", "", "30", "40"},         // CC: 1초 동안 움직이지도 스킬을 쓰지도 못함(가장 강한 CC)
+            {"silence", "CC", "", "30", "43"},       // CC: 침묵. 3초 동안 스킬을 쓰지 못한다
+            {"quake", "ATTACK", "", "30", "46"},      // 공격: 충격파. 범위 안 원이 키워드 3개를 잃음(피할 수 있다)
+            {"confuse", "CC", "", "30", "49"},      // CC: 혼란. 이동 방향이 뒤틀린다
+            {"fireball", "ATTACK", "", "30", "52"},      // 공격: 화염구. 확정 타겟팅 3발, 키워드 3개를 잃음(피할 수 없다)
+            {"amplify", "ATTACK", "", "30", "55"},   // 공격: 공격 증폭. 10초 버프, 주는 체력 피해 2배
+            {"absorb", "ATTACK", "", "30", "58"},     // 공격: 흡수. 사거리 안 모든 원에게서 3개씩 빼앗음(가장 강하다)
+            {"berserk", "ATTACK", "", "1", "61"},   // 공격: 광폭화. 켜고 끄는 스킬(켜고 끄는 쿨타임 1초), 잃은 체력만큼 유행도 배율·이동 속도 증가(가장 마지막 해금)
     };
 
     /** 시더가 정한 스킬의 기본 쿨타임(초). 관리자 화면의 "기본값으로" 버튼이 쓴다. 모르는 코드면 30 */
     public static double defaultCooldown(String code) {
-        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Double.parseDouble(r[4]);
+        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Double.parseDouble(r[3]);
         return 30;
     }
 
     /** 시더가 정한 스킬의 기본 해금 레벨. 관리자 화면의 "기본값으로" 버튼이 쓴다. 모르는 코드면 1 */
     public static int defaultRequiredLevel(String code) {
-        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Integer.parseInt(r[5]);
+        for (String[] r : SKILL_ROWS) if (r[0].equals(code)) return Integer.parseInt(r[4]);
         return 1;
     }
 
@@ -498,7 +508,7 @@ public class DataSeeder implements ApplicationRunner {
                 if (existing.get().getSortOrder() != order) { existing.get().changeSortOrder(order); skills.save(existing.get()); }
                 continue;
             }
-            skills.save(new com.trendist.skill.entity.Skill(r[0], r[1], r[2], r[3], Double.parseDouble(r[4]), Integer.parseInt(r[5]), order));
+            skills.save(new com.trendist.skill.entity.Skill(r[0], r[1], r[2], Double.parseDouble(r[3]), Integer.parseInt(r[4]), order));
             added++;
         }
         return added;

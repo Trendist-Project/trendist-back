@@ -94,7 +94,7 @@ class RoomOfflineTest {
         assertThat(out.loses).hasSize(1);
         assertThat(out.loses.get(0)[0]).isEqualTo(1L);
         assertThat(a.protectUntil).isGreaterThan(0);
-        assertThat(out.texts).anyMatch(t -> "shield".equals(t.get("type")) && t.get("e").equals(a.entityNo));
+        assertThat(out.texts).anyMatch(t -> "invincibility".equals(t.get("type")) && t.get("e").equals(a.entityNo));
     }
 
     @Test
@@ -102,6 +102,7 @@ class RoomOfflineTest {
         RoomTest.Out out = new RoomTest.Out();
         Room r = new Room(1, RoomTest.T, out);
         r.setZoneTuning(RoomTest.NO_RANDOM_ZONES);
+        r.setHpTuning(Room.HpTuning.on()); // 죽음은 체력이 0이 될 때만 온다(4.36)
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         Room.Member b = r.join(2, "s2", "b", 1, 50, List.of(200L));
         a.protectUntil = 0; b.protectUntil = 0;

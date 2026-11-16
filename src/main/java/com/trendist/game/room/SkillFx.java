@@ -90,8 +90,20 @@ final class SkillFx {
     static Map<String, Object> absorbTick(int e, int t) { Map<String, Object> m = fx("absorbTick"); m.put("e", e); m.put("t", t); return m; }
     static Map<String, Object> absorbEnd(int e, int t) { Map<String, Object> m = fx("absorbEnd"); m.put("e", e); m.put("t", t); return m; }
 
-    /** 무적(방패 스킬·키워드를 잃은 뒤)의 보호막과 카운트다운 */
-    static Map<String, Object> shield(int e, long ms) { Map<String, Object> m = msg("shield"); m.put("e", e); m.put("ms", ms); return m; }
+    /** 버프(amplify 공격 증폭·fortify 피해 감소)가 원 e에 ms 동안 걸렸다. 끝나면 amplifyEnd·fortifyEnd */
+    static Map<String, Object> buff(String id, int e, long ms) { Map<String, Object> m = fx(id); m.put("e", e); m.put("ms", ms); return m; }
+    static Map<String, Object> buffEnd(String id, int e) { Map<String, Object> m = fx(id + "End"); m.put("e", e); return m; }
+    /** 광폭화가 켜졌거나 갱신됐다: pct는 잃은 체력 비율(0~100). 끌 때까지 이어진다 */
+    static Map<String, Object> berserk(int e, double pct) { Map<String, Object> m = fx("berserk"); m.put("e", e); m.put("pct", pct); return m; }
+    /** 보호막: pct는 지금 쉴드량(최대 체력 대비 %), max는 처음 값 */
+    static Map<String, Object> barrier(int e, long ms, double pct, double max) {
+        Map<String, Object> m = fx("barrier"); m.put("e", e); m.put("ms", ms); m.put("pct", pct); m.put("max", max); return m;
+    }
+    static Map<String, Object> barrierHit(int e, double pct) { Map<String, Object> m = fx("barrierHit"); m.put("e", e); m.put("pct", pct); return m; }
+    static Map<String, Object> barrierEnd(int e, boolean broken) { Map<String, Object> m = fx("barrierEnd"); m.put("e", e); if (broken) m.put("broken", true); return m; }
+
+    /** 무적(무적 스킬·키워드를 잃은 뒤)의 보호막과 카운트다운 */
+    static Map<String, Object> invincibility(int e, long ms) { Map<String, Object> m = msg("invincibility"); m.put("e", e); m.put("ms", ms); return m; }
 
     // ---- 본인에게: 알림
 
@@ -106,7 +118,12 @@ final class SkillFx {
     static Map<String, Object> darkEnd() { return msg("darkEnd"); }
     /** 이동 속도가 ms 동안 mult배가 된다 */
     static Map<String, Object> slow(long ms, double mult) { Map<String, Object> m = msg("slow"); m.put("ms", ms); m.put("mult", mult); return m; }
+    /** 이동 속도 배수만 조용히 바꾼다(속박·광폭화 때문에 배수가 달라졌다. 토스트는 띄우지 않는다) */
+    static Map<String, Object> slowQuiet(long ms, double mult) { Map<String, Object> m = slow(ms, mult); m.put("quiet", true); return m; }
     static Map<String, Object> slowEnd() { return msg("slowEnd"); }
+    /** 혼란에 걸려 ms 동안 조작 방향이 반대다 */
+    static Map<String, Object> confuse(long ms) { Map<String, Object> m = msg("confuse"); m.put("ms", ms); return m; }
+    static Map<String, Object> confuseEnd() { return msg("confuseEnd"); }
     static Map<String, Object> stun(long ms) { Map<String, Object> m = msg("stun"); m.put("ms", ms); return m; }
     static Map<String, Object> stunEnd() { return msg("stunEnd"); }
 }
