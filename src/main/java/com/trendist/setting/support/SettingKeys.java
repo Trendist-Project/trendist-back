@@ -30,6 +30,7 @@ public final class SettingKeys {
     public static final String SCORE_CAP = "score_cap";
     public static final String MAX_SPEED = "max_speed";
     public static final String ZOOM_FACTOR = "zoom_factor";
+    public static final String VIEW_RANGE_MULTIPLIER = "view_range_multiplier";
     public static final String BIG_RATIO = "collision_big_ratio";
     public static final String KNOCKBACK_CAP = "collision_knockback_cap";
     public static final String KNOCKBACK_SECONDS = "collision_knockback_seconds";
@@ -149,6 +150,7 @@ public final class SettingKeys {
             new Def(SCORE_CAP, "2000", 1, 1000000, "크기 상한 점수(S_cap)"),
             new Def(MAX_SPEED, "480", 50, 1000, "최대 속도(모든 플레이어 동일)"),
             new Def(ZOOM_FACTOR, "280", 1, 10000, "줌 계수"),
+            new Def(VIEW_RANGE_MULTIPLIER, "2", 0.5, 6, "시야 배율: 화면이 보여 주는 영역을 가로·세로로 몇 배 넓게 할지(기본 2 = 이전보다 가로·세로 2배, 1 = 이전과 같음). 클수록 멀리 보이지만 원·구슬이 작게 보인다. 접속 중인 사람에게도 1초 안에 반영된다"),
             new Def(BIG_RATIO, "1.15", 1, 5, "큰 쪽 판정 비율"),
             new Def(KNOCKBACK_CAP, "3", 1, 10, "튕김 세기 상한. 작은 쪽은 크기 비율만큼 더 멀리 튕긴다"),
             new Def(KNOCKBACK_SECONDS, "0.5", 0.05, 5, "튕김이 멈출 때까지 걸리는 시간. 처음에 빠르고 점점 느려진다"),
@@ -277,7 +279,7 @@ public final class SettingKeys {
                 EXTERNAL_CONFIRM_HEAT, EXTERNAL_HOLD_HOURS);                                                                // 외부 소스
         group("성장·경험치·칭호", EXP_PER_PLUS, ATTACK_EXP, KILL_EXP, EXP_SCORE_CAP, RANK_TITLE_MIN_PLAYERS);
         group("맵·크기", WORLD_SIZE, AREA_GROW_SPEED, AREA_SHRINK_SPEED,           // 활동 영역
-                MIN_RADIUS, MAX_RADIUS, EAT_MIN_REACH, SCORE_CAP, ZOOM_FACTOR);                // 원 크기
+                MIN_RADIUS, MAX_RADIUS, EAT_MIN_REACH, SCORE_CAP, ZOOM_FACTOR, VIEW_RANGE_MULTIPLIER);                // 원 크기
         group("이동·충돌", MAX_SPEED, BIG_RATIO, KNOCKBACK_CAP, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE);
         group("보호·접속", LOSE_PROTECT_SECONDS, OFFLINE_KEEP_SECONDS);
         group("세이프존", SAFE_CENTER_RATIO, SAFE_CENTER_MIN, SAFE_ZONE_RATIO, SAFE_ZONE_MIN, SAFE_ZONE_DENSITY, SAFE_ZONE_MAX, SAFE_ZONE_SECONDS);
@@ -336,7 +338,7 @@ public final class SettingKeys {
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
         unit("px", HOOK_REACH_PX, BOLT_REACH_PX, REPEL_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
-        unit("배", AMPLIFY_MULTIPLIER, HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, REPEL_SPEED_MULTIPLIER,
+        unit("배", VIEW_RANGE_MULTIPLIER, AMPLIFY_MULTIPLIER, HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, REPEL_SPEED_MULTIPLIER,
                 REPEL_KNOCKBACK);
         unit("%", FORTIFY_PERCENT, BARRIER_HP_PERCENT, BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT, SKILL_HEAL_PERCENT, SLOW_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);

@@ -181,7 +181,8 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 settings.getInt(SettingKeys.BOT_MIN_PLAYERS),
                 settings.getDouble(SettingKeys.BOT_CAP_RATIO),
                 settings.getDouble(SettingKeys.EXP_SCORE_CAP),
-                settings.getDouble(SettingKeys.EAT_MIN_REACH));
+                settings.getDouble(SettingKeys.EAT_MIN_REACH),
+                settings.getDouble(SettingKeys.VIEW_RANGE_MULTIPLIER));
     }
 
     /** 대시 설정(4.27). */
@@ -234,7 +235,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
     @Override
     public Map<String, Object> tuningMessage(Room.Tuning t) {
         return Map.of("type", "tuning", "maxSpeed", t.maxSpeed(), "minRadius", t.minRadius(), "maxRadius", t.maxRadius(),
-                "scoreCap", t.scoreCap(), "zoomFactor", t.zoomFactor(), "worldSize", t.worldSize());
+                "scoreCap", t.scoreCap(), "zoomFactor", t.zoomFactor(), "worldSize", t.worldSize(), "viewRange", t.viewRangeMultiplier());
     }
 
     private void broadcastTuning(Room r) {

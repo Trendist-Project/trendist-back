@@ -28,7 +28,17 @@ public class Room {
                          double loseProtectSeconds,
                          int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
                          int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap,
-                         double minEatReach) {}
+                         double minEatReach, double viewRangeMultiplier) {
+        /** 시야 배율 없이 만든다(테스트 등): 기본 2배 */
+        public Tuning(double worldSize, double minRadius, double maxRadius, double scoreCap, double maxSpeed,
+                      double zoomFactor, double bigRatio, double knockbackCap, double knockbackSeconds, double knockbackDistance,
+                      double loseProtectSeconds, int orbMax, double orbSpawnSeconds, double orbDensity, double orbSpawnPercent, double orbActivePercent,
+                      int botPlayers, int botMinPlayers, double botCapRatio, double expScoreCap, double minEatReach) {
+            this(worldSize, minRadius, maxRadius, scoreCap, maxSpeed, zoomFactor, bigRatio, knockbackCap, knockbackSeconds, knockbackDistance,
+                    loseProtectSeconds, orbMax, orbSpawnSeconds, orbDensity, orbSpawnPercent, orbActivePercent, botPlayers, botMinPlayers, botCapRatio,
+                    expScoreCap, minEatReach, 2.0);
+        }
+    }
 
     /**
      * 세이프존 설정(4.22). 가운데 고정 존과 무작위 존의 한 변은 활동 영역 한 변의 비율(최소값 이상)이고,
