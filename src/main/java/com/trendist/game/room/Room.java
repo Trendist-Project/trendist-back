@@ -2239,6 +2239,7 @@ public class Room {
             for (Member o : grid.membersNear(b.x, b.y, look)) {
                 if (o == b) continue;
                 if (dark && Math.hypot(o.x - b.x, o.y - b.y) > sight) continue; // 암흑: 시야 밖의 원은 보이지 않는다
+                if (o.stealthUntil > clockSeconds) continue; // 은신 중인 원은 봇에게도 안 보인다: 쫓지도 피하지도 않는다(사람과 같다, 4.33)
                 double d = Math.hypot(o.x - b.x, o.y - b.y) - o.displayRadius - b.displayRadius;
                 // 세이프존 안의 원은 잡을 수 없고, 내가 세이프존 안이면 도망칠 필요가 없다(4.22)
                 if (d >= Math.max(fleeRange, chaseRange)) continue;

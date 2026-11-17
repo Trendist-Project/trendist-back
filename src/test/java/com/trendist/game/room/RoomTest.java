@@ -1402,6 +1402,27 @@ class RoomTest {
     }
 
     @Test
+    void botCannotSeeAStealthedPlayerSoItNeitherChasesNorFleesFromIt() {
+        // 4.21, 4.33: 은신 중인 사람은 사람에게 안 보이듯 봇에게도 안 보인다. 보이면 사냥감 위치로 목표를 잡고, 은신이면 잡지 않는다
+        for (boolean stealth : new boolean[]{false, true}) {
+            Out out = new Out();
+            Room.Member[] h = new Room.Member[1];
+            Room r = botRoom(out, 1, h);
+            Room.Member human = h[0], bot = botsOf(r).getFirst();
+            bot.botStyle = 1; // 사냥꾼: 멀리서도 쫓는다
+            bot.score = 500; bot.radius = bot.displayRadius = r.radiusFor(500);
+            human.score = 0; human.radius = human.displayRadius = r.radiusFor(0);
+            bot.protectUntil = 0; human.protectUntil = 0;
+            bot.x = 800; bot.y = 800; human.x = 1500; human.y = 800;
+            bot.safe = false; human.safe = false; // 세이프존 표시는 틱에서 갱신되므로 옮긴 위치에 맞춰 둔다
+            if (stealth) human.stealthUntil = r.now() + 5;
+            tickSeconds(r, 0.8); // 봇은 반응 속도(0.25~0.7초)마다 다시 판단한다
+            boolean chasing = bot.targetX != null && Math.abs(bot.targetX - human.x) < 1 && Math.abs(bot.targetY - human.y) < 1;
+            assertThat(chasing).isEqualTo(!stealth);
+        }
+    }
+
+    @Test
     void darknessBoltAlsoHitsABotAndEveryoneSeesIt() {
         Out out = new Out();
         Room.Member[] h = new Room.Member[1];
