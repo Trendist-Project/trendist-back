@@ -2572,4 +2572,21 @@ class RoomTest {
         assertThat(stay.hp).isEqualTo(95.0);                  // 처음 자리에 남은 원은 더 맞지 않는다
         assertThat(countFx(out, "skillFx", "zoneEnd")).isZero();
     }
+
+    @Test
+    void usedSkillMessageCarriesHowLongTheEffectLastsForTheSlotIndicator() {
+        // 지속되는 스킬은 쓴 뒤 효과가 이어지는 시간(activeMs)을 알려 스킬 칸에 "켜져 있음"을 띄운다. 맞은 상대에게 걸리는 효과는 0
+        Out out = new Out();
+        Room r = hpSkillRoom(out);
+        Room.Member a = joinWith(r, 1, "a", "zone", List.of());
+        Room.Member b = joinWith(r, 2, "b", "slow", List.of(11L));
+        a.x = 800; a.y = 800; b.x = 1100; b.y = 800;
+        r.tick();
+        r.skill(a, "zone", 0, 0);
+        java.util.Map<String, Object> used = out.texts.stream().filter(m -> "skill".equals(m.get("type")) && "zone".equals(m.get("id"))).findFirst().orElseThrow();
+        assertThat(used.get("activeMs")).isEqualTo(3000L);   // 장판 3초
+        assertThat(SkillConfig.DEFAULT.activeSeconds("slow")).isZero();      // 슬로우는 상대에게 걸리는 효과라 내 칸에는 표시 없음
+        assertThat(SkillConfig.DEFAULT.activeSeconds("invincibility")).isEqualTo(3.0);
+        assertThat(SkillConfig.DEFAULT.activeSeconds("berserk")).isZero();   // 켜고 끄는 스킬은 따로(skillOn)
+    }
 }

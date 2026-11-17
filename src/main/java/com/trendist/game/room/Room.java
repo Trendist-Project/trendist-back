@@ -1543,7 +1543,7 @@ public class Room {
         if (s.offensive()) breakStealth(m);
         double cooldown = skillConfig.cooldown(id);
         m.skillReadyAt[idx] = clockSeconds + cooldown;
-        tell(m, SkillFx.used(id, SkillFx.ms(cooldown)));
+        tell(m, SkillFx.used(id, SkillFx.ms(cooldown), SkillFx.ms(skillConfig.activeSeconds(id))));
     }
 
     // ---- 스킬 장착(4.33)

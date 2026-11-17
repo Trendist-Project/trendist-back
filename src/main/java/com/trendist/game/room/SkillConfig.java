@@ -67,6 +67,18 @@ public record SkillConfig(Map<String, Double> cooldowns, Map<String, Double> par
         params = Map.copyOf(params);
     }
 
+    /**
+     * 스킬을 쓴 뒤 효과가 이어지는 시간(초). 스킬 칸에 "켜져 있음" 표시를 띄우는 기준이다(광폭화처럼 켜고 끄는 스킬은 효과가 따로라 0).
+     * 지속되는 스킬(장판·무적·은신·증폭·감소·보호막·흡수)만 있고, 맞은 상대에게 걸리는 효과(슬로우·독 등)는 내 칸의 표시가 아니라서 0이다.
+     */
+    public double activeSeconds(String code) {
+        String name = ACTIVE_PARAM.get(code);
+        return name == null ? 0 : param(name);
+    }
+
+    private static final Map<String, String> ACTIVE_PARAM = Map.of("zone", "zone_seconds", "invincibility", "invincibility_seconds", "stealth", "stealth_seconds",
+            "amplify", "amplify_seconds", "fortify", "fortify_seconds", "barrier", "barrier_seconds", "absorb", "absorb_seconds");
+
     /** 스킬의 쿨타임(초). 모르면 DEFAULT_COOLDOWNS, 그것도 없으면 0 */
     public double cooldown(String code) {
         Double v = cooldowns.get(code);

@@ -120,8 +120,8 @@ final class SkillFx {
 
     // ---- 본인에게: 알림
 
-    /** 스킬을 썼다: 다시 쓸 수 있을 때까지 */
-    static Map<String, Object> used(String id, long cooldownMs) { Map<String, Object> m = msg("skill"); m.put("id", id); m.put("cooldownMs", cooldownMs); return m; }
+    /** 스킬을 썼다: 다시 쓸 수 있을 때까지(cooldownMs)와 효과가 이어지는 시간(activeMs, 없으면 0: 칸에 "켜져 있음"을 띄우는 시간) */
+    static Map<String, Object> used(String id, long cooldownMs, long activeMs) { Map<String, Object> m = msg("skill"); m.put("id", id); m.put("cooldownMs", cooldownMs); m.put("activeMs", activeMs); return m; }
     /** 스킬을 쓸 수 없었다(reason: safe·unequipped·hpFull·noTarget) */
     static Map<String, Object> fail(String id, String reason) { Map<String, Object> m = msg("skillFail"); m.put("id", id); m.put("reason", reason); return m; }
     /** 갈고리에 맞아 byE에게 끌려온다 */
