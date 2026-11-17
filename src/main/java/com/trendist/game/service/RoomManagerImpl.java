@@ -84,6 +84,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 java.util.Set<String> disabledSkills = skillCatalog.disabledCodes();
                 java.util.Map<String, Integer> requiredLevels = skillCatalog.requiredLevels();
                 java.util.Set<String> knownSkills = skillCatalog.allCodes();
+                int skillSlotCount = skillLoadouts.slotCount(); // 칸 수도 다시 읽는다(방이 칸 목록을 채우기 전에 만들어졌어도 곧 맞는다)
                 java.util.Map<String, java.util.Map<String, Double>> monsterParams = new java.util.HashMap<>();
                 monsterCatalog.all().forEach((code, e) -> monsterParams.put(code, e.params())); // 몬스터 설정값(4.35)
                 rooms.values().forEach(r -> {
@@ -92,6 +93,7 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                     r.setDisabledSkills(disabledSkills);
                     r.setRequiredLevels(requiredLevels);
                     r.setKnownSkills(knownSkills);
+                    if (r.skillSlotCount() != skillSlotCount) r.setSkillSlotCount(skillSlotCount);
                     if (!c.equals(r.comboTuning())) r.setComboTuning(c);
                     if (!hp.equals(r.hpTuning())) r.setHpTuning(hp);
                     if (!dash.equals(r.dashTuning())) r.setDashTuning(dash);

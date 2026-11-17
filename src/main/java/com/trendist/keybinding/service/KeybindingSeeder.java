@@ -36,9 +36,11 @@ public class KeybindingSeeder {
 
     /** 동작(코드, 종류, 칸 번호, 기본 키): 스킬 칸 4개와 대시. 새 기능은 여기에 한 줄을 더한다 */
     private static final Object[][] ACTIONS = {
-            {"skill_slot_1", "SKILL_SLOT", 1, "Digit1"}, {"skill_slot_2", "SKILL_SLOT", 2, "Digit2"},
-            {"skill_slot_3", "SKILL_SLOT", 3, "Digit3"}, {"skill_slot_4", "SKILL_SLOT", 4, "Digit4"},
-            {"dash", "SYSTEM", null, "Space"}};
+            {"skill_slot_1", "SKILL_SLOT", 1, "Space"}, {"skill_slot_2", "SKILL_SLOT", 2, "Digit1"},
+            {"skill_slot_3", "SKILL_SLOT", 3, "Digit2"}, {"skill_slot_4", "SKILL_SLOT", 4, "Digit3"},
+            {"skill_slot_5", "SKILL_SLOT", 5, "Digit4"}}; // 대시는 1번 칸에 기본으로 장착하는 스킬이라 1번 칸 기본 키가 Space, 나머지 칸은 1~4다(예전 dash 동작은 5번 칸 행으로 옮겼다)
+    /** 칸 기본 키를 이 배치로 바꾸기 전 값(같으면 운영에서 고친 적 없는 값이라 새 배치로 맞춘다) */
+    private static final String[] PREVIOUS_SLOT_DEFAULTS = {"Digit1", "Digit2", "Digit3", "Digit4", "Space"};
     private static final String[][] ACTION_TYPES = {{"SKILL_SLOT", "스킬 칸"}, {"SYSTEM", "시스템"}};
 
     /** 새로 만든 행 수 */
@@ -73,12 +75,26 @@ public class KeybindingSeeder {
             else if (!t[1].equals(a.getName())) { a.changeName(t[1]); actionTypes.save(a); }
             types.put(t[0], a);
         }
+        // 예전 dash 동작(시스템)을 5번 칸으로 바꾼다: 행을 그대로 두고 코드·종류만 고쳐, 이미 저장된 대시 키(key_bindings)가 5번 칸 키로 이어진다
+        GameAction oldDash = actions.findByCode("dash").orElse(null);
+        if (oldDash != null && actions.findByCode("skill_slot_5").isEmpty()) {
+            oldDash.rename("skill_slot_5", types.get("SKILL_SLOT"), 5);
+            actions.save(oldDash);
+        }
         for (int i = 0; i < ACTIONS.length; i++) {
             Object[] a = ACTIONS[i];
             GameAction e = actions.findByCode((String) a[0]).orElse(null);
             long order = (i + 1) * 10L;
             if (e == null) { actions.save(new GameAction((String) a[0], types.get((String) a[1]), (Integer) a[2], byCode.get((String) a[3]), order)); added++; }
-            else if (e.getSortOrder() != order) { e.changeSortOrder(order); actions.save(e); }
+            else {
+                boolean dirty = false;
+                if (e.getSortOrder() != order) { e.changeSortOrder(order); dirty = true; }
+                // 칸 기본 키를 새 배치(1번 칸 = 대시 Space)로: 예전 배치 그대로인 칸만 바꾸고 운영에서 고친 칸은 두는다
+                Integer slot = (Integer) a[2];
+                String oldKey = slot != null && slot >= 1 && slot <= PREVIOUS_SLOT_DEFAULTS.length ? PREVIOUS_SLOT_DEFAULTS[slot - 1] : null;
+                if (oldKey != null && !oldKey.equals(a[3]) && e.getDefaultKey() != null && oldKey.equals(e.getDefaultKey().getCode())) { e.changeDefaultKey(byCode.get((String) a[3])); dirty = true; }
+                if (dirty) actions.save(e);
+            }
         }
         return added;
     }

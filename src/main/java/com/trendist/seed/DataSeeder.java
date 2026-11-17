@@ -463,7 +463,7 @@ public class DataSeeder implements ApplicationRunner {
      * 필드: 코드, 종류, 기본 키, 쿨타임(초), 해금 레벨(1 = 기본 스킬). 아이콘은 프론트엔드의 직접 그린 SVG(`SkillIcon`)라 DB에 두지 않는다(V73).
      */
     private static final String[][] SKILL_ROWS = {
-            {"dash", "UTILITY", "Space", "30", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서, 이후는 해금 레벨 순서)
+            {"dash", "UTILITY", "Space", "10", "1"},         // 기본 스킬. 목록 순서의 맨 앞(순서는 이 배열 순서, 이후는 해금 레벨 순서)
             {"invincibility", "DEFENSE", "Digit1", "30", "4"},   // 방어: 첫 생존 수단
             {"hook", "ATTACK", "Digit2", "30", "7"},     // 공격: 첫 빼앗기 수단
             {"slow", "CC", "Digit3", "30", "10"},         // CC: 가장 약한 CC. 이동 속도 50%↓ 3초, 겹침(최대 3겹)

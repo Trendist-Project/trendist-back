@@ -109,7 +109,7 @@ CREATE TABLE action_types (
 
 CREATE TABLE actions (
   id             BIGINT NOT NULL AUTO_INCREMENT COMMENT '동작 ID',
-  code           VARCHAR(40) NOT NULL COMMENT '동작 코드(유일): skill_slot_1~4, dash …',
+  code           VARCHAR(40) NOT NULL COMMENT '동작 코드(유일): skill_slot_1~5(1번 칸이 기본 대시 칸) …',
   type_id        BIGINT NOT NULL COMMENT '동작 종류 ID',
   param          INT NULL COMMENT '종류가 SKILL_SLOT이면 칸 번호',
   default_key_id BIGINT NULL COMMENT '바꾸지 않았을 때 쓰는 기본 키. key_bindings에는 바꾼 것만 저장한다',

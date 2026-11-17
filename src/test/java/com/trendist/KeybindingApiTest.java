@@ -49,10 +49,10 @@ class KeybindingApiTest {
         String t = player("kb1");
         getKb(t).andExpect(status().isOk())
                 .andExpect(jsonPath("$.bindings.length()").value(5))
-                .andExpect(jsonPath(key("skill_slot_1")).value("Digit1"))
-                .andExpect(jsonPath(key("skill_slot_4")).value("Digit4"))
-                .andExpect(jsonPath(key("dash")).value("Space"))
-                .andExpect(jsonPath(dflt("dash")).value(true))
+                .andExpect(jsonPath(key("skill_slot_1")).value("Space")) // 1번 칸이 기본 대시 칸
+                .andExpect(jsonPath(key("skill_slot_2")).value("Digit1"))
+                .andExpect(jsonPath(key("skill_slot_5")).value("Digit4"))
+                .andExpect(jsonPath(dflt("skill_slot_5")).value(true))
                 .andExpect(jsonPath("$.bindings[0].type").value("SKILL_SLOT"))
                 .andExpect(jsonPath("$.bindings[0].param").value(1))
                 // 쓸 수 있는 키 목록: 막은 키는 reserved, 숫자패드는 위쪽 숫자의 짝
@@ -67,55 +67,55 @@ class KeybindingApiTest {
         putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_1\",\"key\":\"KeyQ\"}]}").andExpect(status().isOk())
                 .andExpect(jsonPath(key("skill_slot_1")).value("KeyQ"))
                 .andExpect(jsonPath(dflt("skill_slot_1")).value(false))
-                .andExpect(jsonPath(key("skill_slot_2")).value("Digit2"))
+                .andExpect(jsonPath(key("skill_slot_2")).value("Digit1"))
                 .andExpect(jsonPath(dflt("skill_slot_2")).value(true));
         getKb(t).andExpect(jsonPath(key("skill_slot_1")).value("KeyQ"));
         // 기본 키와 같게 바꾸면 행을 두지 않는다
-        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_1\",\"key\":\"Digit1\"}]}").andExpect(status().isOk())
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_1\",\"key\":\"Space\"}]}").andExpect(status().isOk())
                 .andExpect(jsonPath(dflt("skill_slot_1")).value(true));
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyX\"},{\"action\":\"skill_slot_3\",\"key\":\"KeyC\"}]}").andExpect(status().isOk());
-        mvc.perform(delete("/api/me/keybindings/dash").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
-                .andExpect(jsonPath(key("dash")).value("Space"))
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyX\"},{\"action\":\"skill_slot_3\",\"key\":\"KeyC\"}]}").andExpect(status().isOk());
+        mvc.perform(delete("/api/me/keybindings/skill_slot_5").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
+                .andExpect(jsonPath(key("skill_slot_5")).value("Digit4"))
                 .andExpect(jsonPath(key("skill_slot_3")).value("KeyC"));
         mvc.perform(delete("/api/me/keybindings").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
-                .andExpect(jsonPath(key("skill_slot_3")).value("Digit3"))
+                .andExpect(jsonPath(key("skill_slot_3")).value("Digit2"))
                 .andExpect(jsonPath(dflt("skill_slot_3")).value(true));
     }
 
     @Test
     void conflictsWithOtherBindingsDefaultsAndNumpadAliasesAreRejected() throws Exception {
         String t = player("kb3");
-        // 아직 바꾸지 않은 다른 동작의 기본 키(Digit2 = 2번 칸)
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"Digit2\"}]}").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("KEY_CONFLICT"));
+        // 아직 바꾸지 않은 다른 동작의 기본 키(Digit2 = 3번 칸)
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"Digit2\"}]}").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("KEY_CONFLICT"));
         // 숫자패드는 위쪽 숫자와 같은 키로 본다
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"Numpad2\"}]}").andExpect(status().isConflict());
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"Numpad2\"}]}").andExpect(status().isConflict());
         // 한 요청 안에서 같은 키를 두 동작에
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyX\"},{\"action\":\"skill_slot_1\",\"key\":\"KeyX\"}]}").andExpect(status().isConflict());
-        getKb(t).andExpect(jsonPath(key("dash")).value("Space")); // 거절되면 아무것도 바뀌지 않는다
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyX\"},{\"action\":\"skill_slot_1\",\"key\":\"KeyX\"}]}").andExpect(status().isConflict());
+        getKb(t).andExpect(jsonPath(key("skill_slot_5")).value("Digit4")); // 거절되면 아무것도 바뀌지 않는다
     }
 
     @Test
     void swappingKeysInOneRequestWorksAndAnUnboundActionStaysUnbound() throws Exception {
         String t = player("kb4");
-        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_1\",\"key\":\"Digit2\"},{\"action\":\"skill_slot_2\",\"key\":\"Digit1\"}]}").andExpect(status().isOk())
-                .andExpect(jsonPath(key("skill_slot_1")).value("Digit2"))
-                .andExpect(jsonPath(key("skill_slot_2")).value("Digit1"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_2\",\"key\":\"Digit2\"},{\"action\":\"skill_slot_3\",\"key\":\"Digit1\"}]}").andExpect(status().isOk())
+                .andExpect(jsonPath(key("skill_slot_2")).value("Digit2"))
+                .andExpect(jsonPath(key("skill_slot_3")).value("Digit1"));
         // 키를 비우면 기본 키로 되돌아오지 않는다
         putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_3\",\"key\":null}]}").andExpect(status().isOk())
                 .andExpect(jsonPath(dflt("skill_slot_3")).value(false));
         getKb(t).andExpect(jsonPath(key("skill_slot_3")).value(org.hamcrest.Matchers.contains((Object) null))); // 비운 키는 null
         // 비워 둔 동작의 기본 키는 다른 동작이 쓸 수 있다
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"Digit3\"}]}").andExpect(status().isOk()).andExpect(jsonPath(key("dash")).value("Digit3"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"Digit1\"}]}").andExpect(status().isOk()).andExpect(jsonPath(key("skill_slot_5")).value("Digit1"));
     }
 
     @Test
     void unknownActionsReservedAndUnknownKeysAndDuplicateActionsAreBadRequests() throws Exception {
         String t = player("kb5");
         putKb(t, "{\"bindings\":[{\"action\":\"nope\",\"key\":\"KeyQ\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("UNKNOWN_ACTION"));
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyW\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESERVED_KEY"));
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"Enter\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESERVED_KEY"));
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"NotAKey\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_KEY"));
-        putKb(t, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyX\"},{\"action\":\"dash\",\"key\":\"KeyC\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("DUPLICATE_ACTION"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyW\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESERVED_KEY"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"Enter\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESERVED_KEY"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"NotAKey\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_KEY"));
+        putKb(t, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyX\"},{\"action\":\"skill_slot_5\",\"key\":\"KeyC\"}]}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("DUPLICATE_ACTION"));
         putKb(t, "{\"bindings\":[]}").andExpect(status().isBadRequest());
         mvc.perform(delete("/api/me/keybindings/nope").header("Authorization", "Bearer " + t)).andExpect(status().isBadRequest());
         mvc.perform(get("/api/me/keybindings")).andExpect(status().isUnauthorized());
@@ -124,10 +124,10 @@ class KeybindingApiTest {
     @Test
     void bindingsBelongToThePlayerAndDoNotLeakToAnotherPlayer() throws Exception {
         String a = player("kb6a"), b = player("kb6b");
-        putKb(a, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyX\"}]}").andExpect(status().isOk());
-        getKb(a).andExpect(jsonPath(key("dash")).value("KeyX"));
-        getKb(b).andExpect(jsonPath(key("dash")).value("Space"));
+        putKb(a, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyX\"}]}").andExpect(status().isOk());
+        getKb(a).andExpect(jsonPath(key("skill_slot_5")).value("KeyX"));
+        getKb(b).andExpect(jsonPath(key("skill_slot_5")).value("Digit4"));
         // 같은 키를 다른 플레이어가 써도 된다
-        putKb(b, "{\"bindings\":[{\"action\":\"dash\",\"key\":\"KeyX\"}]}").andExpect(status().isOk());
+        putKb(b, "{\"bindings\":[{\"action\":\"skill_slot_5\",\"key\":\"KeyX\"}]}").andExpect(status().isOk());
     }
 }

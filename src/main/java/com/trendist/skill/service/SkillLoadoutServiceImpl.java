@@ -36,7 +36,11 @@ public class SkillLoadoutServiceImpl implements SkillLoadoutService {
         Map<Long, String> byAction = new HashMap<>();
         for (PlayerSkillSlot r : rows) byAction.put(r.getAction().getId(), r.getSkill() == null ? null : r.getSkill().getCode());
         List<String> out = new ArrayList<>();
-        for (GameAction a : actions.findSkillSlotActions()) out.add(byAction.get(a.getId()));
+        List<GameAction> slotActions = actions.findSkillSlotActions();
+        for (GameAction a : slotActions) {
+            // 대시를 칸에 장착하기 전에 저장한 사람은 5번 칸 행이 없다: 예전처럼 늘 쓸 수 있도록 그 칸을 대시로 채운다. 행이 있으면(빈 칸으로 저장했어도) 저장된 대로다
+            out.add(byAction.containsKey(a.getId()) ? byAction.get(a.getId()) : a.getParam() != null && a.getParam() == slotActions.size() ? "dash" : null);
+        }
         return out;
     }
 

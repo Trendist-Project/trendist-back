@@ -130,11 +130,11 @@ public class Room {
      * 움직이려는 중(방향 입력이나 이동 목표가 있을 때)에만 쓸 수 있다.
      */
     public record DashTuning(double multiplier, double seconds, double cooldownSeconds) {
-        public static final DashTuning DEFAULT = new DashTuning(2, 3, 30);
+        public static final DashTuning DEFAULT = new DashTuning(2, 3, 10);
     }
 
     /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
-    public static final int DEFAULT_SKILL_SLOTS = 4;
+    public static final int DEFAULT_SKILL_SLOTS = 5; // 대시도 칸에 장착하는 스킬이다(기본으로 1번 칸, 4.27·4.33)
     public static final List<String> SKILLS = List.of("repel", "hook", "invincibility", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "fireball", "quake", "absorb", "root", "silence", "confuse", "amplify", "fortify", "barrier", "berserk");
     /**
      * 바꾸기 전의 스킬 코드 → 지금 코드(V63). 반발은 shockwave, 화염구는 flame이었다(충격파 quake·콤보 불꽃과 헷갈려서 바꿨다).
@@ -1596,6 +1596,7 @@ public class Room {
      */
     public void dash(Member m) {
         if (m.bot || members.get(m.entityNo) != m || held(m) || status.rooted(m) || disabledSkills.contains("dash")) return; // 끌려오는 동안·속박 중에는 쓸 수 없다(4.33)
+        if (!equippedSkills(m).contains("dash")) return; // 대시도 칸에 장착해야 쓴다(4.27)
         DashTuning d = dashTuning;
         if (clockSeconds < m.dashReadyAt) return;
         if (!unlocked(m, "dash")) return;
@@ -1637,31 +1638,41 @@ public class Room {
      * 켜져 있으면 장착된다(안 그러면 서버가 장착 요청을 거절하고 옛 장착을 되돌려 보내 "장착이 안 되는" 것처럼 보였다). 쓰는 일은 SKILLS에 있는 스킬만 한다.
      */
     private boolean usableSkill(Member m, String id) {
-        return (SKILLS.contains(id) || knownSkills.contains(id)) && !disabledSkills.contains(id) && m.level >= requiredLevels.getOrDefault(id, 1);
+        return ("dash".equals(id) || SKILLS.contains(id) || knownSkills.contains(id)) && !disabledSkills.contains(id) && m.level >= requiredLevels.getOrDefault(id, 1);
     }
 
-    /** 지금 장착해서 쓸 수 있는 스킬(해금되고 켜져 있는 것만). 고른 적 없으면 해금된 스킬이 해금 레벨 순서(같으면 SKILLS 순서)대로 SKILL_SLOTS개까지 채워진다. */
-    public List<String> equippedSkills(Member m) {
-        String[] lo = m.loadout;
-        List<String> out = new ArrayList<>();
-        if (lo == null) {
-            List<String> unlocked = SKILLS.stream().filter(id -> usableSkill(m, id))
-                    .sorted(Comparator.<String>comparingInt(id -> requiredLevels.getOrDefault(id, 1)).thenComparingInt(SKILLS::indexOf)).toList();
-            return new ArrayList<>(unlocked.subList(0, Math.min(skillSlots, unlocked.size())));
-        }
-        for (String id : lo) if (id != null && usableSkill(m, id) && !out.contains(id)) out.add(id);
+    /**
+     * 고른 적 없는 사람의 기본 장착(칸 순서대로, 빈 칸은 null): 1번 칸에 대시, 2번 칸부터 해금된 스킬이 해금 레벨 순서(같으면 SKILLS 순서)대로
+     * 하나씩 채워진다(2~5번). 새 스킬이 해금될 때마다 다음 빈 칸이 채워진다. 칸을 한 번이라도 바꾸면(setLoadout) 그 뒤로는 고른 대로 둔다.
+     */
+    private String[] defaultLoadout(Member m) {
+        String[] out = new String[skillSlots];
+        List<String> unlocked = SKILLS.stream().filter(id -> usableSkill(m, id))
+                .sorted(Comparator.<String>comparingInt(id -> requiredLevels.getOrDefault(id, 1)).thenComparingInt(SKILLS::indexOf)).toList();
+        if (usableSkill(m, "dash")) out[0] = "dash";
+        for (int i = 1; i < skillSlots && i - 1 < unlocked.size(); i++) out[i] = unlocked.get(i - 1);
         return out;
     }
 
-    /** 클라이언트에 보내는 장착 4칸(빈 칸은 null). 입장할 때와 바뀔 때마다 보낸다 */
+    /** 칸 순서대로 지금 쓸 수 있는 장착(해금되고 켜져 있는 것만, 못 쓰는 칸은 null) */
+    private String[] currentLoadout(Member m) {
+        String[] lo = m.loadout == null ? defaultLoadout(m) : m.loadout;
+        String[] out = new String[skillSlots];
+        for (int i = 0; i < skillSlots && i < lo.length; i++) out[i] = lo[i] != null && usableSkill(m, lo[i]) ? lo[i] : null;
+        return out;
+    }
+
+    /** 지금 장착해서 쓸 수 있는 스킬(대시 포함, 해금되고 켜져 있는 것만). 고른 적 없으면 기본 장착(defaultLoadout)이다. */
+    public List<String> equippedSkills(Member m) {
+        List<String> out = new ArrayList<>();
+        for (String id : currentLoadout(m)) if (id != null && !out.contains(id)) out.add(id);
+        return out;
+    }
+
+    /** 클라이언트에 보내는 장착 칸(대시 포함 5칸, 빈 칸은 null). 입장할 때와 바뀔 때마다 보낸다 */
     public Map<String, Object> loadoutMessage(Member m) {
-        String[] lo = m.loadout;
-        List<String> slots = new ArrayList<>();
-        if (lo == null) slots.addAll(equippedSkills(m));
-        else for (String id : lo) slots.add(id != null && usableSkill(m, id) ? id : null);
-        while (slots.size() < skillSlots) slots.add(null);
         Map<String, Object> msg = new HashMap<>();
-        msg.put("type", "loadout"); msg.put("slots", slots);
+        msg.put("type", "loadout"); msg.put("slots", Arrays.asList(currentLoadout(m)));
         return msg;
     }
 
@@ -1669,7 +1680,7 @@ public class Room {
     public void restoreLoadout(Member m, List<String> saved) {
         if (saved == null) { m.loadout = null; return; }
         String[] lo = new String[skillSlots];
-        for (int i = 0; i < skillSlots && i < saved.size(); i++) lo[i] = saved.get(i) != null && (SKILLS.contains(saved.get(i)) || knownSkills.contains(saved.get(i))) ? saved.get(i) : null;
+        for (int i = 0; i < skillSlots && i < saved.size(); i++) lo[i] = saved.get(i) != null && ("dash".equals(saved.get(i)) || SKILLS.contains(saved.get(i)) || knownSkills.contains(saved.get(i))) ? saved.get(i) : null;
         m.loadout = lo;
     }
 
