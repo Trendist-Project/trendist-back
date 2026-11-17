@@ -97,6 +97,7 @@ public final class SettingKeys {
     public static final String DAILY_RESET_MINUTE = "daily_reset_minute";
     public static final String WHEEL_ENABLED = "wheel_enabled";
     public static final String WHEEL_UNLOCK_LEVEL = "wheel_unlock_level";
+    public static final String WHEEL_COOLDOWN_MINUTES = "wheel_cooldown_minutes";
     public static final String WHEEL_WEIGHT_1 = "wheel_weight_1";
     public static final String WHEEL_WEIGHT_2 = "wheel_weight_2";
     public static final String WHEEL_WEIGHT_3 = "wheel_weight_3";
@@ -223,18 +224,19 @@ public final class SettingKeys {
             new Def(ABSORB_TICK_SECONDS, "1", 0.1, 10, "흡수가 키워드를 하나씩 빼앗는 간격(원마다 빼앗는 수 = 유지 시간 ÷ 간격, 기본 3개)"),
             new Def(DAILY_RESET_HOUR, "0", 0, 23, "하루에 한 번 제한(돌림판·인기도·신고)이 초기화되는 시각의 시(나라 시간대 기준). 0이면 자정(00:00)에 초기화"),
             new Def(DAILY_RESET_MINUTE, "0", 0, 59, "하루에 한 번 제한이 초기화되는 시각의 분(위 시와 함께 00:00이 기본)"),
-            new Def(WHEEL_UNLOCK_LEVEL, "10", 1, 100, "돌림판을 쓸 수 있는 레벨(이 레벨부터 하루에 한 번 돌릴 수 있다)"),
-            new Def(WHEEL_ENABLED, "1", 0, 1, "돌림판 켜기(1) / 끄기(0): 하루에 한 번 돌려 🔥 활성 키워드를 받는다. 끄면 메뉴에서 돌릴 수 없다"),
-            new Def(WHEEL_WEIGHT_1, "22", 0, 1000, "돌림판 1칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 1칸 = 활성 키워드 1개"),
-            new Def(WHEEL_WEIGHT_2, "20", 0, 1000, "돌림판 2칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 2칸 = 활성 키워드 2개"),
-            new Def(WHEEL_WEIGHT_3, "16", 0, 1000, "돌림판 3칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 3칸 = 활성 키워드 3개"),
-            new Def(WHEEL_WEIGHT_4, "13", 0, 1000, "돌림판 4칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 4칸 = 활성 키워드 4개"),
+            new Def(WHEEL_UNLOCK_LEVEL, "10", 1, 100, "돌림판을 쓸 수 있는 레벨(이 레벨부터 돌릴 수 있다)"),
+            new Def(WHEEL_COOLDOWN_MINUTES, "60", 1, 1440, "돌림판을 다시 돌릴 수 있기까지 기다리는 시간(분). 마지막으로 돌린 때부터 센다"),
+            new Def(WHEEL_ENABLED, "1", 0, 1, "돌림판 켜기(1) / 끄기(0): 돌려서 🔥 활성 키워드를 받는다(돌린 뒤 wheel_cooldown_minutes분이 지나야 다시 돌린다). 끄면 메뉴에서 돌릴 수 없다"),
+            new Def(WHEEL_WEIGHT_1, "10", 0, 1000, "돌림판 1칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 1칸 = 활성 키워드 1개"),
+            new Def(WHEEL_WEIGHT_2, "10", 0, 1000, "돌림판 2칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 2칸 = 활성 키워드 2개"),
+            new Def(WHEEL_WEIGHT_3, "10", 0, 1000, "돌림판 3칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 3칸 = 활성 키워드 3개"),
+            new Def(WHEEL_WEIGHT_4, "10", 0, 1000, "돌림판 4칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 4칸 = 활성 키워드 4개"),
             new Def(WHEEL_WEIGHT_5, "10", 0, 1000, "돌림판 5칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 5칸 = 활성 키워드 5개"),
-            new Def(WHEEL_WEIGHT_6, "7", 0, 1000, "돌림판 6칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 6칸 = 활성 키워드 6개"),
-            new Def(WHEEL_WEIGHT_8, "5", 0, 1000, "돌림판 8칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 8칸 = 활성 키워드 8개"),
-            new Def(WHEEL_WEIGHT_10, "4", 0, 1000, "돌림판 10칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 10칸 = 활성 키워드 10개"),
-            new Def(WHEEL_WEIGHT_15, "2", 0, 1000, "돌림판 15칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 15칸 = 활성 키워드 15개"),
-            new Def(WHEEL_WEIGHT_20, "1", 0, 1000, "돌림판 20칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 20칸 = 활성 키워드 20개"),
+            new Def(WHEEL_WEIGHT_6, "10", 0, 1000, "돌림판 6칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 6칸 = 활성 키워드 6개"),
+            new Def(WHEEL_WEIGHT_8, "10", 0, 1000, "돌림판 8칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 8칸 = 활성 키워드 8개"),
+            new Def(WHEEL_WEIGHT_10, "10", 0, 1000, "돌림판 10칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 10칸 = 활성 키워드 10개"),
+            new Def(WHEEL_WEIGHT_15, "10", 0, 1000, "돌림판 15칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 15칸 = 활성 키워드 15개"),
+            new Def(WHEEL_WEIGHT_20, "10", 0, 1000, "돌림판 20칸이 뽑힐 비중(다른 칸 비중과의 비율로 정해진다. 전체 합이 100이면 퍼센트와 같다). 20칸 = 활성 키워드 20개"),
             new Def(STEALTH_SECONDS, "5", 0.5, 60, "은신(유령)이 유지되는 시간(남에게는 원·이름·테두리·효과가 모두 배경색처럼 안 보이고 미니맵에서도 사라진다. 나에게는 반투명으로 보인다. 충격파·갈고리를 쓰면 풀린다)"),
             new Def(COMBO_FLAME_AT, "5", 1, 50, "콤보 불꽃: 키워드를 이만큼 연속으로 빼앗으면 원 둘레에 불꽃이 타오른다(한 번이라도 잃으면 꺼짐)"),
             new Def(HP_ENABLED, "1", 0, 1, "체력(HP) 켜기(1) / 끄기(0): 켜면 부딪힐 때마다(사람·봇 모두) 서로의 유행도 비율로 체력이 깎이고, 0이 되면 죽는다(몬스터와의 싸움에는 쓰이지 않는다)"),
@@ -298,7 +300,7 @@ public final class SettingKeys {
                 AMPLIFY_SECONDS, AMPLIFY_MULTIPLIER, FORTIFY_SECONDS, FORTIFY_PERCENT,      // 공격 증폭·피해 감소
                 BARRIER_SECONDS, BARRIER_HP_PERCENT,                                        // 보호막
                 BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT);                             // 광폭화
-        group("일일 제한·돌림판", DAILY_RESET_HOUR, DAILY_RESET_MINUTE, WHEEL_ENABLED, WHEEL_UNLOCK_LEVEL, WHEEL_WEIGHT_1, WHEEL_WEIGHT_2, WHEEL_WEIGHT_3, WHEEL_WEIGHT_4, WHEEL_WEIGHT_5, WHEEL_WEIGHT_6, WHEEL_WEIGHT_8, WHEEL_WEIGHT_10, WHEEL_WEIGHT_15, WHEEL_WEIGHT_20);
+        group("일일 제한·돌림판", DAILY_RESET_HOUR, DAILY_RESET_MINUTE, WHEEL_ENABLED, WHEEL_UNLOCK_LEVEL, WHEEL_COOLDOWN_MINUTES, WHEEL_WEIGHT_1, WHEEL_WEIGHT_2, WHEEL_WEIGHT_3, WHEEL_WEIGHT_4, WHEEL_WEIGHT_5, WHEEL_WEIGHT_6, WHEEL_WEIGHT_8, WHEEL_WEIGHT_10, WHEEL_WEIGHT_15, WHEEL_WEIGHT_20);
         group("콤보·불꽃", COMBO_FLAME_AT, COMBO_MAX_SECONDS, COMBO_BOT_COUNTS);
         group("체력(HP)", HP_ENABLED, HP_MAX, HP_HIT_SECONDS, HP_FLAME_MULTIPLIER, HP_FLAME_COUNTER,
                 DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, HP_PUBLIC);

@@ -296,7 +296,7 @@ final class GuideSeed {
             java.util.Map.entry("skills/스턴", 5), java.util.Map.entry("skills/화염구", 5), java.util.Map.entry("score-and-size/체력(HP)과 피해량, 불꽃 계산", 3),
             java.util.Map.entry("boss/장로 거북이 (보스)", 2), java.util.Map.entry("skills/혼란", 2), java.util.Map.entry("skills/침묵", 2),
             java.util.Map.entry("skills/속박", 2), java.util.Map.entry("skills/스킬 장착하기", 2), java.util.Map.entry("account/탈퇴하면 어떻게 되나요? 복구할 수 있나요?", 2),
-            java.util.Map.entry("faq/자꾸 키워드를 빼앗겨요.", 2), java.util.Map.entry("score-and-size/연속 빼앗기와 불꽃", 2), java.util.Map.entry("getting-started/움직이기", 2));
+            java.util.Map.entry("faq/자꾸 키워드를 빼앗겨요.", 2), java.util.Map.entry("score-and-size/연속 빼앗기와 불꽃", 2), java.util.Map.entry("getting-started/움직이기", 2), java.util.Map.entry("arena/🎡 돌림판", 2));
 
     static int version(String categoryCode, String title) { return VERSIONS.getOrDefault(categoryCode + "/" + title, 1); }
 
@@ -1138,23 +1138,23 @@ final class GuideSeed {
 
                     > You also heal when you gain a new keyword, take someone down, or level up. (See 'Health, damage and flame math'.)""")
             ,new Added("arena", "🎡 돌림판", """
-                    메뉴(☰)의 **🎡 돌림판**에서 **하루에 한 번** 돌려요. **10레벨부터** 쓸 수 있어요.
+                    메뉴(☰)의 **🎡 돌림판**에서 **1시간에 한 번** 돌려요. **10레벨부터** 쓸 수 있어요.
 
                     - 칸에는 **1·2·3·4·5·6·8·10·15·20**이 적혀 있어요. 멈춘 칸의 숫자만큼 🔥활성 키워드를 **바로** 받아요(최대 20개).
-                    - 어느 칸에 멈출지는 **확률**로 정해져요. 작은 숫자가 더 자주 나오고 큰 숫자일수록 드물어요.
+                    - 어느 칸에 멈출지는 **확률**로 정해져요. 모든 칸이 **똑같은 확률**이에요.
                     - 받은 키워드는 바로 **보관함**에 들어가요. 이미 가진 키워드가 나오면 남은 시간이 다시 24시간으로 늘어나요.
-                    - 하루가 지나면(보통 **00:00**에 초기화돼요) 다시 돌릴 수 있어요. 아직 안 돌렸으면 메뉴에 빨간 점이 떠요.
+                    - 마지막으로 돌린 뒤 **1시간**이 지나면 다시 돌릴 수 있어요. 돌릴 수 있을 때는 메뉴에 빨간 점이 떠요.
 
-                    > 초기화 시각은 운영 중에 바뀔 수 있어요.""",
-                    "🎡 Daily Wheel", """
-                    Spin the **🎡 Daily Wheel** in the menu (☰) **once a day**. It unlocks at **level 10**.
+                    > 기다리는 시간은 운영 중에 바뀔 수 있어요.""",
+                    "🎡 Wheel", """
+                    Spin the **🎡 Daily Wheel** in the menu (☰) **once an hour**. It unlocks at **level 10**.
 
                     - The slices read **1, 2, 3, 4, 5, 6, 8, 10, 15, 20**. You get that many 🔥 active keywords **right away** (up to 20).
-                    - Which slice it stops on is decided by **chance**. Small numbers come up more often and big numbers are rarer.
+                    - Which slice it stops on is decided by **chance**. Every slice has the **same chance**.
                     - The keywords go straight into your **stash**. If you land on one you already hold, its remaining time resets to 24 hours.
-                    - You can spin again after the day rolls over (it usually resets at **00:00**). A red dot appears on the menu while you haven't spun yet.
+                    - You can spin again **one hour** after your last spin. A red dot appears on the menu while the wheel is ready.
 
-                    > The reset time may change during the service.""")
+                    > The waiting time may change during the service.""")
             ,new Added("boss", "장로 거북이 (보스)", """
                     매시 **정각**에 **🐢 장로 거북이**가 나타나요(1명 이상 접속 중일 때, 나타나기 1분 전에 알림이 떠요). **10분** 안에 함께 쓰러뜨리면 보상을 받아요. 나타나는 곳은 세이프존 밖이에요.
 

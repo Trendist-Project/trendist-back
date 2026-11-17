@@ -462,7 +462,7 @@ class ApiFlowTest {
     }
 
     @Test
-    void dailyWheelCanBeSpunOnlyOncePerDayAndPaysTheNumberOnTheSlice() throws Exception {
+    void wheelCanBeSpunOnlyOncePerCooldownAndPaysTheNumberOnTheSlice() throws Exception {
         String t = player("돌림판시험");
         mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t)) // 10레벨부터: 1레벨은 잠겨 있다
                 .andExpect(status().isOk()).andExpect(jsonPath("$.locked").value(true)).andExpect(jsonPath("$.available").value(false)).andExpect(jsonPath("$.requiredLevel").value(10));
@@ -470,15 +470,15 @@ class ApiFlowTest {
         level(t, 12);
         mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.locked").value(false)).andExpect(jsonPath("$.available").value(true)).andExpect(jsonPath("$.slices.length()").value(10))
-                .andExpect(jsonPath("$.slices[9]").value(20)).andExpect(jsonPath("$.todayReward").doesNotExist());
+                .andExpect(jsonPath("$.slices[9]").value(20)).andExpect(jsonPath("$.lastReward").doesNotExist());
         String json = mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         int index = JsonPath.read(json, "$.index"), reward = JsonPath.read(json, "$.reward");
         assertThat(index).isBetween(0, 9);
         assertThat(reward).isEqualTo(com.trendist.wheel.service.WheelService.SLICES[index]).isLessThanOrEqualTo(20);
         mvc.perform(get("/api/me/wheel").header("Authorization", "Bearer " + t))
-                .andExpect(jsonPath("$.available").value(false)).andExpect(jsonPath("$.todayReward").value(reward));
-        mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isConflict()); // 오늘은 이미 돌렸다
+                .andExpect(jsonPath("$.available").value(false)).andExpect(jsonPath("$.lastReward").value(reward));
+        mvc.perform(post("/api/me/wheel/spin").header("Authorization", "Bearer " + t)).andExpect(status().isConflict()); // 쿨타임(60분) 안이라 아직 못 돌린다
     }
 
     @Test

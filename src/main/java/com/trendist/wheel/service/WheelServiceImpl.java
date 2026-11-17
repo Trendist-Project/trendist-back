@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 돌림판: "하루"는 플레이어 나라 시간대 기준이고 초기화 시각은 설정(daily_reset_hour·minute, 기본 00:00)이다. 칸은 SLICES(1~20)이고 칸마다 설정의 비중(wheel_weight_N)으로 뽑는다.
+ * 돌림판: 마지막으로 돌린 뒤 설정 wheel_cooldown_minutes(기본 60분)가 지나면 다시 돌린다. 칸은 SLICES(1~20)이고 칸마다 설정의 비중(wheel_weight_N, 기본은 모두 같음)으로 뽑는다.
  * 비중이 모두 0이면 가장 작은 칸이다. 뽑힌 개수만큼 구슬 횟수는 세지 않는 🔥 키워드를 지급한다(보스 보상과 같은 규칙).
  */
 @Service
@@ -40,9 +40,7 @@ public class WheelServiceImpl implements WheelService {
     @Transactional(readOnly = true)
     public WheelDtos.Status status(long userId) {
         Player p = playerService.requireCurrent(userId);
-        ZoneId zone = ZoneId.of(p.getCountry().getTimezone());
-        LocalDate today = daily.today(zone);
-        return statusOf(p, zone, today, spins.findByPlayerIdAndSpinDate(p.getId(), today).orElse(null));
+        return statusOf(p, spins.findFirstByPlayerIdOrderByCreatedAtDesc(p.getId()).orElse(null));
     }
 
     @Override
@@ -53,8 +51,8 @@ public class WheelServiceImpl implements WheelService {
         Player p = players.findByIdForUpdate(cur.getId()).orElseThrow(); // 같은 사람이 동시에 두 번 누르지 못하게 행을 잠근다
         if (p.getLevel() < settings.getInt(SettingKeys.WHEEL_UNLOCK_LEVEL)) throw new ApiException(HttpStatus.FORBIDDEN, "WHEEL_LEVEL", "레벨이 부족해요"); // 해금 레벨
         ZoneId zone = ZoneId.of(p.getCountry().getTimezone());
-        LocalDate today = daily.today(zone);
-        if (spins.findByPlayerIdAndSpinDate(p.getId(), today).isPresent()) throw new ApiException(HttpStatus.CONFLICT, "WHEEL_USED", "오늘은 이미 돌렸어요");
+        LocalDate today = daily.today(zone); // 기록용(돌린 날)
+        if (nextAt(spins.findFirstByPlayerIdOrderByCreatedAtDesc(p.getId()).orElse(null)) > System.currentTimeMillis()) throw new ApiException(HttpStatus.CONFLICT, "WHEEL_USED", "아직 돌릴 수 없어요");
         int index = pick();
         int reward = SLICES[index];
         WheelSpin spin = spins.save(new WheelSpin(p.getId(), today, reward));
@@ -63,17 +61,24 @@ public class WheelServiceImpl implements WheelService {
             KeywordDtos.OrbResult r = keywordService.grantRewardKeyword(p.getId());
             if (("GAINED".equals(r.status()) || "RENEWED".equals(r.status())) && r.text() != null) texts.add(r.text());
         }
-        return new WheelDtos.SpinResult(index, reward, texts, statusOf(p, zone, today, spin));
+        return new WheelDtos.SpinResult(index, reward, texts, statusOf(p, spin));
     }
 
-    private WheelDtos.Status statusOf(Player p, ZoneId zone, LocalDate today, WheelSpin spin) {
+    /** 마지막 돌림 + 쿨타임(epoch ms). 돌린 적이 없으면 0 */
+    private long nextAt(WheelSpin last) {
+        if (last == null) return 0;
+        return last.getCreatedAt().plusSeconds(60L * Math.max(1, settings.getInt(SettingKeys.WHEEL_COOLDOWN_MINUTES))).toEpochMilli();
+    }
+
+    private WheelDtos.Status statusOf(Player p, WheelSpin last) {
         boolean enabled = settings.getInt(SettingKeys.WHEEL_ENABLED) > 0;
         int need = settings.getInt(SettingKeys.WHEEL_UNLOCK_LEVEL);
         boolean locked = p.getLevel() < need;
-        long nextAt = daily.nextReset(zone).toEpochMilli();
+        long nextAt = nextAt(last);
+        boolean ready = nextAt <= System.currentTimeMillis();
         List<Integer> slices = new ArrayList<>();
         for (int s : SLICES) slices.add(s);
-        return new WheelDtos.Status(enabled, enabled && !locked && spin == null, locked, need, slices, spin == null ? null : spin.getRewardCount(), nextAt);
+        return new WheelDtos.Status(enabled, enabled && !locked && ready, locked, need, slices, last == null ? null : last.getRewardCount(), ready ? 0 : nextAt);
     }
 
     /** 설정의 비중(wheel_weight_N)으로 칸 하나를 뽑는다. 음수는 0으로 본다. 비중이 모두 0이면 첫 칸 */

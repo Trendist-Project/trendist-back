@@ -7,11 +7,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 돌림판 한 번(하루에 한 번): 그날(플레이어 나라 시간대) 받은 활성 키워드 개수를 남긴다. */
+/** 돌림판 한 번: 돌린 날(플레이어 나라 시간대, 기록용)과 받은 활성 키워드 개수를 남긴다. 다시 돌릴 수 있는 때는 createdAt에 쿨타임을 더해 정한다. */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "wheel_spins", uniqueConstraints = @UniqueConstraint(name = "uk_wheel_spins_player_date", columnNames = {"player_id", "spin_date"}))
+@Table(name = "wheel_spins", indexes = @Index(name = "ix_wheel_spins_player_created", columnList = "player_id, created_at"))
 public class WheelSpin extends BaseTimeEntity {
     @Column(name = "player_id", nullable = false) private long playerId;
     @Column(name = "spin_date", nullable = false) private LocalDate spinDate;

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 /** 돌림판 확률: 칸 구간이 비중대로 나뉘고, 많이 돌리면 기대 비율에 가까워지며, 최대 칸은 20이다. */
 class WheelChoiceTest {
-    private static final double[] DEFAULT = {22, 20, 16, 13, 10, 7, 5, 4, 2, 1};
+    private static final double[] DEFAULT = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
 
     private static int choose(double[] w, double roll) throws Exception {
         Class<?> c = Class.forName("com.trendist.wheel.service.WheelServiceImpl");
@@ -29,8 +29,8 @@ class WheelChoiceTest {
     @Test
     void rollsMapToSlicesByTheirWeightRanges() throws Exception {
         assertThat(choose(DEFAULT, 0)).isEqualTo(0);
-        assertThat(choose(DEFAULT, 21.99)).isEqualTo(0);
-        assertThat(choose(DEFAULT, 22)).isEqualTo(1);           // 0번 구간은 [0, 22)
+        assertThat(choose(DEFAULT, 9.99)).isEqualTo(0);
+        assertThat(choose(DEFAULT, 10)).isEqualTo(1);           // 0번 구간은 [0, 10)
         assertThat(choose(DEFAULT, 99.5)).isEqualTo(9);         // 마지막 칸은 [99, 100)
         double[] zeroFirst = {0, 5, 0, 5};
         assertThat(choose(zeroFirst, 0)).isEqualTo(1);          // 비중 0인 칸은 뽑히지 않는다
@@ -51,6 +51,6 @@ class WheelChoiceTest {
             assertThat(hits[i] / (double) n).isCloseTo(expected, org.assertj.core.api.Assertions.within(0.006)); // 20만 번이면 ±0.6%p 안
             mean += WheelService.SLICES[i] * hits[i] / (double) n;
         }
-        assertThat(mean).isCloseTo(3.84, org.assertj.core.api.Assertions.within(0.1)); // 기대 개수 약 3.8개(22+40+48+52+50+42+40+40+30+20 = 384 ÷ 100)
+        assertThat(mean).isCloseTo(7.4, org.assertj.core.api.Assertions.within(0.15)); // 기대 개수 7.4개(1+2+3+4+5+6+8+10+15+20 = 74 ÷ 10칸)
     }
 }
