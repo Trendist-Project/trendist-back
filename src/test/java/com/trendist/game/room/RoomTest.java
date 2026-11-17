@@ -196,6 +196,78 @@ class RoomTest {
     }
 
     @Test
+    void pushingAwayTheOtherRaisesComboAndGettingPushedResetsItEvenWhenNoKeywordMoves() {
+        // 4.25: 충돌에서 상대를 튕겨 낸 쪽(큰 쪽)은 콤보 +1, 튕겨 나간 쪽(작은 쪽)은 콤보 0. 체력 피해·키워드와 관계없이 물리가 정한다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of()); // a는 키워드가 없어 잃을 것도 없다
+        r.setHpTuning(Room.HpTuning.on());
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        a.score = 1; a.radius = a.displayRadius = r.radiusFor(1);
+        b.score = 99; b.radius = b.displayRadius = r.radiusFor(99); // 크기 차이가 커서 작은 a만 튕긴다
+        a.combo = 2;
+        r.tick();
+        assertThat(b.combo).isEqualTo(1);
+        assertThat(a.combo).isZero();
+    }
+
+    @Test
+    void whenBothBounceTogetherNoOneGainsOrLosesComboFromTheBounce() {
+        // 크기가 비슷해 서로 튕기면(반지름 비율 1.15 미만) 튕김으로는 아무도 오르거나 끊기지 않는다
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        a.score = 50; b.score = 50; a.radius = a.displayRadius = b.radius = b.displayRadius = r.radiusFor(50);
+        a.combo = 2; b.combo = 3;
+        r.tick();
+        assertThat(a.combo).isEqualTo(2);
+        assertThat(b.combo).isEqualTo(3);
+    }
+
+    @Test
+    void hpComboAndKeywordResultOfTheSameCollisionCountOnlyOnce() {
+        // 한 번의 충돌에서 체력 콤보와 키워드 결과가 겹쳐도 콤보는 +1만 오른다(키워드 결과는 DB를 거쳐 fightResult로 온다)
+        Out out = new Out();
+        Room r = fightRoom(out, 0, 0);
+        r.setHpTuning(Room.HpTuning.on());
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2); // a 10, b 50 → 큰 b가 a를 튕겨 낸다
+        a.radius = a.displayRadius = r.radiusFor(10); b.radius = b.displayRadius = r.radiusFor(50);
+        r.tick();
+        assertThat(b.combo).isEqualTo(1);
+        r.fightResult(b, a, false); // 같은 충돌의 키워드 결과
+        assertThat(b.combo).isEqualTo(1);
+        r.fightResult(b, a, false); // 다른 충돌의 결과는 센다
+        assertThat(b.combo).isEqualTo(2);
+    }
+
+    @Test
+    void hpComboIsNotCountedAgainWhenTheKeywordResultHasNoLoserOrTheLoserLeft() {
+        // 봇을 이겨 얻은 결과(loser null)·키워드 처리 중 상대가 나간 경우도 같은 충돌이라 콤보가 한 번만 오른다
+        Out out = new Out();
+        Room r = fightRoom(out, 0, 0);
+        r.setHpTuning(Room.HpTuning.on());
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        a.radius = a.displayRadius = r.radiusFor(10); b.radius = b.displayRadius = r.radiusFor(50);
+        r.tick();
+        assertThat(b.combo).isEqualTo(1);
+        r.fightResult(b, (Room.Member) null, false);
+        assertThat(b.combo).isEqualTo(1);
+    }
+
+    @Test
+    void killingWithHpDamageRaisesComboOnlyOnce() {
+        // 체력 싸움으로 죽이면 hpDuel이 올리고 die의 싸움 결과가 또 올리지 않는다(+1)
+        Out out = new Out();
+        Room r = deathRoom(out, List.of());
+        r.setHpTuning(Room.HpTuning.on());
+        Room.Member a = r.byPlayer(1), b = r.byPlayer(2);
+        a.score = 1; b.score = 99; a.hp = 50; // a는 99를 받아 죽는다
+        a.radius = a.displayRadius = r.radiusFor(1); b.radius = b.displayRadius = r.radiusFor(99);
+        r.tick();
+        assertThat(r.byPlayer(1)).isNull();
+        assertThat(b.combo).isEqualTo(1);
+    }
+
+    @Test
     void flameKillsSomeoneWithNoKeywords() {
         Out out = new Out();
         Room r = deathRoom(out, List.of());
@@ -578,6 +650,7 @@ class RoomTest {
         win.botKeywords.clear();
         win.combo = 4; lose.combo = 3;
         win.score = 900; lose.score = 10;
+        win.radius = win.displayRadius = r.radiusFor(900); lose.radius = lose.displayRadius = r.radiusFor(10); // 반지름도 점수를 따른다
         win.x = 800; win.y = 800; lose.x = 810; lose.y = 800;
         r.tick();
         assertThat(win.combo).isEqualTo(5); // 봇이 봇을 이겨도 콤보 +1(설정 켜짐), 불꽃이 붙는다
