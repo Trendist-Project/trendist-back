@@ -34,6 +34,19 @@ final class SkillFx {
     /** 충격파가 원 t에 닿아 키워드 n개를 잃게 했다 */
     static Map<String, Object> quakeHit(int t, int n) { Map<String, Object> m = fx("quakeHit"); m.put("t", t); m.put("n", n); return m; }
 
+    /** 장판: 원 e를 중심으로 따라다니는 반지름 r의 장판을 ms 동안 깔았다((x, y)는 깔 때의 e의 자리) */
+    static Map<String, Object> zone(int e, double x, double y, double r, long ms, long tickMs) {
+        Map<String, Object> m = fx("zone");
+        m.put("e", e); m.put("x", x); m.put("y", y); m.put("r", r); m.put("ms", ms); m.put("tickMs", tickMs);
+        return m;
+    }
+    /** 시전자 e의 장판이 일찍 끝났다(시전자가 나가거나 죽음) */
+    static Map<String, Object> zoneEnd(int e) { Map<String, Object> m = fx("zoneEnd"); m.put("e", e); return m; }
+    /** 터지는 총알에 맞은 원 t가 ms 뒤에 터진다 */
+    static Map<String, Object> burstFuse(int t, long ms) { Map<String, Object> m = fx("burstFuse"); m.put("t", t); m.put("ms", ms); return m; }
+    /** 터지는 총알이 원 t의 (x, y)에서 터졌다 */
+    static Map<String, Object> burstBoom(int t, double x, double y) { Map<String, Object> m = fx("burstBoom"); m.put("t", t); m.put("x", x); m.put("y", y); return m; }
+
     static Map<String, Object> hook(int e, double dx, double dy, double range, long ms) {
         Map<String, Object> m = fx("hook");
         m.put("e", e); m.put("dx", dx); m.put("dy", dy); m.put("range", range); m.put("ms", ms);

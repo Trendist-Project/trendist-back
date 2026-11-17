@@ -44,8 +44,9 @@ final class WaveSkill implements PlayerSkill {
                 if (d - t.displayRadius > radius) continue;
                 w.hit().add(t);
                 if (drop) {
+                    int lost = Math.min(n, room.keywordCount(t)); // 실제로 잃는 개수(가진 것이 적거나 없으면 그만큼만)
                     room.skillHit(w.owner(), t, code, n);
-                    room.broadcast(SkillFx.quakeHit(t.entityNo, n)); // 맞은 원 위에 표시
+                    if (lost > 0 && room.present(t)) room.broadcast(SkillFx.quakeHit(t.entityNo, lost)); // 맞은 원 위에 "-N"(잃은 것이 없으면 띄우지 않는다)
                     continue;
                 }
                 room.knock(t, d < 0.001 ? 1 : dx / d, d < 0.001 ? 0 : dy / d, room.skillConfig().param("repel_knockback"), room.tuning());

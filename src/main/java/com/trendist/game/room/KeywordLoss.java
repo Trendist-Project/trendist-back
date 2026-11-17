@@ -24,28 +24,36 @@ public record KeywordLoss(Cause cause, Room.Member victim, Room.Member by, int a
 
     /**
      * 잃은 원인. code는 클라이언트 lost·hit 메시지의 cause 값이다(protocol.ts의 LossCause와 짝).
-     * serviceCombo면 결과(실제로 잃었는지)가 DB에서 정해지므로 서비스가 끝난 뒤 방에 싸움 결과(콤보)를 넣는다. 아니면 방이 이미 처리했다(스킬 히트·죽음).
+     * 콤보는 키워드 잃기와 상관없다(스킬 히트와 몸싸움 튕김만 콤보를 바꾼다, 4.25).
      * countsSteal이면 이긴 사람의 빼앗은 횟수를 +1 한다(STEAL은 빼앗기 자체가 센다).
      */
     public enum Cause {
-        FIGHT("fight", Way.STEAL, true, false),
-        FLAME("flame", Way.PERCENT, true, true),
-        DEATH("death", Way.PERCENT, false, false),
-        HOOK("hook", Way.STEAL, false, false),
-        ABSORB("absorb", Way.STEAL, false, false),
-        POISON("poison", Way.DROP, false, false),
-        QUAKE("quake", Way.DROP, false, false),
-        FIREBALL("fireball", Way.DROP, false, false);
+        FIGHT("fight", Way.STEAL, false),
+        FLAME("flame", Way.PERCENT, true),
+        DEATH("death", Way.PERCENT, false),
+        HOOK("hook", Way.STEAL, false),
+        ABSORB("absorb", Way.STEAL, false),
+        POISON("poison", Way.DROP, false),
+        QUAKE("quake", Way.DROP, false),
+        FIREBALL("fireball", Way.DROP, false),
+        SLOW("slow", Way.DROP, false),
+        DARKNESS("darkness", Way.DROP, false),
+        SILENCE("silence", Way.DROP, false),
+        STUN("stun", Way.DROP, false),
+        ROOT("root", Way.DROP, false),
+        CONFUSE("confuse", Way.DROP, false),
+        ZONE("zone", Way.DROP, false),
+        BURST("burst", Way.DROP, false);
 
         public final String code;
         public final Way way;
-        public final boolean serviceCombo, countsSteal;
+        public final boolean countsSteal;
 
-        Cause(String code, Way way, boolean serviceCombo, boolean countsSteal) {
-            this.code = code; this.way = way; this.serviceCombo = serviceCombo; this.countsSteal = countsSteal;
+        Cause(String code, Way way, boolean countsSteal) {
+            this.code = code; this.way = way; this.countsSteal = countsSteal;
         }
 
-        /** 스킬 코드(갈고리 hook·흡수 absorb·독 poison·충격파 quake·화염구 fireball)의 원인 */
+        /** 스킬 코드(갈고리 hook·흡수 absorb·독 poison·충격파 quake·화염구 fireball·슬로우·암흑·침묵·스턴·속박·혼란·장판·터지는 총알)의 원인 */
         public static Cause ofSkill(String skillCode) {
             for (Cause c : values()) if (c.code.equals(skillCode) && c != FIGHT && c != FLAME && c != DEATH) return c;
             throw new IllegalArgumentException("not an attack skill: " + skillCode);

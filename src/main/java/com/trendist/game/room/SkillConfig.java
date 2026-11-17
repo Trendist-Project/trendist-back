@@ -34,7 +34,7 @@ public record SkillConfig(Map<String, Double> cooldowns, Map<String, Double> par
         // 화염구(fireball): 발 수와 던지는 간격
         p.put("fireball_count", 3.0); p.put("fireball_interval_seconds", 0.15);
         // 충격파(quake): 닿은 원이 잃는 키워드 수
-        p.put("quake_drop_keywords", 3.0);
+        p.put("quake_drop_keywords", 1.0);
         // 흡수: 선이 이어지는 시간과 빼앗는 간격
         p.put("absorb_seconds", 3.0); p.put("absorb_tick_seconds", 1.0);
         // 속박·침묵·혼란: 걸리는 시간(초)
@@ -45,6 +45,12 @@ public record SkillConfig(Map<String, Double> cooldowns, Map<String, Double> par
         p.put("barrier_seconds", 10.0); p.put("barrier_hp_percent", 50.0);
         // 광폭화: 켜 둔 동안 1초마다 잃는 최대 체력의 %, 이 % 아래로는 더 깎이지 않고 자동으로 꺼진다
         p.put("berserk_drain_percent", 1.0); p.put("berserk_min_hp_percent", 1.0);
+        // 장판(zone): 범위(원 가장자리에서 화면 기준 px), 유지 시간, 피해 간격(쓰자마자 0초부터 한 번씩)
+        p.put("zone_reach_px", 300.0); p.put("zone_seconds", 3.0); p.put("zone_tick_seconds", 1.0);
+        // 터지는 총알(burst): 맞은 뒤 터질 때까지의 시간
+        p.put("burst_fuse_seconds", 2.0);
+        // 스킬 히트 하나가 주는 체력 피해: 몸싸움(hpDamage)이 계산하는 피해의 몇 %인가(모든 스킬이 같은 값, 히트 하나에 한 번)
+        p.put("skill_hit_damage_percent", 10.0);
         DEFAULT_PARAMS = Map.copyOf(p);
     }
 

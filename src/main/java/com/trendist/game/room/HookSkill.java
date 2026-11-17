@@ -59,12 +59,12 @@ final class HookSkill implements PlayerSkill {
     }
 
     private void hit(Room.Member o, Room.Member v) {
-        v.hookedBy = o; v.pullLeft = Math.max(0.05, room.skillConfig().param("hook_pull_seconds")); v.hookLost = false;
+        v.hookedBy = o; v.pullLeft = Math.max(0.05, room.skillConfig().param("hook_pull_seconds"));
         v.kbTime = 0; v.vx = 0; v.vy = 0; v.targetX = null;
         long ms = SkillFx.ms(v.pullLeft);
         room.tell(v, SkillFx.pull(ms, o.entityNo));
         room.broadcast(SkillFx.hookHit(o.entityNo, v.entityNo, ms));
-        v.hookLost = room.skillHit(o, v, code(), 1);
+        room.skillHit(o, v, code(), 1);
     }
 
     /** 끌려오는 원을 쓴 사람 쪽으로 남은 시간에 맞춰 당긴다(원이 서로 닿는 자리까지). 쓴 사람이 사라졌으면 멈춘다 */
@@ -103,6 +103,5 @@ final class HookSkill implements PlayerSkill {
 
     private void unhook(Room.Member m) {
         m.hookedBy = null; m.pullLeft = 0;
-        if (m.hookLost) { m.hookLost = false; room.protectAfterLoss(m); }
     }
 }

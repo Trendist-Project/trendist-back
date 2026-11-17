@@ -373,14 +373,12 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 if (winnerId == null) {
                     keywordService.loseRandom(loserId).ifPresent(lost -> room.submit(r -> {
                         r.botTakes(winner, lost.keywordId()); // 이긴 봇이 사람이 잃은 그 키워드를 메모리에 가진다(4.21)
-                        if (cause.serviceCombo) r.fightResult(winner, r.byPlayer(loserId), false);
                         Room.Member m = r.byPlayer(loserId);
                         if (m != null) sendText(m, LossMessages.lost(cause, winnerName, 1, lost.score(), lost.text()));
                     }));
                     return;
                 }
                 keywordService.stealRandom(loserId, winnerId).ifPresent(st -> room.submit(r -> {
-                    if (cause.serviceCombo) r.fightResult(winnerId, loserId, false);
                     Room.Member m = r.byPlayer(loserId);
                     if (m != null) sendText(m, LossMessages.lost(cause, winnerName, 1, st.score(), st.text()));
                     Room.Member w = r.byPlayer(winnerId);
@@ -432,7 +430,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                 keywordService.loseFraction(loserId, loss.amount()).ifPresent(lost -> {
                     if (cause.countsSteal && !winnerBot) playerService.recordSteal(winnerId); // 불꽃으로 공격 성공 한 번 = 빼앗은 횟수 +1(4.3)
                     room.submit(r -> {
-                        if (cause.serviceCombo) r.fightResult(winner, r.byPlayer(loserId), false); // 죽는 경우는 die가 이미 콤보를 처리했다
                         r.dropPrizeOrbs(loser, lost.activeCount()); // 잃은 🔥활성 키워드 수의 일부만큼 ! 구슬(4.20)
                         sendText(loser, LossMessages.lost(cause, winnerName, lost.count(), lost.score(), null));
                         Room.Member w = r.byPlayer(winnerId); // 이긴 쪽이 봇이면 방 목록에 없고 알릴 연결도 없다
@@ -461,7 +458,6 @@ public class RoomManagerImpl implements RoomManager, Room.Outbox {
                         ? LossMessages.took(cause, botName, r.text(), r.trendValue() == null ? 0 : r.trendValue(), "RENEWED".equals(r.status()) ? "BOT_RENEWED" : "BOT", r.gained() == null ? 0 : r.gained())
                         : LossMessages.took(cause, botName, null, 0, null, 0);
                 room.submit(rr -> {
-                    if (won && cause.serviceCombo) rr.fightResult(playerId, null, true); // 봇을 이겨 키워드를 얻은 것도 콤보(설정, 4.25)
                     Room.Member m = rr.byPlayer(playerId);
                     if (m != null) sendText(m, msg);
                 });

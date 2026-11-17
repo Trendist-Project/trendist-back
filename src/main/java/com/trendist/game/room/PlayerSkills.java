@@ -18,7 +18,8 @@ final class PlayerSkills {
         add(new WaveSkill(room, "repel", false));     // 반발
         add(new WaveSkill(room, "quake", true));      // 충격파
         add(hook);
-        for (String kind : new String[]{"poison", "darkness", "slow", "stun", "root", "silence", "confuse"}) { BoltSkill b = new BoltSkill(room, kind); bolts.put(kind, b); add(b); }
+        for (BoltKind kind : BoltKind.values()) { BoltSkill b = new BoltSkill(room, kind); bolts.put(kind.code, b); add(b); }
+        add(new ZoneSkill(room));
         add(new FireballSkill(room));
         add(new AbsorbSkill(room));
         add(new InstantSkills.Invincibility(room));

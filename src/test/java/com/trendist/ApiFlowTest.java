@@ -1235,7 +1235,7 @@ class ApiFlowTest {
         skillCatalog.invalidate();
         mvc.perform(get("/api/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(21))
+                .andExpect(jsonPath("$.length()").value(23))
                 .andExpect(jsonPath("$[1].code").value("invincibility"))      // 대시 다음은 해금 레벨 순서
                 .andExpect(jsonPath("$[1].defaultKey").value("Digit1"))
                 .andExpect(jsonPath("$[1].cooldownSeconds").value(30.0))
@@ -1264,7 +1264,7 @@ class ApiFlowTest {
             skillRepository.saveAndFlush(hook);
             skillCatalog.invalidate();
             assertThat(skillCatalog.disabledCodes()).contains("hook");
-            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(20));
+            mvc.perform(get("/api/skills")).andExpect(jsonPath("$.length()").value(22));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(hook, "enabled", true);
             skillRepository.saveAndFlush(hook);
@@ -1351,7 +1351,7 @@ class ApiFlowTest {
         String t = player("스킬관리시험");
         mvc.perform(get("/api/admin/skills").header("Authorization", "Bearer " + t)).andExpect(status().isForbidden());
         assertThat(adminSkills.list()).extracting(com.trendist.skill.controller.AdminSkillController.Item::code)
-                .containsExactly("dash", "invincibility", "hook", "slow", "stealth", "repel", "fortify", "cleanse", "darkness", "root", "heal", "poison", "barrier", "stun", "silence", "quake", "confuse", "fireball", "amplify", "absorb", "berserk");
+                .containsExactly("dash", "invincibility", "hook", "slow", "stealth", "repel", "fortify", "cleanse", "darkness", "root", "heal", "poison", "barrier", "stun", "silence", "quake", "confuse", "fireball", "amplify", "absorb", "zone", "burst", "berserk");
         try {
             var r = adminSkills.update(new com.trendist.auth.security.AuthUser(1), "hook", new com.trendist.skill.controller.AdminSkillController.UpdateRequest(12.5, 16, null));
             assertThat(r.cooldownSeconds()).isEqualTo(12.5);

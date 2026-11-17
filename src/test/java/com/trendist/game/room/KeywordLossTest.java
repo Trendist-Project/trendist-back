@@ -15,13 +15,9 @@ class KeywordLossTest {
         assertThat(KeywordLoss.Cause.ofSkill("quake").way).isEqualTo(KeywordLoss.Way.DROP);
         assertThat(KeywordLoss.Cause.ofSkill("fireball").way).isEqualTo(KeywordLoss.Way.DROP);
         assertThatThrownBy(() -> KeywordLoss.Cause.ofSkill("fight")).isInstanceOf(IllegalArgumentException.class); // 스킬이 아닌 원인은 스킬 코드로 고를 수 없다
-        assertThatThrownBy(() -> KeywordLoss.Cause.ofSkill("stun")).isInstanceOf(IllegalArgumentException.class); // CC는 키워드를 잃게 하지 않는다
-    }
-
-    @Test
-    void onlyFightAndFlameLetTheServiceApplyTheComboAfterTheDatabase() {
-        for (KeywordLoss.Cause c : KeywordLoss.Cause.values())
-            assertThat(c.serviceCombo).as(c.code).isEqualTo(c == KeywordLoss.Cause.FIGHT || c == KeywordLoss.Cause.FLAME);
+        for (String code : new String[]{"slow", "darkness", "silence", "stun", "root", "confuse", "zone", "burst"}) // 흡수를 뺀 나머지 히트도 키워드 1개를 떨군다
+            assertThat(KeywordLoss.Cause.ofSkill(code).way).as(code).isEqualTo(KeywordLoss.Way.DROP);
+        assertThatThrownBy(() -> KeywordLoss.Cause.ofSkill("heal")).isInstanceOf(IllegalArgumentException.class); // 맞히지 않는 스킬은 원인이 없다
     }
 
     @Test

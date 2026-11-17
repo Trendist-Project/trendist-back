@@ -135,7 +135,7 @@ public class Room {
 
     /** 장착 칸 수의 기본값(4.33). 실제 칸 수는 서버가 actions의 SKILL_SLOT 동작 수로 정한다(setSkillSlotCount). 칸은 처음부터 모두 열려 있다 */
     public static final int DEFAULT_SKILL_SLOTS = 5; // 대시도 칸에 장착하는 스킬이다(기본으로 1번 칸, 4.27·4.33)
-    public static final List<String> SKILLS = List.of("repel", "hook", "invincibility", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "fireball", "quake", "absorb", "root", "silence", "confuse", "amplify", "fortify", "barrier", "berserk");
+    public static final List<String> SKILLS = List.of("repel", "hook", "invincibility", "stealth", "poison", "darkness", "cleanse", "heal", "slow", "stun", "fireball", "quake", "absorb", "root", "silence", "confuse", "amplify", "fortify", "barrier", "berserk", "zone", "burst");
     /**
      * 바꾸기 전의 스킬 코드 → 지금 코드(V63). 반발은 shockwave, 화염구는 flame이었다(충격파 quake·콤보 불꽃과 헷갈려서 바꿨다).
      * 서버를 바꾼 뒤에도 새로고침하지 않은 화면이 옛 코드로 보내는 것을 받아 주려는 것이라, 배포 뒤 한동안 지나면 지워도 된다.
@@ -169,7 +169,6 @@ public class Room {
         /** 콤보가 마지막으로 오른 시각(방 시계 초). 콤보 유지시간(4.25)은 이 시각부터 잰다: 콤보가 추가될 때마다 다시 시작한다 */
         public double comboStartedAt;
         /** 체력 싸움에서 피해를 더 줘서 콤보를 올린 때의 상대와 시각(방 시계 초). 같은 충돌의 키워드 결과가 콤보를 한 번 더 올리지 않게 거른다(4.25) */
-        final Map<Member, Double> hpComboFoes = new HashMap<>();
         /** 대시(4.27): 대시가 끝나는 시각과 다시 쓸 수 있는 시각(방 시계 초) */
         public double dashUntil, dashReadyAt;
         /** 스킬(4.33): SKILLS 순서대로 다시 쓸 수 있는 시각(방 시계 초). 은신이 끝나는 시각 */
@@ -187,7 +186,6 @@ public class Room {
         /** 갈고리에 맞아 끌려오는 중이면 쓴 사람, 남은 끌려오는 시간(초), 맞을 때 키워드를 잃었는지(끝나면 무적을 준다). 끌려오는 동안은 이동·스킬·다른 원과의 충돌이 모두 막힌다 */
         Member hookedBy;
         double pullLeft;
-        boolean hookLost;
         /** 이동 효과 코드(4.23). null이면 없음. 그림은 클라이언트가 그린다 */
         public String trail;
         public int level;
@@ -237,6 +235,7 @@ public class Room {
 
     private final long countryId;
     private final Outbox outbox;
+    private final Combos combos = new Combos(this);
     private final Queue<Consumer<Room>> tasks = new ConcurrentLinkedQueue<>();
     private final Map<Integer, Member> members = new LinkedHashMap<>();
     /** 최근 채팅(4.13). 새로 들어온 사람에게 보여 준다. 서버를 다시 켜면 비워진다(DB에는 30일 남는다). */
@@ -439,7 +438,7 @@ public class Room {
         for (Long k : keywordIds) holders.computeIfAbsent(k, x -> new HashSet<>()).add(old);
         old.dirX = 0; old.dirY = 0; old.targetX = null; old.targetY = null; old.controls.clear(); // 새 연결의 조작부터 받는다
         // 새로고침하거나 화면을 떠났다 다시 들어오면 콤보는 처음부터다(4.25): 불꽃도 꺼지고 모두의 화면에서 지운다
-        if (old.combo > 0) { old.combo = 0; broadcast(comboMessage(old, "reset")); }
+        combos.reset(old);
         size = humanCount();
         broadcastRoster();
         outbox.sendText(old, orbListMessage());
@@ -499,90 +498,23 @@ public class Room {
     }
 
     /**
-     * 싸움 결과(4.3, 4.25): 이긴 쪽(winnerId)의 콤보를 +1 하고, 키워드를 잃은 쪽(loserId)의 콤보를 0으로 만든다(불꽃이 있었으면 꺼진다).
-     * 사람과 봇이 같은 규칙이다. 봇은 byPlayer에 없으므로 봇이 낀 싸움은 아래 멤버 버전으로 부른다(여기서 null은 "처리할 쪽 없음").
-     * vsBot이면 진 쪽이 봇이다(설정 combo_bot_counts가 꺼져 있으면 봇을 이겨도 콤보에 넣지 않는다). 키워드가 실제로 오간 뒤에만 부른다.
+     * 콤보 규칙(4.25)은 두 가지뿐이고 키워드를 잃고 빼앗는 일은 콤보를 건드리지 않는다(키워드 결과가 콤보를 두 번 올리던 문제를 없앴다).
+     * - 스킬 히트(skillHit): 맞힌 쪽 +1, 맞은 쪽 0. 모든 스킬 히트는 체력 피해가 있다.
+     * - 몸싸움(Combos.knock): 상대를 튕겨 낸 쪽만 +1, 튕겨 나간 쪽은 0. 서로 같이 튕기면(크기가 비슷) 둘 다 0.
+     * 아래 fightResult는 "이긴 쪽 +1, 진 쪽 0"을 한 번 적용하는 도구다(보스 히트·시험이 쓴다). 운영 중 키워드 결과는 부르지 않는다.
      */
     public void fightResult(Long winnerId, Long loserId, boolean vsBot) {
         fightResult(winnerId == null ? null : byPlayer.get(winnerId), loserId == null ? null : byPlayer.get(loserId), vsBot);
     }
 
-    /** 멤버 버전: 이긴 쪽과 진 쪽이 사람이든 봇이든 같은 규칙이다(4.25). null인 쪽은 건너뛴다. */
+    /** 멤버 버전: 이긴 쪽과 진 쪽이 사람이든 봇이든 같은 규칙이다(4.25). null인 쪽은 건너뛴다. vsBot이면 진 쪽이 봇이고 설정(combo_bot_counts)이 꺼져 있으면 올리지 않는다 */
     public void fightResult(Member winner, Member loser, boolean vsBot) {
-        comboLose(loser, winner);
-        comboWinFight(winner, loser, vsBot);
+        combos.lose(loser, winner);
+        combos.win(winner, vsBot);
     }
 
-    /** 같은 충돌에서 체력 싸움이 이미 이긴 쪽의 콤보를 올렸으면(hpDuel) 키워드 결과로 한 번 더 올리지 않는다(충돌 한 번에 +1, 4.25) */
-    private void comboWinFight(Member winner, Member loser, boolean vsBot) {
-        if (winner != null && takeHpCombo(winner, loser)) return;
-        comboWin(winner, vsBot);
-    }
-    /**
-     * 이 충돌의 콤보를 체력 싸움이 이미 올렸으면 그 표시를 지우고 true(상대마다 따로 센다: 한 틱에 둘과 부딪혀도 각각 한 번씩).
-     * loser가 null이면(봇을 이겨 얻은 결과, 키워드 처리 중 상대가 방에서 나간 때) 상대를 가리지 않고 가장 최근 표시 하나를 쓴다.
-     */
-    private boolean takeHpCombo(Member winner, Member loser) {
-        Map<Member, Double> marks = winner.hpComboFoes;
-        marks.values().removeIf(t -> clockSeconds - t > HP_COMBO_DEDUP_SECONDS);
-        if (marks.isEmpty()) return false;
-        Member key = loser;
-        if (key == null || !marks.containsKey(key)) {
-            if (loser != null) return false;
-            key = marks.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
-        }
-        marks.remove(key);
-        return true;
-    }
-
-    /** 체력 싸움 콤보와 같은 충돌로 보는 시간(키워드 결과가 DB를 거쳐 늦게 와도 같은 충돌로 묶는다) */
-    private static final double HP_COMBO_DEDUP_SECONDS = 2.0;
-
-    /**
-     * 콤보 유지시간(4.25): 마지막으로 콤보가 오른 때부터 maxSeconds(설정 combo_max_seconds, 기본 300초 = 5분)가 지나면 연속 횟수와 불꽃이 사라진다.
-     * 방 전체에 {combo, event: expired}를 보낸다. 1초마다 확인한다(사람·봇 모두).
-     */
-    private void expireCombos() {
-        int max = comboTuning.maxSeconds();
-        if (max <= 0) return;
-        for (Member m : members.values()) {
-            if (m.combo <= 0 || clockSeconds - m.comboStartedAt < max) continue;
-            m.combo = 0;
-            broadcast(comboMessage(m, "expired"));
-        }
-    }
-
-    /** 키워드를 잃으면 콤보가 0이 되고(불꽃이 있었으면 꺼짐) 방 전체에 알린다. */
-    private void comboLose(Member loser, Member by) {
-        if (loser == null || loser.combo <= 0) return;
-        boolean broken = loser.combo >= comboTuning.flameAt();
-        loser.combo = 0;
-        if (broken && by != null && !by.bot) outbox.requestFlameOut(this, by); // 불꽃을 꺼뜨렸다(칭호, 4.10)
-        Map<String, Object> msg = comboMessage(loser, broken ? "broken" : "reset");
-        msg.put("by", by != null ? by.nickname : "Bot");
-        if (by != null) msg.put("byE", by.entityNo);
-        broadcast(msg);
-    }
-
-    /** 키워드를 빼앗으면 콤보 +1. 봇을 이긴 경우는 설정(combo_bot_counts)에 따른다. */
-    void comboWin(Member winner, boolean vsBot) {
-        if (winner == null || (vsBot && !comboTuning.countBots())) return;
-        winner.comboStartedAt = clockSeconds; // 콤보가 추가될 때마다 유지시간이 다시 시작된다(4.25)
-        winner.combo++;
-        if (!winner.bot && winner.combo > winner.comboRecordSent) { // 최고 콤보 기록(칭호, 4.10)
-            winner.comboRecordSent = winner.combo;
-            outbox.requestCombo(this, winner, winner.combo);
-        }
-        broadcast(comboMessage(winner, winner.combo == comboTuning.flameAt() ? "start" : "up")); // start: 이번에 불꽃이 붙었다
-    }
-
-    Map<String, Object> comboMessage(Member m, String event) {
-        Map<String, Object> msg = new HashMap<>();
-        msg.put("type", "combo"); msg.put("e", m.entityNo); msg.put("nickname", m.nickname);
-        msg.put("combo", m.combo); msg.put("event", event); msg.put("flameAt", comboTuning.flameAt());
-        msg.put("maxMs", comboTuning.maxSeconds() * 1000L); // 콤보가 오른 때부터 사라질 때까지(ms, 0이면 제한 없음). 클라이언트가 남은 시간을 센다(4.25)
-        return msg;
-    }
+    /** 콤보 규칙(4.25)은 Combos가 맡는다. 보스 히트·시험이 쓰는 "이긴 쪽 +1" */
+    void comboWin(Member winner, boolean vsBot) { combos.win(winner, vsBot); }
 
     /**
      * 연결이 끊겼다(나감·새로고침·네트워크 끊김, 4.32): 원은 마지막 위치에 그대로 offline_keep_seconds(기본 60초) 동안 남는다. 그동안 공격받거나
@@ -631,7 +563,7 @@ public class Room {
     /** byHp이면 체력이 0이 되어 죽은 것이다(죽은 사람에게 알리는 {died}에 cause: hp를 싣는다) */
     private void die(Member loser, Member killer, boolean byHp) {
         if (loser.dead || members.get(loser.entityNo) != loser) return;
-        fightResult(killer, loser, loser.bot);
+        combos.lose(loser, killer); // 죽은 쪽의 콤보만 끝낸다. 이긴 쪽의 콤보는 그 처치를 낸 히트·튕김이 이미 올렸다(4.25)
         healOnKill(killer, loser); // 처치 회복(4.36)
         endBuffs(loser);
         loser.dead = true;
@@ -793,7 +725,7 @@ public class Room {
         Tuning tu = tuning;
         updateArea(dt);
         double half = currentHalf();
-        if (tick % 20 == 0) { dropSilent(); expireOffline(); maintainBots(tu); expireCombos(); }
+        if (tick % 20 == 0) { dropSilent(); expireOffline(); maintainBots(tu); combos.expire(); }
         thinkBots(tu, half);
         // 이동 단계가 시작되기 직전 위치를 기록한다: 입장·리스폰·직접 위치 변경은 이 앞에서 일어나므로 구슬 먹기 선분에 들어가지 않는다
         for (Member m : members.values()) { m.prevX = m.x; m.prevY = m.y; }
@@ -828,6 +760,7 @@ public class Room {
     // ------------------------------------------------------------ 몬스터(4.35)
 
     double clock() { return clockSeconds; }
+    Outbox outbox() { return outbox; }
     double half() { return currentHalf(); }
     Tuning tuningNow() { return tuning; }
     public Map<String, Double> monsterParams(String code) { return monsterParams.get(code); }
@@ -912,7 +845,7 @@ public class Room {
     /** 몬스터에게 즉사한다(4.35): 키워드는 그대로 두고 죽음(4.31)과 같이 방에서 빠져 구경 목록으로 간다 */
     void monsterKill(Member loser, String by) {
         if (loser.dead || members.get(loser.entityNo) != loser) return;
-        if (loser.combo > 0) { loser.combo = 0; broadcast(comboMessage(loser, "reset")); }
+        combos.reset(loser);
         loser.dead = true;
         members.remove(loser.entityNo);
         byPlayer.remove(loser.playerId);
@@ -1297,13 +1230,14 @@ public class Room {
                     b.x += nx * overlap / 2; b.y += ny * overlap / 2;
                     knock(a, -nx, -ny, 1, tu); knock(b, nx, ny, 1, tu);
                     a.targetX = null; b.targetX = null; // 같이 튕기면 둘 다 목표 해제
+                    combos.bounce(a, b);                // 서로 튕겨 나갔으니 둘 다 콤보를 잃는다(4.25)
                 } else {
                     small.x += sign * nx * overlap; small.y += sign * ny * overlap;
                     knock(small, sign * nx, sign * ny, Math.min(ratio, tu.knockbackCap()), tu); small.targetX = null;
                     pusher = big; pushed = small;
                 }
                 boolean aFlame = isFlame(a), bFlame = isFlame(b); // 이 충돌의 불꽃 여부는 콤보를 고치기 전 값으로 정한다(튕긴 뒤 콤보가 달라져도 판정이 바뀌지 않게)
-                if (pusher != null) knockCombo(pusher, pushed, key); // 튕겨 낸 쪽 콤보 +1, 튕겨 나간 쪽 콤보 0
+                if (pusher != null) combos.knock(pusher, pushed, key); // 튕겨 낸 쪽 콤보 +1, 튕겨 나간 쪽 콤보 0
                 if (hpDuel(a, b, key, aFlame, bFlame)) continue; // 체력이 0이 된 사람이 있으면 죽음이 싸움 결과까지 처리했다(키워드를 두 번 잃지 않는다)
                 if (aFlame != bFlame) {
                     // 불꽃이 붙은 쪽(사람·봇)이 불꽃 없는 쪽과 부딪히면 점수와 상관없이 이기고, 상대는 키워드를 모두 잃는다(4.25)
@@ -1325,10 +1259,9 @@ public class Room {
                         loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                         BotKw lost = botLose(loser, tu); // 봇도 사람처럼 (메모리의) 실제 키워드 하나를 잃는다(4.21)
                         invincible(loser, tu);
-                        comboLose(loser, winner); // 잃으면 봇의 콤보와 불꽃도 사라진다(4.25)
                         // 이긴 사람은 봇이 잃은 바로 그 키워드를 빼앗고, 이긴 쪽이 봇이면 그 키워드가 그 봇의 메모리 목록에 들어간다
                         if (!winner.bot) outbox.requestLoss(this, KeywordLoss.fromBot(KeywordLoss.Cause.FIGHT, loser, winner, lost.id()));
-                        else { botGain(winner, lost.id()); comboWinFight(winner, loser, true); }
+                        else botGain(winner, lost.id());
                     } else if (loser.protectUntil <= clockSeconds && !loser.keywords.isEmpty()) {
                         loser.protectUntil = clockSeconds + tu.loseProtectSeconds();
                         invincible(loser, tu);
@@ -1461,24 +1394,6 @@ public class Room {
         if (aDies) hpKill(a, b);
         if (bDies) hpKill(b, a);
         return aDies || bDies;
-    }
-
-    /** 같은 두 원의 튕김 콤보는 이 시간(초)에 한 번만 센다(겹친 채 곧바로 다시 닿아도 몇 번씩 올리지 않게) */
-    private static final double KNOCK_COMBO_COOLDOWN = 1.0;
-    private final Map<Long, Double> knockComboAt = new HashMap<>();
-
-    /**
-     * 충돌에서 상대를 튕겨 낸 쪽(pusher)은 콤보 +1, 튕겨 나간 쪽(pushed)은 콤보 0(불꽃도 꺼진다)(4.25). 체력 피해·버프에 따라 달라지지 않고 물리가 정한다.
-     * 같은 충돌의 키워드 결과·처치가 또 올리지 않게 pusher가 표시를 남긴다(comboWinFight).
-     */
-    private void knockCombo(Member pusher, Member pushed, long pairKey) {
-        Double last = knockComboAt.get(pairKey);
-        if (last != null && clockSeconds - last < KNOCK_COMBO_COOLDOWN) return;
-        knockComboAt.put(pairKey, clockSeconds);
-        if (knockComboAt.size() > 512) knockComboAt.values().removeIf(t -> clockSeconds - t >= KNOCK_COMBO_COOLDOWN);
-        comboLose(pushed, pusher);
-        comboWin(pusher, pushed.bot);
-        pusher.hpComboFoes.put(pushed, clockSeconds);
     }
 
     // ------------------------------------------------------------ 버프·보호막·광폭화(4.33)
@@ -1726,11 +1641,14 @@ public class Room {
     /** 방 시계(초) */
     double now() { return clockSeconds; }
     /** 방 안의 원(사람·봇, 관전자 제외) */
-    Collection<Member> all() { return members.values(); }
+    /** 방의 원들(복사본). 스킬 히트가 체력을 0으로 만들면 반복 도중 원이 방에서 빠지므로 복사본을 돌린다 */
+    Collection<Member> all() { return new ArrayList<>(members.values()); }
     /** 아직 이 방에 있는 그 원인지(나갔다 다시 들어오면 다른 Member다) */
     boolean inRoom(Member m) { return members.get(m.entityNo) == m; }
     /** 방에 있고 살아 있는지 */
     boolean present(Member m) { return inRoom(m) && !m.dead; }
+    /** 지금 가진 키워드 수(봇은 방 메모리의 것). 스킬이 실제로 잃게 할 수 있는 개수를 알 때 쓴다 */
+    int keywordCount(Member m) { return m.bot ? m.botKeywords.size() : m.keywords.size(); }
     /** 본인에게만 보낸다(봇에게는 보내지 않는다) */
     void tell(Member m, Map<String, Object> msg) { if (!m.bot) outbox.sendText(m, msg); }
     StatusEffects status() { return status; }
@@ -1767,32 +1685,65 @@ public class Room {
     private boolean held(Member m) { return m.hookedBy != null || status.stunned(m); }
 
     /**
-     * 공격 스킬의 히트 하나(4.25, 4.33). 스킬로 키워드를 잃게 하는 길은 모두 여기를 지난다(갈고리·독·화염구·충격파·흡수).
-     * - 콤보: 맞힌 사람(attacker)은 +1, 맞은 사람(victim)은 0이 된다(불꽃도 꺼진다). 맞은 사람에게 **잃을 키워드가 없어도** 똑같다. 맞힌 사람이 방에 없으면(나감·죽음) 맞은 쪽만 끊긴다.
-     * - 키워드: count개를 잃는다. 갈고리·흡수는 맞힌 사람이 빼앗고, 독·화염구·충격파는 아무도 가져가지 않는다(KeywordLoss.Cause가 정한다, skillCode는 스킬 코드).
-     * 잃은 뒤 무적은 주지 않는다(주는 스킬은 스스로 준다: 갈고리는 끌려온 뒤에). 실제로 키워드를 잃게 되면 true(사람은 DB가 틱 밖에서 처리하므로 가진 것이 있는지로 본다).
+     * 스킬 히트 하나(4.25, 4.33). 스킬이 사람을 맞히는 길은 모두 여기를 지난다(쇠창살·슬로우·암흑·침묵·스턴·혼란·독·화염구·충격파·흡수 + 장판·터지는 총알).
+     * 한 번의 히트는 세 가지를 같은 순서로 한다. 각 단계의 규칙은 아래 메서드가 맡는다.
+     *  1) 콤보(Combos.hit): 맞힌 쪽 +1, 맞은 쪽 0. 히트 하나에 한 번뿐이고 2)·3)이 따로 올리지 않는다.
+     *  2) 체력 피해(skillDamage): 몸싸움 피해의 skill_hit_damage_percent%, 모든 스킬 같음. 이 피해로 죽으면 키워드는 죽음 규칙만 적용하고 3)은 하지 않는다.
+     *  3) 키워드 잃기(skillKeywordLoss): 히트 하나에 count개(충격파만 설정 quake_drop_keywords, 나머지는 1). 쇠창살·흡수는 맞힌 사람이 그 키워드를 빼앗고
+     *     나머지는 아무도 가져가지 않는다(KeywordLoss.Cause가 정한다, skillCode는 스킬 코드).
+     * 잃은 뒤 무적은 주지 않는다(무적은 몸싸움에서 잃었을 때만 자동으로 붙는다). 실제로 키워드를 잃게 되면 true(사람은 DB가 틱 밖에서 처리하므로 가진 것이 있는지로 본다).
      */
     boolean skillHit(Member attacker, Member victim, String skillCode, int count) {
-        KeywordLoss.Cause cause = KeywordLoss.Cause.ofSkill(skillCode);
-        boolean steal = cause.way == KeywordLoss.Way.STEAL; // 갈고리·흡수는 빼앗고, 독·충격파·화염구는 떨군다
+        combos.hit(attacker, victim);
         boolean live = attacker != null && present(attacker);
-        comboLose(victim, attacker);
-        if (live) comboWin(attacker, victim.bot);
+        if (live && skillDamage(attacker, victim)) return false;
+        return skillKeywordLoss(KeywordLoss.Cause.ofSkill(skillCode), live ? attacker : null, victim, count);
+    }
+
+    /** 히트의 키워드 잃기: victim이 count개를 잃고, 원인이 빼앗는 스킬이면(by가 사람) 맞힌 사람이 그 키워드를 가져간다. by가 null이면(맞힌 사람이 나감·죽음) 떨구기와 같다 */
+    private boolean skillKeywordLoss(KeywordLoss.Cause cause, Member by, Member victim, int count) {
+        boolean steal = cause.way == KeywordLoss.Way.STEAL;
         if (victim.bot) {
             boolean lost = false;
             for (int i = 0; i < count && !victim.botKeywords.isEmpty(); i++) {
                 BotKw kw = botLose(victim, tuning);
                 lost = true;
-                if (steal && live && !attacker.bot) outbox.requestLoss(this, KeywordLoss.fromBot(cause, victim, attacker, kw.id()));
+                if (steal && by != null && !by.bot) outbox.requestLoss(this, KeywordLoss.fromBot(cause, victim, by, kw.id()));
             }
             return lost;
         }
         boolean has = !victim.keywords.isEmpty();
-        // 빼앗는 스킬은 하나씩, 떨구는 스킬은 count개를 한 번에(알림 하나). 빼앗을 사람이 없으면(나감·죽음) 떨구기와 같다(KeywordLoss의 by가 null).
-        // 가진 것이 없으면 틱 밖에서 아무 일도 없다(방의 목록이 잠깐 늦을 수 있어 떨구기는 그대로 맡긴다)
-        if (steal) { if (has) for (int i = 0; i < count; i++) outbox.requestLoss(this, KeywordLoss.skill(cause, victim, live ? attacker : null, 1)); }
-        else outbox.requestLoss(this, KeywordLoss.skill(cause, victim, attacker, count));
+        // 빼앗는 스킬은 하나씩, 떨구는 스킬은 count개를 한 번에(알림 하나). 가진 것이 없으면 빼앗기는 아무 일도 없고, 떨구기는 DB에 맡긴다(방의 목록이 잠깐 늦을 수 있다)
+        if (steal) { if (has) for (int i = 0; i < count; i++) outbox.requestLoss(this, KeywordLoss.skill(cause, victim, by, 1)); }
+        else outbox.requestLoss(this, KeywordLoss.skill(cause, victim, by, count));
         return has;
+    }
+
+    /**
+     * 충돌에서 victim이 튕겨 나가는 세기(knock의 strength)를 from과 부딪혔다고 보고 구한다: 두 원의 크기 비율이 big_ratio보다 작으면 둘 다 1,
+     * 그 이상이면 작은 쪽만 min(비율, knockback_cap)이고 큰 쪽은 밀리지 않는다(0). 터지는 총알이 터질 때 이 값을 그대로 쓴다.
+     */
+    double collisionKnock(Member from, Member victim) {
+        double big = Math.max(from.displayRadius, victim.displayRadius), small = Math.max(1e-6, Math.min(from.displayRadius, victim.displayRadius));
+        double ratio = big / small;
+        if (ratio < tuning.bigRatio()) return 1;
+        return victim.displayRadius < from.displayRadius ? Math.min(ratio, tuning.knockbackCap()) : 0;
+    }
+
+    /**
+     * 스킬 히트의 체력 피해: 히트 하나에 한 번, **몸싸움이 계산하는 피해(hpDamage)의 skill_hit_damage_percent%**(기본 10%)다. 모든 스킬이 같은 식이다.
+     * 공격 증폭 → 피해 감소 → 보호막 순서는 몸싸움과 같다. 이 피해로 죽었으면 true. 체력 방식이 꺼져 있거나 피해가 0이면 아무 일도 없다.
+     */
+    boolean skillDamage(Member att, Member vic) {
+        double pct = skillConfig.param("skill_hit_damage_percent");
+        if (!hpTuning.enabled() || vic.dead || pct <= 0) return false;
+        double total = modifyDamage(att, vic, round2(hpDamage(att, vic) * pct / 100.0));
+        if (total <= 0) return false;
+        boolean dies = round2(vic.hp - Math.max(0, total - barrierPoints(vic))) <= 0;
+        hurt(vic, att, total, dies);
+        if (!dies) return false;
+        hpKill(vic, att);
+        return true;
     }
 
     /**
@@ -1829,7 +1780,7 @@ public class Room {
     }
 
     /** 콤보 불꽃이 붙었는지(사람과 봇 모두, 4.25) */
-    boolean isFlame(Member m) { return m.combo >= comboTuning.flameAt(); }
+    boolean isFlame(Member m) { return combos.flame(m); }
 
     /** 키워드를 잃은 원은 잠깐 무적이다(4.3). 모두의 화면에 그 원의 보호막과 카운트다운이 보이게 알린다. */
     void invincible(Member m, Tuning tu) {
@@ -2178,7 +2129,6 @@ public class Room {
         botRecompute(cold, tu);
         cold.protectUntil = clockSeconds + tu.loseProtectSeconds();
         invincible(cold, tu);
-        fightResult(hot, cold, true);
         dropPrizeOrbs(cold, count); // 봇의 키워드는 모두 🔥로 본다
         if (!hot.bot) {
             outbox.sendText(hot, LossMessages.hit(KeywordLoss.Cause.FLAME, cold.nickname, count, score));

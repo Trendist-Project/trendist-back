@@ -3,6 +3,7 @@ package com.trendist.game.room;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 투사체(4.33): 독·암흑·슬로우·스턴. 내 원 가장자리에서 겨눈 방향으로 날아가고(논타겟) 처음 닿은 원 하나가 맞아 그 상태 효과(StatusEffects)에 걸린다.
@@ -21,10 +22,14 @@ final class BoltSkill implements PlayerSkill {
     }
 
     private final Room room;
+    private final BoltKind kind;
     private final String code;
     private final List<Bolt> bolts = new ArrayList<>();
+    /** 터지는 총알(burst)에 맞아 곧 터질 원: 맞은 원, 쏜 사람, 터질 시각 */
+    private record Fuse(Room.Member victim, Room.Member owner, double at) {}
+    private final List<Fuse> fuses = new ArrayList<>();
 
-    BoltSkill(Room room, String code) { this.room = room; this.code = code; }
+    BoltSkill(Room room, BoltKind kind) { this.room = room; this.kind = kind; this.code = kind.code; }
 
     public String code() { return code; }
     public boolean offensive() { return true; }
@@ -45,8 +50,37 @@ final class BoltSkill implements PlayerSkill {
         return true;
     }
 
+    /** 터지는 총알에 맞은 원에 도화선을 단다(같은 원에 다시 맞으면 새로 단다) */
+    private void armFuse(Room.Member owner, Room.Member victim) {
+        double fuse = room.skillConfig().param("burst_fuse_seconds");
+        fuses.removeIf(f -> f.victim() == victim);
+        fuses.add(new Fuse(victim, owner, room.now() + fuse));
+        room.broadcast(SkillFx.burstFuse(victim.entityNo, SkillFx.ms(fuse)));
+    }
+
+    /** 터지는 총알: 맞은 원이 burst_fuse_seconds 뒤에 터진다. 터질 때 맞힐 수 있는 상태면 두 번째 히트(체력 피해 burst_explode_damage_percent)를 주고 무작위 방향으로 튕겨 낸다 */
+    private void explodeDue() {
+        for (Iterator<Fuse> it = fuses.iterator(); it.hasNext(); ) {
+            Fuse f = it.next();
+            if (!room.present(f.victim())) { it.remove(); continue; }
+            if (room.now() + 1e-9 < f.at()) continue;
+            it.remove();
+            Room.Member v = f.victim();
+            if (!room.targetable(f.owner(), v)) continue; // 세이프존·무적이 되었으면 불발
+            room.broadcast(SkillFx.burstBoom(v.entityNo, v.x, v.y));
+            room.skillHit(f.owner(), v, "burst", 1);
+            if (!room.present(v)) continue; // 두 번째 히트로 죽었다
+            double strength = room.collisionKnock(f.owner(), v); // 충돌의 튕김과 같은 세기
+            if (strength <= 0) continue;
+            double a = ThreadLocalRandom.current().nextDouble(Math.PI * 2);
+            room.knockFrom(v, Math.cos(a), Math.sin(a), strength, room.tuning());
+            v.targetX = null;
+        }
+    }
+
     /** 투사체를 한 틱 나아가게 하고, 지난 선분에 처음 닿은 원이 있으면 맞힌다 */
     public void update(double dt) {
+        if (!fuses.isEmpty()) explodeDue();
         for (Iterator<Bolt> it = bolts.iterator(); it.hasNext(); ) {
             Bolt b = it.next();
             Room.Member o = b.owner;
@@ -62,7 +96,12 @@ final class BoltSkill implements PlayerSkill {
             if (best != null) {
                 it.remove();
                 room.broadcast(SkillFx.boltHit(b.id, best.entityNo, b.x + (nx - b.x) * bestT, b.y + (ny - b.y) * bestT));
-                room.status().applyBolt(code, best, o);
+                // 맞히면 히트 하나(콤보 +1, 체력 피해, 키워드 1개 잃기)인 종류는 먼저 히트를 주고, 그 히트로 죽었으면 효과를 걸지 않는다
+                if (kind.hitsOnImpact) room.skillHit(o, best, code, 1);
+                if (room.present(best)) {
+                    if (kind == BoltKind.BURST) armFuse(o, best);  // 터지는 총알: 상태 효과 대신 도화선을 단다
+                    else room.status().applyBolt(code, best, o);
+                }
                 continue;
             }
             b.x = nx; b.y = ny; b.left -= step;

@@ -93,6 +93,11 @@ public final class SettingKeys {
     public static final String QUAKE_DROP_KEYWORDS = "quake_drop_keywords";
     public static final String ABSORB_SECONDS = "absorb_seconds";
     public static final String ABSORB_TICK_SECONDS = "absorb_tick_seconds";
+    public static final String ZONE_REACH_PX = "zone_reach_px";
+    public static final String ZONE_SECONDS = "zone_seconds";
+    public static final String ZONE_TICK_SECONDS = "zone_tick_seconds";
+    public static final String BURST_FUSE_SECONDS = "burst_fuse_seconds";
+    public static final String SKILL_HIT_DAMAGE_PERCENT = "skill_hit_damage_percent";
     public static final String DAILY_RESET_HOUR = "daily_reset_hour";
     public static final String DAILY_RESET_MINUTE = "daily_reset_minute";
     public static final String WHEEL_ENABLED = "wheel_enabled";
@@ -219,9 +224,14 @@ public final class SettingKeys {
             new Def(BERSERK_MIN_HP_PERCENT, "1", 1, 50, "광폭화로 체력이 이 % 아래로 내려가면 더 깎이기 전에 자동으로 꺼진다"),
             new Def(FIREBALL_COUNT, "3", 1, 10, "화염구 한 번에 던지는 발 수(한 발에 키워드 1개, 반드시 맞는다)"),
             new Def(FIREBALL_INTERVAL_SECONDS, "0.15", 0, 2, "화염구 한 발과 다음 발 사이의 간격"),
-            new Def(QUAKE_DROP_KEYWORDS, "3", 1, 20, "충격파에 닿은 원이 잃는 키워드 수(아무도 가져가지 않는다)"),
+            new Def(QUAKE_DROP_KEYWORDS, "1", 1, 20, "충격파에 닿은 원이 잃는 키워드 수(아무도 가져가지 않는다)"),
             new Def(ABSORB_SECONDS, "3", 0.5, 30, "흡수 선이 이어지는 시간(쓰는 순간 1개, 그 뒤 빼앗는 간격마다 1개를 빼앗는다)"),
             new Def(ABSORB_TICK_SECONDS, "1", 0.1, 10, "흡수가 키워드를 하나씩 빼앗는 간격(원마다 빼앗는 수 = 유지 시간 ÷ 간격, 기본 3개)"),
+            new Def(ZONE_REACH_PX, "300", 50, 2000, "장판의 범위(쓴 원의 가장자리에서 화면 기준 px). 쓴 원을 따라다니고, 쓴 순간의 원 크기로 정한 반지름이 유지된다"),
+            new Def(ZONE_SECONDS, "3", 0.5, 30, "장판이 남아 있는 시간"),
+            new Def(ZONE_TICK_SECONDS, "1", 0.1, 10, "장판 위의 원이 피해를 입는 간격(쓰자마자 0초부터 한 번씩. 기본은 0·1·2초에 세 번)"),
+            new Def(BURST_FUSE_SECONDS, "2", 0.2, 30, "터지는 총알에 맞은 원이 터질 때까지의 시간"),
+            new Def(SKILL_HIT_DAMAGE_PERCENT, "10", 0, 100, "스킬 히트 하나가 주는 체력 피해: 몸싸움이 계산하는 피해(내 유행도 ÷ (내 유행도 + 상대 유행도), 불꽃이면 배수)의 몇 %인가. 모든 스킬이 같은 값이고 히트 하나에 한 번 입힌다(독은 틱마다, 화염구는 발마다, 장판은 틱마다, 터지는 총알은 맞을 때와 터질 때). 0이면 피해 없이 콤보만 쌓인다"),
             new Def(DAILY_RESET_HOUR, "0", 0, 23, "하루에 한 번 제한(돌림판·인기도·신고)이 초기화되는 시각의 시(나라 시간대 기준). 0이면 자정(00:00)에 초기화"),
             new Def(DAILY_RESET_MINUTE, "0", 0, 59, "하루에 한 번 제한이 초기화되는 시각의 분(위 시와 함께 00:00이 기본)"),
             new Def(WHEEL_UNLOCK_LEVEL, "10", 1, 100, "돌림판을 쓸 수 있는 레벨(이 레벨부터 돌릴 수 있다)"),
@@ -296,6 +306,9 @@ public final class SettingKeys {
                 SLOW_SECONDS, SLOW_PERCENT, SLOW_MAX_STACKS, STUN_SECONDS,                  // 슬로우·스턴
                 FIREBALL_COUNT, FIREBALL_INTERVAL_SECONDS, QUAKE_DROP_KEYWORDS,                   // 화염구·충격파
                 ABSORB_SECONDS, ABSORB_TICK_SECONDS,                                        // 흡수
+                ZONE_REACH_PX, ZONE_SECONDS, ZONE_TICK_SECONDS,                                                          // 장판
+                BURST_FUSE_SECONDS,                                                                                        // 터지는 총알
+                SKILL_HIT_DAMAGE_PERCENT,                                                                                  // 스킬 히트의 체력 피해(모든 스킬 공통)
                 ROOT_SECONDS, SILENCE_SECONDS, CONFUSE_SECONDS,                             // 속박·침묵·혼란
                 AMPLIFY_SECONDS, AMPLIFY_MULTIPLIER, FORTIFY_SECONDS, FORTIFY_PERCENT,      // 공격 증폭·피해 감소
                 BARRIER_SECONDS, BARRIER_HP_PERCENT,                                        // 보호막
@@ -330,19 +343,19 @@ public final class SettingKeys {
     private static final java.util.Map<String, String> UNIT_OF = new java.util.HashMap<>();
     private static void unit(String unit, String... names) { for (String n : names) UNIT_OF.put(n, unit); }
     static {
-        unit("초", OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
+        unit("초", ZONE_SECONDS, ZONE_TICK_SECONDS, BURST_FUSE_SECONDS, OFFLINE_KEEP_SECONDS, KNOCKBACK_SECONDS, KNOCKBACK_DISTANCE, LOSE_PROTECT_SECONDS,
                 ORB_SPAWN_SECONDS, SAFE_ZONE_SECONDS, DASH_SECONDS, COMBO_MAX_SECONDS,
                 HOOK_SECONDS, HOOK_PULL_SECONDS, INVINCIBILITY_SECONDS, STEALTH_SECONDS, HP_HIT_SECONDS,
                 POISON_TICK_SECONDS, DARKNESS_SECONDS, CLEANSE_IMMUNE_SECONDS, SLOW_SECONDS, STUN_SECONDS, FIREBALL_INTERVAL_SECONDS,
                 ABSORB_SECONDS, ABSORB_TICK_SECONDS, ROOT_SECONDS, SILENCE_SECONDS, CONFUSE_SECONDS, AMPLIFY_SECONDS, FORTIFY_SECONDS, BARRIER_SECONDS);
-        unit("분", NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES, DAILY_RESET_MINUTE);
+        unit("분", WHEEL_COOLDOWN_MINUTES, NICKNAME_CHANGE_MINUTES, ART_CHANGE_MINUTES, DAILY_RESET_MINUTE);
         unit("시", DAILY_RESET_HOUR);
         unit("시간", PLUS_TTL_HOURS, EXTERNAL_HOLD_HOURS);
-        unit("px", HOOK_REACH_PX, BOLT_REACH_PX, REPEL_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
+        unit("px", ZONE_REACH_PX, HOOK_REACH_PX, BOLT_REACH_PX, REPEL_REACH_PX, WORLD_SIZE, MIN_RADIUS, EAT_MIN_REACH, MAX_RADIUS, SAFE_CENTER_MIN, SAFE_ZONE_MIN);
         unit("px/s", MAX_SPEED, AREA_GROW_SPEED, AREA_SHRINK_SPEED);
         unit("배", VIEW_RANGE_MULTIPLIER, AMPLIFY_MULTIPLIER, HP_FLAME_MULTIPLIER, BIG_RATIO, KNOCKBACK_CAP, BOT_CAP_RATIO, DASH_SPEED_MULTIPLIER, REPEL_SPEED_MULTIPLIER,
                 REPEL_KNOCKBACK);
-        unit("%", FORTIFY_PERCENT, BARRIER_HP_PERCENT, BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT, SKILL_HEAL_PERCENT, SLOW_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
+        unit("%", SKILL_HIT_DAMAGE_PERCENT, FORTIFY_PERCENT, BARRIER_HP_PERCENT, BERSERK_DRAIN_PERCENT, BERSERK_MIN_HP_PERCENT, SKILL_HEAL_PERCENT, SLOW_PERCENT, ORB_SPAWN_PERCENT, ORB_ACTIVE_PERCENT, HP_SAFE_REGEN_PERCENT, HP_KILL_HEAL_PERCENT, DEATH_LOSE_PERCENT, FLAME_HIT_LOSE_PERCENT);
         unit("명", TREND_MIN_POPULATION, ACTIVATE_HOLDERS, BOT_PLAYERS, BOT_MIN_PLAYERS, RANK_TITLE_MIN_PLAYERS);
         unit("개", ORB_MAX, SAFE_ZONE_MAX, AI_COMMENT_BATCH_SIZE, FIREBALL_COUNT, QUAKE_DROP_KEYWORDS);
         unit("겹", POISON_MAX_STACKS, SLOW_MAX_STACKS);

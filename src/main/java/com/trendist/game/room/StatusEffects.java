@@ -196,7 +196,7 @@ final class StatusEffects {
             if (p != null && p.stacks > 0) {
                 if (m.dead) clear(m, Kind.POISON);
                 else if (room.now() + 1e-9 >= p.nextAt) {
-                    room.skillHit(p.owner, m, "poison", p.stacks); // 틱마다 히트 한 번, 겹 수만큼 잃는다
+                    room.skillHit(p.owner, m, "poison", 1); // 틱마다 히트 한 번, 키워드 1개(겹 수와 상관없이)
                     p.ticksLeft--;
                     p.nextAt += c.param("poison_tick_seconds");
                     if (p.ticksLeft <= 0) clear(m, Kind.POISON);
