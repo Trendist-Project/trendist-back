@@ -631,13 +631,14 @@ class RoomTest {
 
     @Test
     void dashSpeedsUpForSetTimeThenCoolsDown() {
-        // 4.27: 움직이는 중에 쓰면 3초 동안 최대 속도 2배, 쓴 때부터 30초가 지나야 다시 쓴다. 가만히 있으면 쓸 수 없고 쿨타임도 쓰지 않는다
+        // 4.27: 쓰면 3초 동안 최대 속도 2배, 쓴 때부터 30초가 지나야 다시 쓴다. 가만히 있을 때도 쓸 수 있다(그때부터 움직이면 빠르다)
         Out out = new Out();
         Room r = new Room(1, T, out);
         Room.Member a = r.join(1, "s1", "a", 1, 0, List.of());
         a.x = 0; a.y = 0;
-        r.dash(a);
-        assertThat(out.texts).noneMatch(m -> "dash".equals(m.get("type"))); // 정지 상태
+        r.dash(a); // 정지 상태에서 시작
+        assertThat(out.texts).anyMatch(m -> "dash".equals(m.get("type")));
+        a.dashUntil = 0; a.dashReadyAt = 0; out.texts.clear(); // 다시 처음부터
         r.setInput(a, 1, 0);
         for (int i = 0; i < 20; i++) r.tick();
         assertThat(a.vx).isGreaterThan(230).isLessThan(250); // 평소 240
@@ -1572,7 +1573,7 @@ class RoomTest {
         r.skill(a, "stealth", 0, 0);                           // 은신도 아직(25)
         assertThat(count(out, "skill", "hook")).isZero();
         assertThat(count(out, "skill", "stealth")).isZero();
-        r.dash(a);                                             // 대시는 기본 스킬(레벨 제한 없음): 움직이는 중이 아니라 효과는 없지만 막히지는 않는다
+        r.dash(a);                                             // 대시는 기본 스킬(레벨 제한 없음): 막히지 않는다
         assertThat(out.texts.stream().noneMatch(m -> "skillFail".equals(m.get("type")) && "dash".equals(m.get("id")))).isTrue();
     }
 

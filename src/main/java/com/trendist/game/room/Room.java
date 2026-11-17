@@ -1542,16 +1542,15 @@ public class Room {
     }
 
     /**
-     * 대시(4.27): 쿨타임이 지났고 움직이려는 중이면 시작한다. 시작하면 본인에게 {dash: 지속 ms, 쿨타임 ms, 배수}를 알려
-     * 클라이언트 예측이 같은 속도로 가게 하고, 모두에게 {dashFx: 원 번호, 지속 ms}를 보내 그 원에 강조 효과를 그리게 한다. 아니면 아무 일도 없다(쿨타임도 쓰지 않는다).
+     * 대시(4.27): 쿨타임이 지났으면 가만히 있을 때도 시작한다. 시작하면 본인에게 {dash: 지속 ms, 쿨타임 ms, 배수}를 알려
+     * 클라이언트 예측이 같은 속도로 가게 하고, 모두에게 {dashFx: 원 번호, 지속 ms}를 보내 그 원에 강조 효과를 그리게 한다. 쿨타임 중이거나 쓸 수 없으면 아무 일도 없다.
      */
     public void dash(Member m) {
         if (m.bot || members.get(m.entityNo) != m || held(m) || status.rooted(m) || disabledSkills.contains("dash")) return; // 끌려오는 동안·속박 중에는 쓸 수 없다(4.33)
         DashTuning d = dashTuning;
         if (clockSeconds < m.dashReadyAt) return;
         if (!unlocked(m, "dash")) return;
-        boolean moving = m.dirX != 0 || m.dirY != 0 || m.targetX != null;
-        if (!moving || d.seconds() <= 0 || d.multiplier() <= 1) return;
+        if (d.seconds() <= 0 || d.multiplier() <= 1) return; // 가만히 있을 때도 쓴다(대시 시간 동안 움직이면 빠르다)
         m.dashUntil = clockSeconds + d.seconds();
         m.dashReadyAt = clockSeconds + Math.max(d.seconds(), d.cooldownSeconds());
         outbox.sendText(m, RoomMessages.dash(SkillFx.ms(d.seconds()), SkillFx.ms(Math.max(d.seconds(), d.cooldownSeconds())), d.multiplier()));
