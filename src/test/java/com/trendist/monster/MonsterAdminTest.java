@@ -78,11 +78,19 @@ class MonsterAdminTest {
         assertThat(live).isEqualTo("[]");
         String hist = "";
         for (int i = 0; i < 40; i++) {
-            hist = body(a, "/api/admin/monsters/spawns?limit=5");
+            hist = body(a, "/api/admin/monsters/spawns?code=elder_turtle&page=0&size=10");
             if (hist.contains("\"REMOVED\"")) break;
             Thread.sleep(100);
         }
         assertThat(hist).contains("\"REMOVED\"").contains("\"ADMIN\"");
+        // 페이지 단위(10개씩, 종류별): 총 개수와 쪽 수가 나오고, 없는 종류·범위 밖 쪽은 빈 목록
+        String pg = body(a, "/api/admin/monsters/spawns?code=elder_turtle&page=0&size=10");
+        assertThat((Integer) JsonPath.read(pg, "$.size")).isEqualTo(10);
+        assertThat(((Number) JsonPath.read(pg, "$.total")).longValue()).isGreaterThanOrEqualTo(1L);
+        assertThat((Integer) JsonPath.read(pg, "$.totalPages")).isGreaterThanOrEqualTo(1);
+        assertThat((String) JsonPath.read(pg, "$.items[0].code")).isEqualTo("elder_turtle");
+        assertThat((Integer) JsonPath.read(body(a, "/api/admin/monsters/spawns?code=nope&page=0"), "$.items.length()")).isEqualTo(0);
+        assertThat((Integer) JsonPath.read(body(a, "/api/admin/monsters/spawns?code=elder_turtle&page=9999"), "$.items.length()")).isEqualTo(0);
         mvc.perform(post("/api/admin/monsters/999999/end?country=KR").header("Authorization", a)).andExpect(status().isNotFound());
     }
 }

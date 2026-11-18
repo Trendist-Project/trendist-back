@@ -45,6 +45,7 @@ public class AdminMonsterController {
     public record TypeItem(String code, String name, String nameEn, String kind, String behavior, String image, boolean enabled, List<SettingItem> settings) {}
     public record SettingUpdate(Double value) {}
     public record EnabledUpdate(Boolean enabled) {}
+    public record SpawnPage(List<SpawnItem> items, int page, int size, long total, int totalPages) {}
     public record SpawnItem(Long id, String code, String name, String country, String source, String status, Instant startedAt, Instant endedAt,
                             long maxHp, long finalHp, int humans, long avgScore, long topScore, int participants, long topDamage) {}
 
@@ -114,20 +115,28 @@ public class AdminMonsterController {
         return Map.of("ok", true);
     }
 
+    /** 등장 기록(페이지 단위, 최신순). code가 있으면 그 종류만, 없으면 전부. size 기본 10 */
     @GetMapping("/spawns")
     @Transactional(readOnly = true)
-    public List<SpawnItem> history(@RequestParam(defaultValue = "30") int limit) {
+    public SpawnPage history(@RequestParam(required = false) String code, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         Map<Long, MonsterType> byId = new java.util.HashMap<>();
         types.findAll().forEach(t -> byId.put(t.getId(), t));
         Map<Long, String> codes = new java.util.HashMap<>();
         countries.findAll().forEach(c -> codes.put(c.getId(), c.getCode()));
+        PageRequest req = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(100, size)), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
+        org.springframework.data.domain.Page<MonsterSpawn> found;
+        if (code == null || code.isBlank()) found = spawns.findAll(req);
+        else {
+            MonsterType t = types.findByCode(code).orElse(null);
+            found = t == null ? org.springframework.data.domain.Page.empty(req) : spawns.findByMonsterTypeId(t.getId(), req);
+        }
         List<SpawnItem> out = new ArrayList<>();
-        for (MonsterSpawn s : spawns.findAllByOrderByIdDesc(PageRequest.of(0, Math.max(1, Math.min(200, limit))))) {
+        for (MonsterSpawn s : found.getContent()) {
             MonsterType t = byId.get(s.getMonsterTypeId());
             out.add(new SpawnItem(s.getId(), t == null ? "?" : t.getCode(), t == null ? "?" : t.getName(), codes.getOrDefault(s.getCountryId(), "?"), s.getSource(), s.getStatus(),
                     s.getStartedAt(), s.getEndedAt(), s.getMaxHp(), s.getFinalHp(), s.getHumans(), s.getAvgScore(), s.getTopScore(), s.getParticipants(), s.getTopDamage()));
         }
-        return out;
+        return new SpawnPage(out, found.getNumber(), found.getSize(), found.getTotalElements(), found.getTotalPages());
     }
 
     private static SettingItem item(MonsterSetting s) {
