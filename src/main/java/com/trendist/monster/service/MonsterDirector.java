@@ -8,16 +8,21 @@ import com.trendist.game.service.RoomManager;
 import com.trendist.monster.repository.MonsterSpawnRepository;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 몬스터 등장 스케줄(4.35): 1초마다 켜진 몬스터 종류와 나라(방)마다 "지금이 등장할 때인가"를 본다.
+ * 몬스터 등장 스케줄(4.35): 1초마다 켜진 보스 묶음(같은 주기·오프셋)과 나라(방)마다 "지금이 등장할 때인가"를 본다. 묶음 안에서는 시간대마다 한 마리만 무작위로 나온다.
  * 주기(interval_minutes)의 정각(offset_minutes 만큼 뒤)에 나오고, 나오기 announce_seconds 전에 예고하며, 접속한 사람이 min_players보다 적으면 그 시간은 건너뛴다.
  * 같은 시간대에 두 번 나오지 않게 DB 기록(monster_spawns)을 본다. 관리자가 즉시 소환·제거할 때도 이 클래스를 거친다.
  */
@@ -47,34 +52,68 @@ public class MonsterDirector {
     public void tick() {
         try {
             long now = System.currentTimeMillis() / 1000;
-            for (MonsterCatalog.Entry e : catalog.enabled()) {
-                if (!"BOSS".equals(e.type().getKind())) continue;
-                for (Room room : rooms.rooms()) schedule(e, room, now);
-            }
+            Map<String, List<MonsterCatalog.Entry>> groups = groups();
+            for (List<MonsterCatalog.Entry> group : groups.values())
+                for (Room room : rooms.rooms()) schedule(group, room, now);
             if (handled.size() > 200) handled.clear();
             if (alerted.size() > 200) alerted.clear();
         } catch (RuntimeException e) { log.warn("monster director failed", e); }
     }
 
-    private void schedule(MonsterCatalog.Entry e, Room room, long now) {
-        Map<String, Double> p = e.params();
-        long interval = Math.max(1, Math.round(p.getOrDefault("interval_minutes", 60.0))) * 60;
-        long offset = Math.round(p.getOrDefault("offset_minutes", 0.0)) * 60;
+    /**
+     * 같은 시각(같은 주기·오프셋)에 나오는 켜진 보스끼리 한 묶음이다. 그 시각이 되면 묶음 안에서 한 마리만 무작위로(`spawn_weight` 비중) 뽑아 낸다.
+     * 비중이 0이거나 정기 등장이 꺼진 보스는 뽑히지 않는다. 묶음 안은 코드 순서로 고정해 같은 시각에는 같은 결과가 나오게 한다.
+     */
+    private Map<String, List<MonsterCatalog.Entry>> groups() {
+        Map<String, List<MonsterCatalog.Entry>> m = new TreeMap<>();
+        for (MonsterCatalog.Entry e : catalog.enabled()) {
+            if (!"BOSS".equals(e.type().getKind()) || e.params().getOrDefault("spawn_weight", 1.0) <= 0) continue;
+            long interval = Math.max(1, Math.round(e.params().getOrDefault("interval_minutes", 60.0))), offset = Math.round(e.params().getOrDefault("offset_minutes", 0.0));
+            m.computeIfAbsent(interval + ":" + offset, k -> new ArrayList<>()).add(e);
+        }
+        for (List<MonsterCatalog.Entry> g : m.values()) g.sort(Comparator.comparing(e -> e.type().getCode()));
+        return m;
+    }
+
+    /** 그 시간대(slotStart, 초)에 이 방에서 나올 보스: 시간대와 나라로 정한 난수로 비중에 따라 하나를 고른다(예고와 등장, 서버를 다시 켠 뒤에도 같은 결과) */
+    static MonsterCatalog.Entry pick(List<MonsterCatalog.Entry> group, long countryId, long slotStart) {
+        if (group.size() == 1) return group.get(0);
+        double total = 0;
+        for (MonsterCatalog.Entry e : group) total += Math.max(0, e.params().getOrDefault("spawn_weight", 1.0));
+        double roll = new Random(slotStart * 1_000_003L + countryId * 7919L).nextDouble() * total;
+        for (MonsterCatalog.Entry e : group) {
+            roll -= Math.max(0, e.params().getOrDefault("spawn_weight", 1.0));
+            if (roll < 0) return e;
+        }
+        return group.get(group.size() - 1);
+    }
+
+    private void schedule(List<MonsterCatalog.Entry> group, Room room, long now) {
+        Map<String, Double> p0 = group.get(0).params();
+        long interval = Math.max(1, Math.round(p0.getOrDefault("interval_minutes", 60.0))) * 60;
+        long offset = Math.round(p0.getOrDefault("offset_minutes", 0.0)) * 60;
         long slot = Math.floorDiv(now - offset, interval) * interval + offset; // 지금이 속한 시간대의 시작(초)
-        String code = e.type().getCode();
-        // 예고: 다음 시간대가 announce_seconds 안에 다가왔고 사람이 충분하면 한 번만
-        long announce = Math.round(p.getOrDefault("announce_seconds", 60.0)), next = slot + interval;
-        String alertKey = code + ":" + room.countryId() + ":" + next;
-        if (announce > 0 && next - now <= announce && !alerted.contains(alertKey) && !active(room, code)
-                && room.size() >= p.getOrDefault("min_players", 1.0)) {
+        // 예고: 다음 시간대가 announce_seconds 안에 다가왔고 사람이 충분하면 한 번만(나올 보스를 미리 정해 그 이름으로 알린다)
+        long next = slot + interval;
+        MonsterCatalog.Entry nextBoss = pick(group, room.countryId(), next);
+        Map<String, Double> pn = nextBoss.params();
+        long announce = Math.round(pn.getOrDefault("announce_seconds", 60.0));
+        String alertKey = nextBoss.type().getCode() + ":" + room.countryId() + ":" + next;
+        if (announce > 0 && next - now <= announce && !alerted.contains(alertKey) && !active(room, nextBoss.type().getCode())
+                && room.size() >= pn.getOrDefault("min_players", 1.0)) {
             alerted.add(alertKey);
-            room.submit(r -> r.announce(Map.of("type", "monsterAlert", "name", e.type().getName(), "en", String.valueOf(e.type().getNameEn()), "seconds", next - System.currentTimeMillis() / 1000)));
+            room.submit(r -> r.announce(Map.of("type", "monsterAlert", "name", nextBoss.type().getName(), "en", String.valueOf(nextBoss.type().getNameEn()), "seconds", next - System.currentTimeMillis() / 1000)));
         }
         // 등장: 시간대가 시작한 뒤 grace_seconds 안일 때만
-        String key = code + ":" + room.countryId() + ":" + slot;
+        MonsterCatalog.Entry e = pick(group, room.countryId(), slot);
+        Map<String, Double> p = e.params();
+        String code = e.type().getCode();
+        String key = interval + ":" + offset + ":" + room.countryId() + ":" + slot;
         if (now - slot >= p.getOrDefault("grace_seconds", 120.0) || handled.contains(key) || active(room, code)) return;
         handled.add(key);
-        if (spawns.existsByMonsterTypeIdAndCountryIdAndStartedAtGreaterThanEqual(e.type().getId(), room.countryId(), Instant.ofEpochSecond(slot))) return;
+        for (MonsterCatalog.Entry g : group) { // 서버를 다시 켠 뒤에도 같은 시간대에 이미 나온(건너뛴 것 포함) 기록이 있으면 다시 나오지 않는다
+            if (spawns.existsByMonsterTypeIdAndCountryIdAndStartedAtGreaterThanEqual(g.type().getId(), room.countryId(), Instant.ofEpochSecond(slot))) return;
+        }
         if (room.size() < p.getOrDefault("min_players", 1.0)) {
             recorder.open(e.type().getId(), room.countryId(), "SCHEDULE", "SKIPPED"); // 사람이 적어 건너뛴 것도 기록한다
             return;

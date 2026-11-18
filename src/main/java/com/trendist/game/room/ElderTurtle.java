@@ -13,25 +13,13 @@ final class ElderTurtle extends SkillBoss {
         super(id, spec, radius, start, now, duration, x, y, opening, List.of(new DashSkill(), new RingSkill()));
     }
 
-    /** 체력(HP)을 정하고 만든다. HP = 사람 수 × 참여율 × 1인당 타격 수 × 기준 유행도 × 타격당 배수 × 여유 */
+    /** 체력(HP)을 정하고 만든다(계산식은 SkillBoss.startFor, 모든 보스 공통) */
     static ElderTurtle spawn(Room room, int id, Spec spec) {
         Map<String, Double> p = spec.params();
-        int humans = 0; double sum = 0, top = 0;
-        for (Room.Member m : room.members()) {
-            if (m.bot || m.offline) continue;
-            humans++; sum += m.score; top = Math.max(top, m.score);
-        }
-        double avg = humans == 0 ? 0 : sum / humans;
-        double w = d(p, "hp_top_weight"), ref = avg * (1 - w) + top * w;
-        double flameRatio = d(p, "hp_flame_ratio"), perHit = flameRatio * d(p, "flame_damage_mult") + (1 - flameRatio);
-        double n = Math.max(humans, d(p, "hp_min_players"));
-        double hp = n * d(p, "hp_participation_rate") * d(p, "hp_hits_per_player") * ref * perHit * d(p, "hp_margin");
-        hp = Math.max(d(p, "hp_min"), Math.min(d(p, "hp_max"), hp));
-        long maxHp = Math.round(hp);
-        double now = room.clock(), half = room.half(), radius = d(p, "radius");
-        double reach = Math.max(0, half - radius), ang = room.random().nextDouble(Math.PI * 2);
-        double sx = Math.cos(ang) * reach * 0.6, sy = Math.sin(ang) * reach * 0.6; // 가운데(세이프존)에서 떨어진 곳에서 나온다
-        return new ElderTurtle(id, spec, radius, new Start(maxHp, humans, Math.round(avg), Math.round(top)), now, d(p, "duration_seconds"), sx, sy, d(p, "opening_delay_seconds"));
+        Start start = startFor(room, spec);
+        double radius = d(p, "radius");
+        double[] at = spawnPoint(room, radius);
+        return new ElderTurtle(id, spec, radius, start, room.clock(), d(p, "duration_seconds"), at[0], at[1], d(p, "opening_delay_seconds"));
     }
 
     private static double d(Map<String, Double> p, String k) { Double v = p.get(k); return v == null ? 0 : v; }

@@ -34,6 +34,12 @@ abstract class BossSkill {
     Map<String, Object> telegraph(SkillBoss b, Room room) { return null; }
     /** 실행 중 위치가 빨리 바뀌어 상태를 매 틱 보내야 하는가 */
     boolean fast() { return false; }
+    /** 패턴이 끝난 뒤에도 남는 것(바닥 장판·날아가는 투사체)을 매 틱 처리한다. 지금 어떤 패턴을 쓰는 중이든 불린다 */
+    void passiveTick(SkillBoss b, Room room, double now, double dt) {}
+    /** 이 패턴이 실행 중일 때 보스 몸에 부딪힐 수 있는가(점프로 떠 있는 동안은 false) */
+    boolean bodyActive() { return true; }
+    /** 실행 중 상태 메시지에 더할 값(예: air·stun). 없으면 null */
+    Map<String, Object> extraState(SkillBoss b, Room room) { return null; }
     /** 이 패턴이 실행 중일 때 사람이 보스 몸에 부딪혔다(보스의 기본 충돌 처리 뒤에 불린다) */
     void onBodyContact(SkillBoss b, Room room, Room.Member m, double now) {}
 }

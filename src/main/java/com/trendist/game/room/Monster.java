@@ -48,6 +48,7 @@ public abstract class Monster {
     static Monster create(Room room, int id, Spec spec) {
         return switch (spec.behavior()) {
             case "ELDER_TURTLE" -> ElderTurtle.spawn(room, id, spec);
+            case "MOON_RABBIT" -> MoonRabbit.spawn(room, id, spec);
             default -> null;
         };
     }

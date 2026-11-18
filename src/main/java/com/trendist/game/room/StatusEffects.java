@@ -107,12 +107,30 @@ final class StatusEffects {
     }
 
     /** 슬로우: 이미 걸려 있으면 겹이 오르고(최대 slow_max_stacks) 시간은 처음부터 다시 센다 */
-    void slow(Room.Member t, Room.Member owner) {
+    void slow(Room.Member t, Room.Member owner) { slow(t, owner, room.skillConfig().param("slow_seconds")); }
+
+    /**
+     * 바닥 장판(달토끼의 끈끈 떡 등)이 거는 슬로우: 겹은 오르지 않고(1겹), 이미 걸려 있으면 끝나는 시각만 늘린다.
+     * 장판 안에 서 있는 동안 틱마다 불러도 겹이 쌓이지 않는다. 세기는 슬로우 스킬의 slow_percent를 그대로 쓴다.
+     */
+    void slowZone(Room.Member t, double seconds) {
+        if (has(t, Kind.SLOW)) {
+            Effect e = t.effects.get(Kind.SLOW);
+            if (e.until - room.now() < seconds * 0.5) { // 절반 아래로 줄었을 때만 늘린다(장판 위에 서 있는 동안 매 틱 알리지 않게)
+                e.until = room.now() + seconds;
+                room.broadcast(SkillFx.status("slow", t.entityNo, e.stacks, SkillFx.ms(seconds)));
+            }
+            return;
+        }
+        slow(t, null, seconds);
+    }
+
+    /** 슬로우: 이미 걸려 있으면 겹이 오르고(최대 slow_max_stacks) 시간은 처음부터 다시 센다 */
+    void slow(Room.Member t, Room.Member owner, double seconds) {
         SkillConfig c = room.skillConfig();
         boolean on = has(t, Kind.SLOW);
         Effect e = effect(t, Kind.SLOW, owner);
         e.stacks = on ? Math.min(c.intParam("slow_max_stacks"), e.stacks + 1) : 1;
-        double seconds = c.param("slow_seconds");
         e.until = room.now() + seconds;
         t.lastSpeedMult = speedMult(t); t.speedSentAt = room.now();
         room.tell(t, SkillFx.slow(SkillFx.ms(seconds), t.lastSpeedMult)); // 속박·광폭화와 합친 배수

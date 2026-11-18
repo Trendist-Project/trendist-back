@@ -35,6 +35,34 @@ abstract class SkillBoss extends Monster {
     private double vx, vy;
     private final Map<Room.Member, Double> lastHit = new HashMap<>(); // 같은 사람을 다시 칠 수 있는 시각(연타 방지, 무적이 아니다)
 
+    /**
+     * 체력(HP)을 정한다(모든 보스 공통, 4.35). HP = 사람 수 × 참여율 × 1인당 타격 수 × 기준 유행도 × 타격당 배수 × 여유(`hp_min`~`hp_max`로 자른다).
+     * 접속한 사람(봇·오프라인 제외)의 수·평균·1등 유행도를 함께 돌려준다.
+     */
+    static Start startFor(Room room, Spec spec) {
+        Map<String, Double> p = spec.params();
+        int humans = 0; double sum = 0, top = 0;
+        for (Room.Member m : room.members()) {
+            if (m.bot || m.offline) continue;
+            humans++; sum += m.score; top = Math.max(top, m.score);
+        }
+        double avg = humans == 0 ? 0 : sum / humans;
+        double w = param(p, "hp_top_weight"), ref = avg * (1 - w) + top * w;
+        double flameRatio = param(p, "hp_flame_ratio"), perHit = flameRatio * param(p, "flame_damage_mult") + (1 - flameRatio);
+        double n = Math.max(humans, param(p, "hp_min_players"));
+        double hp = n * param(p, "hp_participation_rate") * param(p, "hp_hits_per_player") * ref * perHit * param(p, "hp_margin");
+        hp = Math.max(param(p, "hp_min"), Math.min(param(p, "hp_max"), hp));
+        return new Start(Math.round(hp), humans, Math.round(avg), Math.round(top));
+    }
+
+    /** 나타나는 자리: 가운데(세이프존)에서 떨어진 곳 */
+    static double[] spawnPoint(Room room, double radius) {
+        double reach = Math.max(0, room.half() - radius), ang = room.random().nextDouble(Math.PI * 2);
+        return new double[]{Math.cos(ang) * reach * 0.6, Math.sin(ang) * reach * 0.6};
+    }
+
+    static double param(Map<String, Double> p, String k) { Double v = p.get(k); return v == null ? 0 : v; }
+
     protected SkillBoss(int id, Spec spec, double radius, Start start, double now, double duration, double x, double y, double opening, List<BossSkill> skills) {
         super(id, spec, radius, start, now, duration);
         this.x = x; this.y = y; this.openingUntil = now + opening; this.skills = List.copyOf(skills);
@@ -66,7 +94,8 @@ abstract class SkillBoss extends Monster {
             case RECOVER -> { if (now >= phUntil) ph = Ph.CHASE; }
         }
         vx = (x - px) / dt; vy = (y - py) / dt;
-        bodyContacts(room, now, tu);
+        for (BossSkill sk : skills) sk.passiveTick(this, room, now, dt); // 패턴이 끝난 뒤에도 남는 것(장판·투사체)
+        if (current == null || ph != Ph.ACTIVE || current.bodyActive()) bodyContacts(room, now, tu); // 점프 중처럼 몸이 없는 동안은 부딪히지 않는다
         if (hp <= 0 && !ended) room.endMonster(this, KILLED);
     }
 
@@ -150,6 +179,11 @@ abstract class SkillBoss extends Monster {
         }
         return false;
     }
+
+    /** 패턴이 겨눌 사람(없으면 null) */
+    Room.Member currentTarget(Room room) { return target(room); }
+    /** 분노 중인가(패턴이 분노 때만 달라지는 값을 읽을 때) */
+    boolean raged() { return rage; }
 
     private Room.Member target(Room room) {
         if (targetE == null) return null;
@@ -265,6 +299,7 @@ abstract class SkillBoss extends Monster {
         m.put("flame", flame); m.put("rage", rage); m.put("ph", phaseName());
         m.put("tgt", targetE == null ? 0 : targetE);
         m.put("vx", Math.round(vx)); m.put("vy", Math.round(vy));
+        if (ph == Ph.ACTIVE && current != null) { Map<String, Object> ex = current.extraState(this, room); if (ex != null) m.putAll(ex); }
         if (ph == Ph.WINDUP) {
             Map<String, Object> tele = current.telegraph(this, room);
             if (tele != null) {
