@@ -793,7 +793,7 @@ CREATE TABLE monster_spawns (
   monster_type_id BIGINT NOT NULL COMMENT '몬스터 종류(monster_types 참조)',
   country_id      BIGINT NOT NULL COMMENT '나라(방)',
   source          VARCHAR(20) NOT NULL COMMENT 'SCHEDULE(정기) / ADMIN(관리자 즉시 소환)',
-  status          VARCHAR(20) NOT NULL COMMENT 'ACTIVE / KILLED(처치) / TIMEOUT(시간 초과) / REMOVED(관리자 제거·서버 재시작) / SKIPPED(사람이 적어 건너뜀)',
+  status          VARCHAR(20) NOT NULL COMMENT 'ACTIVE / KILLED(처치) / TIMEOUT(시간 초과) / REMOVED(관리자 제거·서버 재시작). 사람이 적어 건너뛴 시간은 기록하지 않는다(옛 SKIPPED 행은 화면에서 숨긴다)',
   started_at      DATETIME(6) NOT NULL COMMENT '등장 시각',
   ended_at        DATETIME(6) NULL COMMENT '끝난 시각',
   max_hp          BIGINT NOT NULL DEFAULT 0 COMMENT '정해진 체력(유행도 값)',
