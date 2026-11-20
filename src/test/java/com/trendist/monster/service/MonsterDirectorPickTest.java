@@ -18,34 +18,27 @@ class MonsterDirectorPickTest {
     void sameSlotAndRoomAlwaysGiveTheSameBoss() {
         List<MonsterCatalog.Entry> g = List.of(entry("elder_turtle", 1), entry("moon_rabbit", 1));
         for (long slot = 0; slot < 50; slot++) {
-            String first = MonsterDirector.pick(g, 1, slot * 3600).type().getCode();
-            for (int i = 0; i < 5; i++) assertThat(MonsterDirector.pick(g, 1, slot * 3600).type().getCode()).isEqualTo(first); // 예고와 등장·서버 재시작 뒤에도 같다
+            String first = MonsterDirector.pick(g, slot * 3600).type().getCode();
+            for (int i = 0; i < 5; i++) assertThat(MonsterDirector.pick(g, slot * 3600).type().getCode()).isEqualTo(first); // 예고와 등장·서버 재시작 뒤에도 같다
         }
     }
 
     @Test
-    void equalWeightsSplitRoughlyEvenlyAndRoomsDiffer() {
+    void equalWeightsSplitEvenly() {
         List<MonsterCatalog.Entry> g = List.of(entry("elder_turtle", 1), entry("moon_rabbit", 1));
         Map<String, Integer> count = new HashMap<>();
-        int differ = 0;
-        for (long slot = 0; slot < 2000; slot++) {
-            String kr = MonsterDirector.pick(g, 1, 1_700_000_000L + slot * 3600).type().getCode();
-            String global = MonsterDirector.pick(g, 2, 1_700_000_000L + slot * 3600).type().getCode();
-            count.merge(kr, 1, Integer::sum);
-            if (!kr.equals(global)) differ++;
-        }
+        for (long slot = 0; slot < 2000; slot++) count.merge(MonsterDirector.pick(g, 1_700_000_000L + slot * 3600).type().getCode(), 1, Integer::sum);
         assertThat(count.get("moon_rabbit")).isBetween(850, 1150);
         assertThat(count.get("elder_turtle")).isBetween(850, 1150);
-        assertThat(differ).isGreaterThan(0); // 방마다 따로 뽑는다
     }
 
     @Test
     void weightsBiasTheDraw() {
         List<MonsterCatalog.Entry> g = List.of(entry("elder_turtle", 3), entry("moon_rabbit", 1));
         int turtle = 0;
-        for (long slot = 0; slot < 2000; slot++) if (MonsterDirector.pick(g, 1, 1_700_000_000L + slot * 3600).type().getCode().equals("elder_turtle")) turtle++;
+        for (long slot = 0; slot < 2000; slot++) if (MonsterDirector.pick(g, 1_700_000_000L + slot * 3600).type().getCode().equals("elder_turtle")) turtle++;
         assertThat(turtle).isBetween(1350, 1650); // 약 75%
-        assertThat(MonsterDirector.pick(List.of(entry("moon_rabbit", 1)), 1, 123).type().getCode()).isEqualTo("moon_rabbit"); // 하나뿐이면 그대로
+        assertThat(MonsterDirector.pick(List.of(entry("moon_rabbit", 1)), 123).type().getCode()).isEqualTo("moon_rabbit"); // 하나뿐이면 그대로
     }
 
     private static List<MonsterCatalog.Entry> seven() {
@@ -55,32 +48,34 @@ class MonsterDirectorPickTest {
     @Test
     void everyBossAppearsExactlyOncePerCycleOfAsManyHoursAsThereAreBosses() {
         List<MonsterCatalog.Entry> g = seven();
-        for (long country = 1; country <= 2; country++)
-            for (long cycle = -3; cycle < 60; cycle++) {
-                java.util.Set<String> seen = new java.util.HashSet<>();
-                for (int i = 0; i < 7; i++) seen.add(MonsterDirector.pick(g, country, (cycle * 7 + i) * 3600L).type().getCode());
-                assertThat(seen).as("cycle %d country %d", cycle, country).hasSize(7); // 일곱 정각 안에 일곱 보스가 모두 한 번씩
-            }
+        for (long cycle = -3; cycle < 60; cycle++) {
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (int i = 0; i < 7; i++) seen.add(MonsterDirector.pick(g, (cycle * 7 + i) * 3600L).type().getCode());
+            assertThat(seen).as("cycle %d", cycle).hasSize(7); // 일곱 정각 안에 일곱 보스가 모두 한 번씩
+        }
     }
 
     @Test
-    void cyclesAreShuffledPerCountryAndNeverRepeatTheSameBossBackToBack() {
+    void cyclesAreShuffledAndNeverRepeatTheSameBossBackToBack() {
         List<MonsterCatalog.Entry> g = seven();
-        java.util.Set<String> firstOrders = new java.util.HashSet<>();
-        int krGlobalDiffer = 0;
+        java.util.Set<String> orders = new java.util.HashSet<>();
         for (long cycle = 0; cycle < 100; cycle++) {
-            StringBuilder kr = new StringBuilder(), gl = new StringBuilder();
-            for (int i = 0; i < 7; i++) {
-                kr.append(MonsterDirector.pick(g, 1, (cycle * 7 + i) * 3600L).type().getCode());
-                gl.append(MonsterDirector.pick(g, 2, (cycle * 7 + i) * 3600L).type().getCode());
-            }
-            firstOrders.add(kr.toString());
-            if (!kr.toString().equals(gl.toString())) krGlobalDiffer++;
+            StringBuilder order = new StringBuilder();
+            for (int i = 0; i < 7; i++) order.append(MonsterDirector.pick(g, (cycle * 7 + i) * 3600L).type().getCode());
+            orders.add(order.toString());
         }
-        assertThat(firstOrders.size()).isGreaterThan(50);   // 사이클마다 순서가 달라진다
-        assertThat(krGlobalDiffer).isGreaterThan(90);       // 나라마다 따로 섞는다
-        for (long slot = 0; slot < 7 * 400; slot++)         // 어디서도 같은 보스가 연달아 나오지 않는다(사이클 경계 포함)
-            assertThat(MonsterDirector.pick(g, 1, (slot + 1) * 3600L).type().getCode()).isNotEqualTo(MonsterDirector.pick(g, 1, slot * 3600L).type().getCode());
+        assertThat(orders.size()).isGreaterThan(50);   // 사이클마다 순서가 달라진다
+        for (long slot = 0; slot < 7 * 400; slot++)    // 어디서도 같은 보스가 연달아 나오지 않는다(사이클 경계 포함)
+            assertThat(MonsterDirector.pick(g, (slot + 1) * 3600L).type().getCode()).isNotEqualTo(MonsterDirector.pick(g, slot * 3600L).type().getCode());
+    }
+
+    @Test
+    void theOrderDependsOnlyOnTheTimeSoAllServersGetTheSameBossAtTheSameHour() {
+        List<MonsterCatalog.Entry> g = seven();
+        for (long slot = 0; slot < 500; slot++) { // 같은 시각이면 어느 나라든 같은 보스(뽑기에 나라가 들어가지 않는다)
+            long at = 1_700_000_000L + slot * 3600;
+            assertThat(MonsterDirector.pick(g, at).type().getCode()).isEqualTo(MonsterDirector.pick(seven(), at).type().getCode());
+        }
     }
 
     @Test
@@ -88,7 +83,7 @@ class MonsterDirectorPickTest {
         List<MonsterCatalog.Entry> g = List.of(entry("a", 3), entry("b", 1), entry("c", 2)); // 한 사이클 6정각: a 3번, b 1번, c 2번
         for (long cycle = 0; cycle < 40; cycle++) {
             Map<String, Integer> n = new HashMap<>();
-            for (int i = 0; i < 6; i++) n.merge(MonsterDirector.pick(g, 1, (cycle * 6 + i) * 3600L).type().getCode(), 1, Integer::sum);
+            for (int i = 0; i < 6; i++) n.merge(MonsterDirector.pick(g, (cycle * 6 + i) * 3600L).type().getCode(), 1, Integer::sum);
             assertThat(n).containsEntry("a", 3).containsEntry("b", 1).containsEntry("c", 2);
         }
         assertThat(MonsterDirector.bag(List.of(entry("x", 0.2), entry("y", 1.4))).size()).isEqualTo(2); // 반올림, 최소 1
@@ -102,7 +97,7 @@ class MonsterDirectorPickTest {
             long now = slot + i * 3600L + 600; // 사이클 안의 어느 시간이든
             long first = Math.floorDiv(now / 3600, 7) * 7;
             java.util.Set<String> names = new java.util.HashSet<>();
-            for (int j = 0; j < 7; j++) names.add(MonsterDirector.pick(g, 1, (first + j) * 3600L).type().getCode());
+            for (int j = 0; j < 7; j++) names.add(MonsterDirector.pick(g, (first + j) * 3600L).type().getCode());
             assertThat(names).hasSize(7);
         }
     }

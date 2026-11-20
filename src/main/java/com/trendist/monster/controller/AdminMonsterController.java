@@ -164,12 +164,12 @@ public class AdminMonsterController {
         List<TimelineRow> rows = new ArrayList<>();
         grid.forEach((h, cells) -> rows.add(new TimelineRow(h, cells)));
         Map<String, CycleView> cycles = new java.util.LinkedHashMap<>();
-        for (Country c : countries.findByEnabledTrue()) {
-            MonsterDirector.Cycle cy = director.cycle(c.getId(), now.getEpochSecond());
-            if (cy == null) continue;
+        MonsterDirector.Cycle cy = director.cycle(now.getEpochSecond()); // 모든 나라가 같은 사이클이다
+        if (cy != null) {
             List<CycleItem> items = new ArrayList<>();
             for (MonsterDirector.CyclePos p : cy.positions()) items.add(new CycleItem(Instant.ofEpochSecond(p.startEpoch()), p.boss().type().getCode(), p.boss().type().getName(), p.boss().type().getImage()));
-            cycles.put(c.getCode(), new CycleView(cy.size(), cy.index(), items));
+            CycleView view = new CycleView(cy.size(), cy.index(), items);
+            for (String c : codes) cycles.put(c, view);
         }
         return new Timeline(now, codes, rows, cycles);
     }
