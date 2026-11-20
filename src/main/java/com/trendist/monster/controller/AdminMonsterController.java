@@ -53,7 +53,10 @@ public class AdminMonsterController {
 
     public record TimelineEntry(String code, String name, String nameEn, String image, String status, String source, Instant startedAt, int participants, long maxHp, long finalHp) {}
     public record TimelineRow(Instant hour, Map<String, List<TimelineEntry>> cells) {}
-    public record Timeline(Instant now, List<String> countries, List<TimelineRow> rows) {}
+    /** 이번 사이클(나라별): 크기, 지금이 몇 번째 칸인지(0부터), 칸마다 시작 시각과 보스 */
+    public record CycleItem(Instant start, String code, String name, String image) {}
+    public record CycleView(int size, int index, List<CycleItem> items) {}
+    public record Timeline(Instant now, List<String> countries, List<TimelineRow> rows, Map<String, CycleView> cycles) {}
 
     @GetMapping("/types")
     @Transactional(readOnly = true)
@@ -124,7 +127,7 @@ public class AdminMonsterController {
     /**
      * 시간별 출현표: 정각마다 나라별로 어떤 보스가 나왔는지(지난 `past`시간)와 나올 예정인지(앞으로 `ahead`시간)를 최신순(미래가 위)으로 준다.
      * 지난 칸은 등장 기록(처치·시간 초과·제거·싸우는 중, 관리자 소환 포함)이고 사람이 적어 건너뛴 시간은 기록이 없으니 빈 칸이다.
-     * 앞날 칸은 예고·등장과 같은 뽑기로 미리 계산한 예정(SCHEDULED)이라 정기 등장이 켜진 보스만 나온다.
+     * 앞날 칸은 예고·등장과 같은 뽑기로 미리 계산한 예정(SCHEDULED)이라 정기 등장이 켜진 보스만 나온다. `cycles`는 나라별 이번 사이클(한 사이클에 보스마다 최소 한 번)의 칸 목록이다.
      */
     @GetMapping("/timeline")
     @Transactional(readOnly = true)
@@ -160,7 +163,15 @@ public class AdminMonsterController {
         }
         List<TimelineRow> rows = new ArrayList<>();
         grid.forEach((h, cells) -> rows.add(new TimelineRow(h, cells)));
-        return new Timeline(now, codes, rows);
+        Map<String, CycleView> cycles = new java.util.LinkedHashMap<>();
+        for (Country c : countries.findByEnabledTrue()) {
+            MonsterDirector.Cycle cy = director.cycle(c.getId(), now.getEpochSecond());
+            if (cy == null) continue;
+            List<CycleItem> items = new ArrayList<>();
+            for (MonsterDirector.CyclePos p : cy.positions()) items.add(new CycleItem(Instant.ofEpochSecond(p.startEpoch()), p.boss().type().getCode(), p.boss().type().getName(), p.boss().type().getImage()));
+            cycles.put(c.getCode(), new CycleView(cy.size(), cy.index(), items));
+        }
+        return new Timeline(now, codes, rows, cycles);
     }
 
     /** 등장 기록(페이지 단위, 최신순). code가 있으면 그 종류만, 없으면 전부. size 기본 10 */

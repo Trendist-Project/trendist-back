@@ -123,6 +123,7 @@ class MonsterAdminTest {
             String live = body(a, "/api/admin/monsters/live");
             java.util.List<Integer> ids = JsonPath.read(live, "$[?(@.code=='elder_turtle')].id");
             for (int id : ids) mvc.perform(post("/api/admin/monsters/" + id + "/end?country=KR").header("Authorization", a));
+            for (int i = 0; i < 60 && !JsonPath.<java.util.List<Object>>read(body(a, "/api/admin/monsters/live"), "$[?(@.code=='elder_turtle')]").isEmpty(); i++) Thread.sleep(100); // 제거는 방 틱에서 처리되니 끝날 때까지 기다린다(다음 시험이 소환할 수 있게)
             mvc.perform(patch("/api/admin/monsters/types/elder_turtle").header("Authorization", a).contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"));
         }
     }

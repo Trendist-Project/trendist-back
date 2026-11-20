@@ -61,7 +61,7 @@ public class MonsterDirector {
     }
 
     /**
-     * 같은 시각(같은 주기·오프셋)에 나오는 켜진 보스끼리 한 묶음이다. 그 시각이 되면 묶음 안에서 한 마리만 무작위로(`spawn_weight` 비중) 뽑아 낸다.
+     * 같은 시각(같은 주기·오프셋)에 나오는 켜진 보스끼리 한 묶음이다. 그 시각이 되면 묶음 안에서 사이클 순서대로 한 마리가 나온다(pick).
      * 비중이 0이거나 정기 등장이 꺼진 보스는 뽑히지 않는다. 묶음 안은 코드 순서로 고정해 같은 시각에는 같은 결과가 나오게 한다.
      */
     private Map<String, List<MonsterCatalog.Entry>> groups() {
@@ -75,17 +75,77 @@ public class MonsterDirector {
         return m;
     }
 
-    /** 그 시간대(slotStart, 초)에 이 방에서 나올 보스: 시간대와 나라로 정한 난수로 비중에 따라 하나를 고른다(예고와 등장, 서버를 다시 켠 뒤에도 같은 결과) */
+    /** 묶음의 주기·오프셋(초). 묶음은 같은 값을 가진 보스끼리라 첫 보스의 값을 쓴다 */
+    private static long[] period(List<MonsterCatalog.Entry> group) {
+        Map<String, Double> p = group.get(0).params();
+        return new long[]{Math.max(1, Math.round(p.getOrDefault("interval_minutes", 60.0))) * 60, Math.round(p.getOrDefault("offset_minutes", 0.0)) * 60};
+    }
+
+    /**
+     * 한 사이클에 나올 보스 목록(가방): 켜진 보스마다 `spawn_weight`를 반올림한 횟수(최소 1)만큼 넣는다. 모두 1이면 보스 수만큼이라 사이클 한 번에 보스마다 정확히 한 번씩 나온다.
+     * 묶음은 코드 순서로 정렬돼 있어 같은 설정이면 같은 가방이다.
+     */
+    static List<MonsterCatalog.Entry> bag(List<MonsterCatalog.Entry> group) {
+        List<MonsterCatalog.Entry> out = new ArrayList<>();
+        for (MonsterCatalog.Entry e : group) {
+            long copies = Math.max(1, Math.round(e.params().getOrDefault("spawn_weight", 1.0)));
+            for (long i = 0; i < copies; i++) out.add(e);
+        }
+        return out;
+    }
+
+    /** 사이클 번호(cycle)의 나라별 순서: 가방을 시간(사이클 번호)과 나라로 정한 난수로 섞는다. 이전 사이클의 마지막 보스가 첫째로 오면 다른 보스와 바꿔 연달아 같은 보스가 나오지 않게 한다 */
+    static List<MonsterCatalog.Entry> cycleOrder(List<MonsterCatalog.Entry> bag, long countryId, long cycle) {
+        List<MonsterCatalog.Entry> order = shuffled(bag, countryId, cycle);
+        int m = order.size();
+        if (m > 2) {
+            String prevLast = shuffled(bag, countryId, cycle - 1).get(m - 1).type().getCode();
+            if (order.get(0).type().getCode().equals(prevLast))
+                for (int j = 1; j < m - 1; j++) // 마지막 자리는 건드리지 않아 다음 사이클의 비교 기준이 변하지 않는다
+                    if (!order.get(j).type().getCode().equals(prevLast)) { java.util.Collections.swap(order, 0, j); break; }
+        }
+        return order;
+    }
+
+    private static List<MonsterCatalog.Entry> shuffled(List<MonsterCatalog.Entry> bag, long countryId, long cycle) {
+        List<MonsterCatalog.Entry> order = new ArrayList<>(bag);
+        java.util.Collections.shuffle(order, new Random(cycle * 1_000_003L + countryId * 7919L + 17));
+        return order;
+    }
+
+    /**
+     * 그 시간대(slotStart, 초)에 이 방에서 나올 보스. **사이클 방식**: 정각을 순서대로 세어(주기마다 하나) 가방 크기(보스 수)만큼을 한 사이클로 보고, 사이클마다 가방을 섞어 그 순서대로 낸다.
+     * 그래서 한 사이클 안에 켜진 보스가 모두 최소 한 번은 나온다(비중 `spawn_weight`는 한 사이클에서 나오는 횟수). 순서는 시간(사이클 번호)과 나라로 정한 난수라
+     * 예고와 등장, 서버를 다시 켠 뒤에도 같고 나라(KR·GLOBAL)마다 따로다. 보스를 켜고 끄면 사이클 크기가 바뀌어 그 시점부터 새 사이클로 센다.
+     */
     static MonsterCatalog.Entry pick(List<MonsterCatalog.Entry> group, long countryId, long slotStart) {
         if (group.size() == 1) return group.get(0);
-        double total = 0;
-        for (MonsterCatalog.Entry e : group) total += Math.max(0, e.params().getOrDefault("spawn_weight", 1.0));
-        double roll = new Random(slotStart * 1_000_003L + countryId * 7919L).nextDouble() * total;
-        for (MonsterCatalog.Entry e : group) {
-            roll -= Math.max(0, e.params().getOrDefault("spawn_weight", 1.0));
-            if (roll < 0) return e;
+        long[] pd = period(group);
+        List<MonsterCatalog.Entry> bag = bag(group);
+        long k = Math.floorDiv(slotStart - pd[1], pd[0]); // 정각 번호
+        return cycleOrder(bag, countryId, Math.floorDiv(k, bag.size())).get((int) Math.floorMod(k, bag.size()));
+    }
+
+    /** 한 사이클의 칸: 시작 시각(초)과 그 시각에 나올 보스 */
+    public record CyclePos(long startEpoch, MonsterCatalog.Entry boss) {}
+    /** 지금 사이클: 크기, 지금 시간이 몇 번째 칸인지(0부터), 칸 목록(시간순) */
+    public record Cycle(int size, int index, List<CyclePos> positions) {}
+
+    /** 이 나라의 지금 사이클(가장 큰 묶음 기준). 켜진 보스가 없으면 null. 관리자 출현표가 "이번 사이클 몇 번째"를 보여 줄 때 쓴다 */
+    public Cycle cycle(long countryId, long nowEpoch) {
+        List<MonsterCatalog.Entry> group = null;
+        for (List<MonsterCatalog.Entry> g : groups().values()) if (group == null || g.size() > group.size()) group = g;
+        if (group == null) return null;
+        long[] pd = period(group);
+        List<MonsterCatalog.Entry> bag = bag(group);
+        int m = bag.size();
+        long kNow = Math.floorDiv(nowEpoch - pd[1], pd[0]), first = Math.floorDiv(kNow, m) * m;
+        List<CyclePos> pos = new ArrayList<>();
+        for (int i = 0; i < m; i++) {
+            long slot = (first + i) * pd[0] + pd[1];
+            pos.add(new CyclePos(slot, pick(group, countryId, slot)));
         }
-        return group.get(group.size() - 1);
+        return new Cycle(m, (int) (kNow - first), pos);
     }
 
     private void schedule(List<MonsterCatalog.Entry> group, Room room, long now) {
