@@ -29,7 +29,7 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: dlrudgjs104
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
 
       - name: Build and Push Docker image
@@ -55,8 +55,8 @@ jobs:
       - name: Send .env to remote server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
+          host: 220.71.172.204
+          username: ubuntu
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: ".env"
           target: "/home/ubuntu/trendist"
@@ -66,8 +66,8 @@ jobs:
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
+          host: 220.71.172.204
+          username: ubuntu
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
