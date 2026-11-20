@@ -114,11 +114,30 @@ public class MonsterDirector {
         for (MonsterCatalog.Entry g : group) { // 서버를 다시 켠 뒤에도 같은 시간대에 이미 나온(건너뛴 것 포함) 기록이 있으면 다시 나오지 않는다
             if (spawns.existsByMonsterTypeIdAndCountryIdAndStartedAtGreaterThanEqual(g.type().getId(), room.countryId(), Instant.ofEpochSecond(slot))) return;
         }
-        if (room.size() < p.getOrDefault("min_players", 1.0)) {
-            recorder.open(e.type().getId(), room.countryId(), "SCHEDULE", "SKIPPED"); // 사람이 적어 건너뛴 것도 기록한다
-            return;
-        }
+        if (room.size() < p.getOrDefault("min_players", 1.0)) return; // 사람이 적으면 그 시간은 건너뛴다(기록은 남기지 않는다. 메모리의 handled가 같은 실행 중 다시 시도하지 않게 한다)
         spawn(e, room, "SCHEDULE");
+    }
+
+    /** 앞으로 나올 보스 예정 한 칸: 시작 시각(초), 나라 번호·코드, 그 시각에 뽑힌 보스 */
+    public record Upcoming(long startEpoch, long countryId, String countryCode, MonsterCatalog.Entry boss) {}
+
+    /**
+     * 지금(fromEpoch초) 이후 toEpoch초까지 나라마다 켜진 묶음의 정각들을 훑어 그 시각에 나올 보스를 알려 준다. 예고와 실제 등장이 쓰는 뽑기(pick)를 그대로 쓰므로
+     * 보여 준 보스가 실제로 나오는 보스다(시간대·나라로 정한 난수라 서버를 다시 켜도 같다). 사람이 적어 건너뛰는 것은 알 수 없으니 예정일 뿐이다.
+     */
+    public List<Upcoming> upcoming(long fromEpoch, long toEpoch) {
+        List<Upcoming> out = new ArrayList<>();
+        List<Country> cs = countries.findByEnabledTrue();
+        for (List<MonsterCatalog.Entry> group : groups().values()) {
+            Map<String, Double> p0 = group.get(0).params();
+            long interval = Math.max(1, Math.round(p0.getOrDefault("interval_minutes", 60.0))) * 60;
+            long offset = Math.round(p0.getOrDefault("offset_minutes", 0.0)) * 60;
+            long first = (Math.floorDiv(fromEpoch - offset, interval) + 1) * interval + offset; // fromEpoch 다음 첫 정각
+            for (long slot = first; slot <= toEpoch; slot += interval)
+                for (Country c : cs) out.add(new Upcoming(slot, c.getId(), c.getCode(), pick(group, c.getId(), slot)));
+        }
+        out.sort(Comparator.comparingLong(Upcoming::startEpoch));
+        return out;
     }
 
     private boolean active(Room room, String code) {

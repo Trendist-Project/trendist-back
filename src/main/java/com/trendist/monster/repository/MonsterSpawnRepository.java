@@ -14,4 +14,9 @@ public interface MonsterSpawnRepository extends JpaRepository<MonsterSpawn, Long
     /** 한 종류의 등장 기록(최신순은 호출하는 쪽이 Pageable의 정렬로 정한다) */
     Page<MonsterSpawn> findByMonsterTypeId(Long monsterTypeId, Pageable page);
     List<MonsterSpawn> findByStatus(String status);
+    /** 목록: 예전에 남긴 건너뜀(SKIPPED) 행은 빼고 보여 준다 */
+    Page<MonsterSpawn> findByStatusNot(String status, Pageable page);
+    Page<MonsterSpawn> findByMonsterTypeIdAndStatusNot(Long monsterTypeId, String status, Pageable page);
+    /** 출현표: 기간 안에 시작한 등장(건너뜀 제외, 시작 시각순) */
+    List<MonsterSpawn> findByStartedAtGreaterThanEqualAndStartedAtLessThanAndStatusNotOrderByStartedAtAsc(Instant from, Instant to, String status);
 }

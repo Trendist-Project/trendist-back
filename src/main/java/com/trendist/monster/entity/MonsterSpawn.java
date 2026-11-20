@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 
 /**
  * 몬스터 등장 기록(4.35): 한 번 나올 때마다 한 줄. source는 SCHEDULE(정각)·ADMIN(관리자 즉시 소환),
- * status는 ACTIVE(싸우는 중)·KILLED(처치)·TIMEOUT(시간 초과)·REMOVED(관리자 제거)·SKIPPED(사람이 적어 건너뜀).
+ * status는 ACTIVE(싸우는 중)·KILLED(처치)·TIMEOUT(시간 초과)·REMOVED(관리자 제거).
+ * 사람이 적어 건너뛴 시간은 기록하지 않는다(예전에는 SKIPPED 행을 남겼다. 옛 행은 남아 있지만 목록·출현표에서 숨긴다).
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

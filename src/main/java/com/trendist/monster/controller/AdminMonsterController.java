@@ -40,6 +40,8 @@ public class AdminMonsterController {
     private final MonsterDirector director;
     private final RoomManager rooms;
     private final com.trendist.monster.service.MonsterConfigService config;
+    /** 예전에 사람이 적어 건너뛴 시간을 남긴 행의 상태(지금은 남기지 않고, 옛 행은 화면에서 숨긴다) */
+    private static final String SKIPPED = "SKIPPED";
 
     public record SettingItem(String name, double value, double min, double max, String description, String unit, String group) {}
     public record TypeItem(String code, String name, String nameEn, String kind, String behavior, String image, boolean enabled, List<SettingItem> settings) {}
@@ -48,6 +50,10 @@ public class AdminMonsterController {
     public record SpawnPage(List<SpawnItem> items, int page, int size, long total, int totalPages) {}
     public record SpawnItem(Long id, String code, String name, String country, String source, String status, Instant startedAt, Instant endedAt,
                             long maxHp, long finalHp, int humans, long avgScore, long topScore, int participants, long topDamage) {}
+
+    public record TimelineEntry(String code, String name, String nameEn, String image, String status, String source, Instant startedAt, int participants, long maxHp, long finalHp) {}
+    public record TimelineRow(Instant hour, Map<String, List<TimelineEntry>> cells) {}
+    public record Timeline(Instant now, List<String> countries, List<TimelineRow> rows) {}
 
     @GetMapping("/types")
     @Transactional(readOnly = true)
@@ -115,6 +121,48 @@ public class AdminMonsterController {
         return Map.of("ok", true);
     }
 
+    /**
+     * 시간별 출현표: 정각마다 나라별로 어떤 보스가 나왔는지(지난 `past`시간)와 나올 예정인지(앞으로 `ahead`시간)를 최신순(미래가 위)으로 준다.
+     * 지난 칸은 등장 기록(처치·시간 초과·제거·싸우는 중, 관리자 소환 포함)이고 사람이 적어 건너뛴 시간은 기록이 없으니 빈 칸이다.
+     * 앞날 칸은 예고·등장과 같은 뽑기로 미리 계산한 예정(SCHEDULED)이라 정기 등장이 켜진 보스만 나온다.
+     */
+    @GetMapping("/timeline")
+    @Transactional(readOnly = true)
+    public Timeline timeline(@RequestParam(defaultValue = "24") int past, @RequestParam(defaultValue = "12") int ahead) {
+        int back = Math.max(1, Math.min(72, past)), fwd = Math.max(0, Math.min(48, ahead));
+        Instant now = Instant.now(), thisHour = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+        Instant from = thisHour.minus(back, java.time.temporal.ChronoUnit.HOURS), to = thisHour.plus(fwd + 1, java.time.temporal.ChronoUnit.HOURS);
+        List<String> codes = countries.findByEnabledTrue().stream().map(Country::getCode).toList();
+        Map<Long, String> countryCode = new java.util.HashMap<>();
+        countries.findAll().forEach(c -> countryCode.put(c.getId(), c.getCode()));
+        Map<Long, MonsterType> byId = new java.util.HashMap<>();
+        types.findAll().forEach(t -> byId.put(t.getId(), t));
+        Map<Instant, Map<String, List<TimelineEntry>>> grid = new java.util.TreeMap<>(java.util.Comparator.reverseOrder());
+        for (Instant h = from; h.isBefore(to); h = h.plus(1, java.time.temporal.ChronoUnit.HOURS)) {
+            Map<String, List<TimelineEntry>> cells = new java.util.LinkedHashMap<>();
+            for (String c : codes) cells.put(c, new ArrayList<>());
+            grid.put(h, cells);
+        }
+        for (MonsterSpawn s : spawns.findByStartedAtGreaterThanEqualAndStartedAtLessThanAndStatusNotOrderByStartedAtAsc(from, to, SKIPPED)) {
+            MonsterType t = byId.get(s.getMonsterTypeId());
+            Map<String, List<TimelineEntry>> cells = grid.get(s.getStartedAt().truncatedTo(java.time.temporal.ChronoUnit.HOURS));
+            List<TimelineEntry> cell = cells == null ? null : cells.get(countryCode.get(s.getCountryId()));
+            if (t == null || cell == null) continue;
+            cell.add(new TimelineEntry(t.getCode(), t.getName(), t.getNameEn(), t.getImage(), s.getStatus(), s.getSource(), s.getStartedAt(), s.getParticipants(), s.getMaxHp(), s.getFinalHp()));
+        }
+        for (MonsterDirector.Upcoming u : director.upcoming(now.getEpochSecond(), to.getEpochSecond() - 1)) {
+            Instant start = Instant.ofEpochSecond(u.startEpoch());
+            Map<String, List<TimelineEntry>> cells = grid.get(start.truncatedTo(java.time.temporal.ChronoUnit.HOURS));
+            List<TimelineEntry> cell = cells == null ? null : cells.get(u.countryCode());
+            if (cell == null) continue;
+            MonsterType t = u.boss().type();
+            cell.add(new TimelineEntry(t.getCode(), t.getName(), t.getNameEn(), t.getImage(), "SCHEDULED", "SCHEDULE", start, 0, 0, 0));
+        }
+        List<TimelineRow> rows = new ArrayList<>();
+        grid.forEach((h, cells) -> rows.add(new TimelineRow(h, cells)));
+        return new Timeline(now, codes, rows);
+    }
+
     /** 등장 기록(페이지 단위, 최신순). code가 있으면 그 종류만, 없으면 전부. size 기본 10 */
     @GetMapping("/spawns")
     @Transactional(readOnly = true)
@@ -125,10 +173,10 @@ public class AdminMonsterController {
         countries.findAll().forEach(c -> codes.put(c.getId(), c.getCode()));
         PageRequest req = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(100, size)), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
         org.springframework.data.domain.Page<MonsterSpawn> found;
-        if (code == null || code.isBlank()) found = spawns.findAll(req);
+        if (code == null || code.isBlank()) found = spawns.findByStatusNot(SKIPPED, req);
         else {
             MonsterType t = types.findByCode(code).orElse(null);
-            found = t == null ? org.springframework.data.domain.Page.empty(req) : spawns.findByMonsterTypeId(t.getId(), req);
+            found = t == null ? org.springframework.data.domain.Page.empty(req) : spawns.findByMonsterTypeIdAndStatusNot(t.getId(), SKIPPED, req);
         }
         List<SpawnItem> out = new ArrayList<>();
         for (MonsterSpawn s : found.getContent()) {

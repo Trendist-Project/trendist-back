@@ -26,6 +26,9 @@ import org.springframework.test.web.servlet.MvcResult;
 class MonsterAdminTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.trendist.monster.repository.MonsterSpawnRepository spawns;
+    @Autowired com.trendist.monster.repository.MonsterTypeRepository monsterTypes;
+    @Autowired com.trendist.country.repository.CountryRepository countries;
 
     private String admin() throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/guest")).andReturn();
@@ -92,5 +95,35 @@ class MonsterAdminTest {
         assertThat((Integer) JsonPath.read(body(a, "/api/admin/monsters/spawns?code=nope&page=0"), "$.items.length()")).isEqualTo(0);
         assertThat((Integer) JsonPath.read(body(a, "/api/admin/monsters/spawns?code=elder_turtle&page=9999"), "$.items.length()")).isEqualTo(0);
         mvc.perform(post("/api/admin/monsters/999999/end?country=KR").header("Authorization", a)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void timelineListsSpawnedAndScheduledBossesAndHidesTheOldSkippedRows() throws Exception {
+        String a = admin();
+        long type = monsterTypes.findByCode("elder_turtle").orElseThrow().getId(), kr = countries.findByCode("KR").orElseThrow().getId();
+        spawns.save(new com.trendist.monster.entity.MonsterSpawn(type, kr, "SCHEDULE", "SKIPPED", java.time.Instant.now())); // 예전에 남긴 건너뜀 행
+        mvc.perform(patch("/api/admin/monsters/types/elder_turtle").header("Authorization", a).contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}")).andExpect(status().isOk());
+        try {
+            mvc.perform(post("/api/admin/monsters/types/elder_turtle/spawn?country=KR").header("Authorization", a)).andExpect(status().isOk());
+            String tl = body(a, "/api/admin/monsters/timeline?past=2&ahead=3");
+            java.util.List<String> countriesShown = JsonPath.read(tl, "$.countries");
+            assertThat(countriesShown).contains("KR");
+            java.util.List<Object> rows = JsonPath.read(tl, "$.rows");
+            assertThat(rows).hasSize(2 + 1 + 3);                                              // 지난 2시간 + 지금 + 앞으로 3시간
+            java.util.List<String> hours = JsonPath.read(tl, "$.rows[*].hour");
+            assertThat(hours).isSortedAccordingTo(java.util.Comparator.reverseOrder());        // 미래가 위
+            java.util.List<String> statuses = JsonPath.read(tl, "$.rows[*].cells.KR[*].status");
+            assertThat(statuses).contains("ACTIVE", "SCHEDULED").doesNotContain("SKIPPED");   // 방금 소환한 것과 예정, 건너뜀은 숨김
+            java.util.List<String> sources = JsonPath.read(tl, "$.rows[*].cells.KR[?(@.status=='ACTIVE')].source");
+            assertThat(sources).contains("ADMIN");
+            String sp = body(a, "/api/admin/monsters/spawns?size=100");
+            java.util.List<String> all = JsonPath.read(sp, "$.items[*].status");
+            assertThat(all).doesNotContain("SKIPPED");                                         // 등장 기록 목록에서도 숨긴다
+        } finally {
+            String live = body(a, "/api/admin/monsters/live");
+            java.util.List<Integer> ids = JsonPath.read(live, "$[?(@.code=='elder_turtle')].id");
+            for (int id : ids) mvc.perform(post("/api/admin/monsters/" + id + "/end?country=KR").header("Authorization", a));
+            mvc.perform(patch("/api/admin/monsters/types/elder_turtle").header("Authorization", a).contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"));
+        }
     }
 }

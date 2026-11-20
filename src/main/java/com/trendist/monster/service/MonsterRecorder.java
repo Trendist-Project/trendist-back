@@ -17,12 +17,10 @@ public class MonsterRecorder {
     private final MonsterSpawnRepository spawns;
     private final MonsterDamageRepository damages;
 
-    /** 등장 기록을 만든다(체력은 방이 정한 뒤 started로 채운다). 건너뛴 것은 SKIPPED로 바로 끝낸다 */
+    /** 등장 기록을 만든다(체력은 방이 정한 뒤 started로 채운다). 사람이 적어 건너뛴 시간은 기록하지 않는다 */
     @Transactional
     public long open(long typeId, long countryId, String source, String status) {
-        MonsterSpawn s = spawns.save(new MonsterSpawn(typeId, countryId, source, status, Instant.now()));
-        if ("SKIPPED".equals(status)) s.finish("SKIPPED", 0, 0, null, 0);
-        return s.getId();
+        return spawns.save(new MonsterSpawn(typeId, countryId, source, status, Instant.now())).getId();
     }
 
     @Transactional
