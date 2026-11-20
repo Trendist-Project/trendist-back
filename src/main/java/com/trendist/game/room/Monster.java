@@ -49,6 +49,11 @@ public abstract class Monster {
         return switch (spec.behavior()) {
             case "ELDER_TURTLE" -> ElderTurtle.spawn(room, id, spec);
             case "MOON_RABBIT" -> MoonRabbit.spawn(room, id, spec);
+            case "DEEP_OCTOPUS" -> DeepOctopus.spawn(room, id, spec);
+            case "ELECTRIC_EEL" -> ElectricEel.spawn(room, id, spec);
+            case "PUFFER_KING" -> PufferKing.spawn(room, id, spec);
+            case "GREAT_SHARK" -> GreatShark.spawn(room, id, spec);
+            case "GREAT_WHALE" -> GreatWhale.spawn(room, id, spec);
             default -> null;
         };
     }

@@ -175,6 +175,50 @@ final class StatusEffects {
         room.broadcast(SkillFx.status("stun", t.entityNo, SkillFx.ms(seconds)));
     }
 
+    // ---- 보스 패턴이 거는 효과(4.35): 시간을 패턴 설정에서 받는다. 건 사람이 없고, 스킬 히트(키워드 잃기)가 아니다
+
+    /** 암흑 장판: 장판 안에 서 있는 동안 매 틱 불러도 알림이 쌓이지 않게, 남은 시간이 절반 아래로 줄었을 때만 새로 건다 */
+    void darkZone(Room.Member t, double seconds) {
+        Effect e = t.effects.get(Kind.DARK);
+        if (e != null && room.now() < e.until && e.until - room.now() >= seconds * 0.5) return;
+        effect(t, Kind.DARK, null).until = room.now() + seconds;
+        room.tell(t, SkillFx.dark(SkillFx.ms(seconds)));
+        room.broadcast(SkillFx.status("darkness", t.entityNo, SkillFx.ms(seconds)));
+    }
+
+    /** 혼란을 seconds 동안 건다(더 긴 쪽을 쓴다) */
+    void confuseFor(Room.Member t, double seconds) {
+        Effect e = effect(t, Kind.CONFUSE, null);
+        e.until = Math.max(e.until, room.now() + seconds);
+        room.tell(t, SkillFx.confuse(SkillFx.ms(seconds)));
+        room.broadcast(SkillFx.status("confuse", t.entityNo, SkillFx.ms(seconds)));
+    }
+
+    /** 스턴을 seconds 동안 건다(더 긴 쪽을 쓴다) */
+    void stunFor(Room.Member t, double seconds) {
+        Effect e = effect(t, Kind.STUN, null);
+        e.until = Math.max(e.until, room.now() + seconds);
+        t.vx = 0; t.vy = 0; t.targetX = null; t.targetY = null;
+        room.tell(t, SkillFx.stun(SkillFx.ms(seconds)));
+        room.broadcast(SkillFx.status("stun", t.entityNo, SkillFx.ms(seconds)));
+    }
+
+    /**
+     * 보스 독: 모양(독 표시)만 독 효과로 달고, 틱 피해는 건 패턴이 직접 준다(체력만 닳고 키워드는 잃지 않는다). 효과의 틱은 돌지 않게 다음 틱을 먼 미래로 둔다.
+     * 정화가 효과를 지우면 has()가 false가 되어 패턴이 피해를 멈춘다.
+     */
+    void bossPoison(Room.Member t, double seconds) {
+        Effect e = effect(t, Kind.POISON, null);
+        e.stacks = 1; e.ticksLeft = 0; e.nextAt = Double.MAX_VALUE; e.until = room.now() + seconds;
+        room.broadcast(SkillFx.status("poison", t.entityNo, 1, SkillFx.ms(seconds)));
+    }
+
+    /** 보스 독에 걸려 있는지(정화되지 않았는지) */
+    boolean bossPoisoned(Room.Member t) { return has(t, Kind.POISON); }
+
+    /** 보스 독을 푼다(시간이 다 됐을 때) */
+    void bossPoisonEnd(Room.Member t) { clear(t, Kind.POISON); }
+
     private Effect effect(Room.Member t, Kind kind, Room.Member owner) {
         Effect e = t.effects.computeIfAbsent(kind, k -> new Effect());
         if (!has(t, kind)) { e.stacks = 0; e.until = 0; } // 끝난 효과가 남아 있으면 새로 건다

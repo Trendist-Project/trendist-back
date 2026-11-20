@@ -15,12 +15,23 @@ public final class MonsterDefs {
 
     public static final String ELDER_TURTLE = "elder_turtle";
     public static final String MOON_RABBIT = "moon_rabbit";
+    public static final String DEEP_OCTOPUS = "deep_octopus";
+    public static final String ELECTRIC_EEL = "electric_eel";
+    public static final String PUFFER_KING = "puffer_king";
+    public static final String GREAT_SHARK = "great_shark";
+    public static final String GREAT_WHALE = "great_whale";
+
 
     /** 정기 등장은 처음에는 꺼 둔다(운영자가 [정기 등장]을 켜야 한다). 매시 같은 시각(같은 주기·오프셋)에 나오는 켜진 보스 중 하나가 무작위로 나온다(`spawn_weight` 비중) */
     public static List<Type> types() {
         return List.of(
             new Type(ELDER_TURTLE, "장로 거북이", "Elder Turtle", "BOSS", "ELDER_TURTLE", "elder-turtle", false, elderTurtle()),
-            new Type(MOON_RABBIT, "달토끼", "Moon Rabbit", "BOSS", "MOON_RABBIT", "moon-rabbit", false, moonRabbit()));
+            new Type(MOON_RABBIT, "달토끼", "Moon Rabbit", "BOSS", "MOON_RABBIT", "moon-rabbit", false, moonRabbit()),
+            new Type(ELECTRIC_EEL, "전기뱀장어", "Electric Eel", "BOSS", "ELECTRIC_EEL", "electric-eel", false, electricEel()),
+            new Type(DEEP_OCTOPUS, "심해 문어", "Abyssal Octopus", "BOSS", "DEEP_OCTOPUS", "deep-octopus", false, deepOctopus()),
+            new Type(PUFFER_KING, "복어 대왕", "Puffer King", "BOSS", "PUFFER_KING", "puffer-king", false, pufferKing()),
+            new Type(GREAT_SHARK, "대형 상어", "Great Shark", "BOSS", "GREAT_SHARK", "great-shark", false, greatShark()),
+            new Type(GREAT_WHALE, "대왕 고래", "Great Whale", "BOSS", "GREAT_WHALE", "great-whale", false, greatWhale()));
     }
 
     private static List<Def> elderTurtle() {
@@ -178,5 +189,182 @@ public final class MonsterDefs {
         d.add(new Def("carrot_radius_px", 45, 5, 1000, "당근 하나의 맞는 범위 반지름", "px", "당근 부채"));
         d.add(new Def("carrot_hp_percent", 6, 0, 100, "당근에 맞으면 잃는 체력(최대 체력의 %, 한 번 쏜 묶음에서 한 사람에게 한 번). 분노 중에는 rage_damage_mult배", "%", "당근 부채"));
         return d;
+    }
+
+    // ================================================================ 바다 보스 다섯 마리(229판)
+
+    /** 짧게 쓰는 설정 한 줄 */
+    private static Def d(String name, double value, double min, double max, String desc, String unit, String group) { return new Def(name, value, min, max, desc, unit, group); }
+
+    /** 이미 만든 목록에서 설정 하나의 기본값을 바꾼다(보스마다 다른 값) */
+    private static void set(List<Def> list, String name, double value) {
+        for (int i = 0; i < list.size(); i++) {
+            Def x = list.get(i);
+            if (x.name().equals(name)) { list.set(i, new Def(x.name(), value, x.min(), x.max(), x.description(), x.unit(), x.group())); return; }
+        }
+        throw new IllegalArgumentException("no setting " + name);
+    }
+
+    /** 패턴 공통 네 가지(`<id>_enabled`·`_weight`·`_cooldown`·`_windup`, 그룹 = 패턴 이름) */
+    private static List<Def> pattern(String group, String id, String label, double cooldown, double windup, String windupDesc) {
+        List<Def> l = new ArrayList<>();
+        l.add(d(id + "_enabled", 1, 0, 1, label + " 사용(1이면 씀, 0이면 이 패턴을 쓰지 않는다)", null, group));
+        l.add(d(id + "_weight", 1, 0, 100, label + " 선택 가중치(0이면 쓰지 않음)", null, group));
+        l.add(d(id + "_cooldown", cooldown, 0, 600, label + " 쿨타임(쓴 때부터)", "초", group));
+        l.add(d(id + "_windup", windup, 0.2, 10, label + " 예고 시간(" + windupDesc + ")", "초", group));
+        return l;
+    }
+
+    /** 몸·이동(바다 보스 공통): 접촉 피해와 돌아다니기 */
+    private static List<Def> bodyDefs() {
+        List<Def> l = new ArrayList<>();
+        l.add(d("contact_hp_percent", 5, 0, 100, "보스 몸에 부딪힐 때마다(hit_interval_seconds 간격) 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "몸·이동"));
+        l.add(d("wander_speed_ratio", 0.5, 0.05, 1, "쫓을 사람이 없을 때 돌아다니는 속도: 이동 속도의 몇 배인지", "배", "몸·이동"));
+        l.add(d("wander_pause_seconds", 2, 0, 30, "돌아다니다 도착하면 쉬는 시간(실제로는 절반~1.5배 사이로 흔들린다)", "초", "몸·이동"));
+        return l;
+    }
+
+    private static List<Def> sea(double radius, double speed, double hits, List<List<Def>> patterns) {
+        List<Def> l = commonDefs(radius);
+        set(l, "speed_ratio", speed);
+        set(l, "hp_hits_per_player", hits);
+        for (List<Def> p : patterns) l.addAll(p);
+        l.addAll(bodyDefs());
+        l.addAll(rewardDefs());
+        return l;
+    }
+
+    /** 심해 문어 */
+    private static List<Def> deepOctopus() {
+        List<Def> sweep = pattern("촉수 휘두르기", "sweep", "촉수 휘두르기", 16, 1.5, "촉수가 쓸고 갈 부채꼴이 붉게 보인다");
+        sweep.add(d("sweep_lock_seconds", 0.4, 0, 5, "예고 마지막 이 시간 동안은 방향을 고정한다", "초", "촉수 휘두르기"));
+        sweep.add(d("sweep_arms", 3, 1, 8, "촉수 수", "개", "촉수 휘두르기"));
+        sweep.add(d("sweep_rage_arms", 4, 1, 8, "분노 중 촉수 수", "개", "촉수 휘두르기"));
+        sweep.add(d("sweep_angle_deg", 60, 5, 360, "한 번 휘두를 때 촉수가 도는 각도(이 호가 위험 구역이고 호 사이는 빈 곳)", "도", "촉수 휘두르기"));
+        sweep.add(d("sweep_seconds", 2.5, 0.2, 10, "촉수가 도는 시간", "초", "촉수 휘두르기"));
+        sweep.add(d("sweep_range_px", 1800, 100, 20000, "촉수 길이(몸 중심에서 잰다)", "px", "촉수 휘두르기"));
+        sweep.add(d("sweep_width_px", 240, 20, 3000, "촉수 폭", "px", "촉수 휘두르기"));
+        sweep.add(d("sweep_hp_percent", 8, 0, 100, "촉수에 맞으면 잃는 체력(최대 체력의 %, 한 번 휘두르는 동안 한 번). 분노 중에는 rage_damage_mult배", "%", "촉수 휘두르기"));
+        sweep.add(d("sweep_knock_px", 600, 0, 10000, "촉수에 맞은 사람이 튕기는 거리", "px", "촉수 휘두르기"));
+        List<Def> ink = pattern("먹물", "ink", "먹물", 20, 1.5, "떨어질 자리마다 점선 원이 뜬다");
+        ink.add(d("ink_count", 3, 1, 20, "한 번에 던지는 먹물 장판 수(공격 대상 자리에 먼저, 다음은 다른 사람 자리, 남으면 대상 둘레)", "개", "먹물"));
+        ink.add(d("ink_rage_count", 5, 0, 20, "분노 중 먹물 장판 수(0이면 그대로)", "개", "먹물"));
+        ink.add(d("ink_radius_px", 380, 30, 3000, "먹물 장판 반지름", "px", "먹물"));
+        ink.add(d("ink_lock_seconds", 0.5, 0, 5, "예고 마지막 이 시간 동안은 자리를 고정한다(그 전에는 대상을 따라간다)", "초", "먹물"));
+        ink.add(d("ink_scatter", 1.2, 0, 10, "남는 먹물을 공격 대상에서 떨어뜨리는 거리: 반지름의 몇 배인지", "배", "먹물"));
+        ink.add(d("ink_seconds", 8, 1, 120, "먹물 장판이 바닥에 남는 시간", "초", "먹물"));
+        ink.add(d("ink_blind_seconds", 2, 0.2, 30, "장판에 닿은 사람이 암흑(시야가 자기 원 둘레로 좁아짐)에 걸리는 시간(서 있는 동안 계속 이어지고 벗어나면 이 시간 뒤 풀린다). 피해는 없다", "초", "먹물"));
+        List<Def> pull = pattern("빨판 끌기", "pull", "빨판 끌기", 30, 2, "몸이 움츠러든다");
+        pull.add(d("pull_range_px", 2400, 100, 30000, "끌어당기는 범위(몸 중심에서 잰다)", "px", "빨판 끌기"));
+        pull.add(d("pull_seconds", 1.5, 0.2, 10, "끌어당기는 시간", "초", "빨판 끌기"));
+        pull.add(d("pull_speed", 600, 50, 10000, "끌려오는 속도(사람 최대 속도보다 빠르면 걸어서는 못 벗어난다)", "px/초", "빨판 끌기"));
+        pull.add(d("pull_contact_px", 300, 0, 5000, "끌기가 끝날 때 몸 가장자리에서 이 거리 안으로 끌려온 사람이 맞는다", "px", "빨판 끌기"));
+        pull.add(d("pull_hp_percent", 10, 0, 100, "끌려와서 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "빨판 끌기"));
+        pull.add(d("pull_knock_px", 500, 0, 10000, "끌기 끝에 맞은 사람이 튕기는 거리", "px", "빨판 끌기"));
+        pull.add(d("pull_stun_seconds", 2, 0, 10, "끌기가 끝난 뒤 무방비로 서 있는 시간(모여 있는 사람들이 때릴 틈)", "초", "빨판 끌기"));
+        return sea(900, 0.9, 60, List.of(sweep, ink, pull));
+    }
+
+    /** 전기뱀장어 */
+    private static List<Def> electricEel() {
+        List<Def> lane = pattern("번개 줄기", "lane", "번개 줄기", 14, 1.5, "대상을 지나는 가로 띠가 노랗게 깜빡인다");
+        lane.add(d("lane_lock_seconds", 0.4, 0, 5, "예고 마지막 이 시간 동안은 띠를 고정한다", "초", "번개 줄기"));
+        lane.add(d("lane_count", 3, 1, 12, "띠 수", "줄", "번개 줄기"));
+        lane.add(d("lane_rage_count", 5, 1, 12, "분노 중 띠 수", "줄", "번개 줄기"));
+        lane.add(d("lane_width_px", 300, 20, 5000, "띠 폭", "px", "번개 줄기"));
+        lane.add(d("lane_gap_px", 700, 50, 10000, "띠 사이 간격(가운데에서 가운데)", "px", "번개 줄기"));
+        lane.add(d("lane_hp_percent", 10, 0, 100, "띠에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "번개 줄기"));
+        lane.add(d("lane_stun_seconds", 0.8, 0, 10, "띠에 맞은 사람이 기절하는 시간", "초", "번개 줄기"));
+        List<Def> chain = pattern("감전 연쇄", "chain", "감전 연쇄", 18, 2, "공격 대상 머리 위에 번개 표식이 뜬다");
+        chain.add(d("chain_lock_seconds", 0.5, 0, 5, "예고 마지막 이 시간 동안은 표식 자리를 고정한다", "초", "감전 연쇄"));
+        chain.add(d("chain_range_px", 800, 50, 10000, "번개가 튀는 거리(서로 이 거리보다 멀면 이어지지 않는다)", "px", "감전 연쇄"));
+        chain.add(d("chain_max", 4, 1, 30, "번개에 맞는 최대 사람 수(표식 대상 포함)", "명", "감전 연쇄"));
+        chain.add(d("chain_rage_max", 6, 1, 30, "분노 중 번개에 맞는 최대 사람 수", "명", "감전 연쇄"));
+        chain.add(d("chain_hp_percent", 8, 0, 100, "번개에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "감전 연쇄"));
+        List<Def> storm = pattern("번개 폭풍", "storm", "번개 폭풍", 22, 1, "보스가 멈춰 전기를 모은다");
+        storm.add(d("storm_count", 8, 1, 60, "번개가 떨어지는 곳 수", "곳", "번개 폭풍"));
+        storm.add(d("storm_rage_count", 12, 1, 60, "분노 중 번개가 떨어지는 곳 수", "곳", "번개 폭풍"));
+        storm.add(d("storm_interval", 0.25, 0.05, 5, "번개를 하나씩 표시하는 간격", "초", "번개 폭풍"));
+        storm.add(d("storm_warn_seconds", 1, 0.2, 5, "표시된 뒤 번개가 떨어지기까지(피할 시간)", "초", "번개 폭풍"));
+        storm.add(d("storm_radius_px", 260, 30, 3000, "번개 하나의 맞는 범위 반지름", "px", "번개 폭풍"));
+        storm.add(d("storm_hp_percent", 7, 0, 100, "번개에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "번개 폭풍"));
+        return sea(700, 1.3, 60, List.of(lane, chain, storm));
+    }
+
+    /** 복어 대왕 */
+    private static List<Def> pufferKing() {
+        List<Def> inflate = pattern("부풀기", "inflate", "부풀기", 24, 2, "몸이 풍선처럼 부풀고 판정 범위가 점선 원으로 보인다");
+        inflate.add(d("inflate_radius_px", 2200, 100, 30000, "터질 때 맞는 범위 반지름(몸 중심에서 잰다)", "px", "부풀기"));
+        inflate.add(d("inflate_hp_percent", 14, 0, 100, "터지는 가시에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "부풀기"));
+        inflate.add(d("inflate_knock_px", 1500, 0, 20000, "맞은 사람이 튕기는 거리", "px", "부풀기"));
+        inflate.add(d("inflate_stun_seconds", 2, 0, 10, "터진 뒤 쪼그라들어 무방비로 서 있는 시간(딜 타임)", "초", "부풀기"));
+        inflate.add(d("inflate_rage_count", 2, 1, 5, "분노 중 연달아 터지는 횟수(마지막만 전체 크기)", "회", "부풀기"));
+        inflate.add(d("inflate_small_ratio", 0.6, 0.1, 1, "분노 중 앞선 부풀기의 범위: 전체 크기의 몇 배인지", "배", "부풀기"));
+        inflate.add(d("inflate_chain_windup", 0.8, 0.2, 5, "연달아 터질 때 다음 부풀기를 예고하는 시간", "초", "부풀기"));
+        List<Def> spike = pattern("가시 발사", "spike", "가시 발사", 15, 1.2, "몸에서 방사형 가이드 선이 비친다");
+        spike.add(d("spike_count", 16, 4, 64, "한 묶음의 가시 수(각도가 고르게 퍼진다). 분노하면 반 칸 어긋난 묶음이 한 번 더 나간다", "발", "가시 발사"));
+        spike.add(d("spike_gap_seconds", 0.5, 0.1, 5, "분노 중 두 번째 묶음이 나가기까지의 간격", "초", "가시 발사"));
+        spike.add(d("spike_speed", 1500, 100, 20000, "가시가 날아가는 속도", "px/초", "가시 발사"));
+        spike.add(d("spike_range_px", 3000, 100, 100000, "가시가 날아가는 거리", "px", "가시 발사"));
+        spike.add(d("spike_radius_px", 50, 5, 1000, "가시 하나의 맞는 범위 반지름", "px", "가시 발사"));
+        spike.add(d("spike_hp_percent", 5, 0, 100, "가시에 맞으면 잃는 체력(최대 체력의 %, 한 묶음에서 한 사람에게 한 번). 분노 중에는 rage_damage_mult배", "%", "가시 발사"));
+        spike.add(d("spike_poison_seconds", 4, 0, 60, "가시에 맞으면 독에 걸리는 시간(0이면 독 없음). 정화 스킬로 풀 수 있다", "초", "가시 발사"));
+        spike.add(d("spike_poison_percent", 1.5, 0, 100, "독이 1초마다 깎는 체력(최대 체력의 %). 체력만 닳고 키워드는 잃지 않는다", "%", "가시 발사"));
+        List<Def> bubble = pattern("거품 추적", "bubble", "거품 추적", 20, 1, "보스가 숨을 들이쉰다");
+        bubble.add(d("bubble_count", 5, 1, 30, "거품 수(서로 다른 사람을 하나씩 따라간다)", "개", "거품 추적"));
+        bubble.add(d("bubble_speed", 280, 20, 5000, "거품이 쫓아가는 속도", "px/초", "거품 추적"));
+        bubble.add(d("bubble_seconds", 6, 1, 60, "거품이 닿지 않아도 터지는 시간", "초", "거품 추적"));
+        bubble.add(d("bubble_radius_px", 320, 30, 5000, "거품이 터질 때 맞는 범위 반지름", "px", "거품 추적"));
+        bubble.add(d("bubble_hp_percent", 6, 0, 100, "터지는 거품에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "거품 추적"));
+        return sea(600, 1.1, 60, List.of(inflate, spike, bubble));
+    }
+
+    /** 대형 상어 */
+    private static List<Def> greatShark() {
+        List<Def> hunt = pattern("사냥 돌진", "hunt", "사냥 돌진", 22, 1.2, "체력이 가장 낮은 사람에게 붉은 길이 이어진다");
+        hunt.add(d("hunt_lock_seconds", 0.3, 0, 5, "예고 마지막 이 시간 동안은 방향을 고정한다", "초", "사냥 돌진"));
+        hunt.add(d("hunt_speed_mult", 2.2, 1, 10, "돌진 속도: 보스 기본 속도의 몇 배", "배", "사냥 돌진"));
+        hunt.add(d("hunt_seconds", 1, 0.2, 10, "돌진 한 번이 이어지는 시간", "초", "사냥 돌진"));
+        hunt.add(d("hunt_count", 3, 1, 10, "연달아 돌진하는 횟수(돌진마다 표식 대상 쪽으로 다시 겨눈다)", "회", "사냥 돌진"));
+        hunt.add(d("hunt_rage_count", 5, 1, 10, "분노 중 연달아 돌진하는 횟수", "회", "사냥 돌진"));
+        hunt.add(d("hunt_gap_seconds", 0.4, 0, 5, "돌진과 돌진 사이 멈추는 시간(다음 길이 잠깐 보인다)", "초", "사냥 돌진"));
+        hunt.add(d("hunt_hp_percent", 10, 0, 100, "돌진에 맞으면 잃는 체력(최대 체력의 %, 한 번의 돌진에 한 번). 분노 중에는 rage_damage_mult배", "%", "사냥 돌진"));
+        List<Def> ambush = pattern("급습", "ambush", "급습", 26, 0.8, "보스가 물속으로 잠기려 한다");
+        ambush.add(d("ambush_dive_seconds", 3, 0.5, 20, "물속에서 사람 둘레를 쫓는 시간(떠 있는 동안은 몸 판정이 없다)", "초", "급습"));
+        ambush.add(d("ambush_lock_seconds", 0.6, 0.1, 5, "물기 직전 점선 원이 뜨고 자리가 고정되는 시간(그 사이에 피할 수 있다)", "초", "급습"));
+        ambush.add(d("ambush_speed_mult", 1.6, 0.5, 10, "잠수 중 쫓는 속도: 보스 기본 속도의 몇 배", "배", "급습"));
+        ambush.add(d("ambush_radius_px", 450, 50, 5000, "무는 범위(점선 원) 반지름", "px", "급습"));
+        ambush.add(d("ambush_hp_percent", 15, 0, 100, "물리면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "급습"));
+        ambush.add(d("ambush_knock_px", 1200, 0, 20000, "물린 사람이 튕기는 거리", "px", "급습"));
+        ambush.add(d("ambush_stun_seconds", 2, 0, 10, "문 뒤 무방비로 서 있는 시간(딜 타임)", "초", "급습"));
+        ambush.add(d("ambush_rage_count", 2, 1, 5, "분노 중 연달아 무는 횟수(두 번째부터 잠수는 절반)", "회", "급습"));
+        List<Def> tail = pattern("꼬리 치기", "tail", "꼬리 치기", 16, 1, "보스 뒤쪽 반원이 붉게 표시된다");
+        tail.add(d("tail_range_px", 1500, 100, 20000, "꼬리가 닿는 거리(몸 중심에서 잰다)", "px", "꼬리 치기"));
+        tail.add(d("tail_hp_percent", 9, 0, 100, "꼬리에 맞으면 잃는 체력(최대 체력의 %). 분노하면 전방위. 분노 중에는 rage_damage_mult배", "%", "꼬리 치기"));
+        tail.add(d("tail_knock_px", 1500, 0, 20000, "꼬리에 맞은 사람이 튕기는 거리", "px", "꼬리 치기"));
+        return sea(850, 1.2, 60, List.of(hunt, ambush, tail));
+    }
+
+    /** 대왕 고래 */
+    private static List<Def> greatWhale() {
+        List<Def> spout = pattern("물기둥", "spout", "물기둥", 14, 1.5, "대상 둘레에 점선 원이 뜬다");
+        spout.add(d("spout_lock_seconds", 0.5, 0, 5, "예고 마지막 이 시간 동안은 자리를 고정한다", "초", "물기둥"));
+        spout.add(d("spout_count", 4, 1, 30, "물기둥 수(첫 번째는 대상 바로 그 자리)", "개", "물기둥"));
+        spout.add(d("spout_rage_count", 8, 1, 30, "분노 중 물기둥 수", "개", "물기둥"));
+        spout.add(d("spout_radius_px", 350, 30, 5000, "물기둥 하나의 맞는 범위 반지름", "px", "물기둥"));
+        spout.add(d("spout_hp_percent", 8, 0, 100, "물기둥에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "물기둥"));
+        spout.add(d("spout_knock_px", 1200, 0, 20000, "물기둥에 맞은 사람이 튕기는 거리", "px", "물기둥"));
+        List<Def> wave = pattern("거대 파도", "wave", "거대 파도", 24, 2.5, "몸을 젖히고 대상 쪽에 붉은 띠가 깜빡인다");
+        wave.add(d("wave_lock_seconds", 0.5, 0, 5, "예고 마지막 이 시간 동안은 방향을 고정한다", "초", "거대 파도"));
+        wave.add(d("wave_width_px", 1800, 100, 20000, "파도 띠 폭", "px", "거대 파도"));
+        wave.add(d("wave_speed", 1400, 100, 20000, "파도 앞면이 전진하는 속도", "px/초", "거대 파도"));
+        wave.add(d("wave_band_px", 500, 50, 5000, "파도 앞면의 두께(앞면이 이 두께만큼 지나는 동안 닿으면 맞는다)", "px", "거대 파도"));
+        wave.add(d("wave_hp_percent", 10, 0, 100, "파도에 맞으면 잃는 체력(최대 체력의 %). 분노 중에는 rage_damage_mult배", "%", "거대 파도"));
+        wave.add(d("wave_push_px", 1500, 0, 20000, "파도에 맞은 사람이 파도 방향으로 밀려나는 거리", "px", "거대 파도"));
+        wave.add(d("wave_rage_angle_deg", 25, 0, 90, "분노 중 파도 둘이 대상 방향에서 벌어지는 각도(±)", "도", "거대 파도"));
+        List<Def> song = pattern("고래의 노래", "song", "고래의 노래", 28, 2, "동심원 파동이 퍼진다");
+        song.add(d("song_radius_px", 1800, 100, 30000, "노래가 닿는 범위 반지름(몸 중심에서 잰다)", "px", "고래의 노래"));
+        song.add(d("song_confuse_seconds", 3, 0.5, 30, "범위 안의 사람이 혼란(방향 키 반대)에 걸리는 시간. 피해는 없다", "초", "고래의 노래"));
+        return sea(1300, 0.6, 90, List.of(spout, wave, song));
     }
 }
